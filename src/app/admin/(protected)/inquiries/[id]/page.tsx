@@ -1,17 +1,19 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Database, Mail, MessageSquare, Phone, Save } from "lucide-react";
+import { ArrowLeft, CalendarClock, Database, Mail, MessageSquare, NotebookPen, Phone, Save } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
 import { isDatabaseConfigured } from "@/lib/db";
 import { getEntityAuditLogs } from "@/lib/repositories/audit-logs";
-import { getAdminInquiry, getAssignableAdminUsers } from "@/lib/repositories/inquiries";
-import { updateInquiryFollowUpAction } from "../actions";
+import { getAdminInquiry, getAdminInquiryNotes, getAssignableAdminUsers } from "@/lib/repositories/inquiries";
+import { createInquiryNoteAction, updateInquiryFollowUpAction } from "../actions";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +23,7 @@ export const metadata: Metadata = {
 };
 
 const statuses = ["NEW", "QUALIFIED", "IN_PROGRESS", "WON", "LOST", "SPAM"] as const;
+const noteKinds = ["GENERAL", "CALL", "EMAIL", "WHATSAPP", "QUOTE", "SAMPLE", "MEETING", "OTHER"] as const;
 const statusLabel: Record<(typeof statuses)[number], string> = {
   NEW: "新询盘",
   QUALIFIED: "已确认",
@@ -28,6 +31,16 @@ const statusLabel: Record<(typeof statuses)[number], string> = {
   WON: "已成交",
   LOST: "已丢单",
   SPAM: "垃圾询盘",
+};
+const noteKindLabel: Record<(typeof noteKinds)[number], string> = {
+  GENERAL: "普通记录",
+  CALL: "电话",
+  EMAIL: "邮件",
+  WHATSAPP: "WhatsApp",
+  QUOTE: "报价",
+  SAMPLE: "样品",
+  MEETING: "会议",
+  OTHER: "其他",
 };
 
 const statusColor: Record<string, string> = {
@@ -51,6 +64,7 @@ const actionLabel = (action: string) => {
     "inquiry.created": "询盘已创建",
     "inquiry.rate_limited": "触发限流",
     "inquiry.follow_up_updated": "跟进信息已更新",
+    "inquiry.note_created": "新增跟进记录",
   };
   return labels[action] || action.replace(/^inquiry\./, "").replaceAll("_", " ");
 };
@@ -75,6 +89,7 @@ export default async function AdminInquiryDetailPage({
 
   const databaseReady = isDatabaseConfigured();
   const assignees = await getAssignableAdminUsers();
+  const notes = await getAdminInquiryNotes(inquiry.id);
   const auditLogs = await getEntityAuditLogs("Inquiry", inquiry.id);
 
   return (
@@ -104,18 +119,18 @@ export default async function AdminInquiryDetailPage({
       {feedback.saved && (
         <Alert className="mt-7 border-emerald-500/30 bg-emerald-500/8 text-emerald-100">
           <Save className="size-4" />
-          <AlertTitle>询盘状态已保存</AlertTitle>
+          <AlertTitle>{feedback.saved === "note" ? "跟进记录已保存" : "询盘状态已保存"}</AlertTitle>
           <AlertDescription className="text-emerald-100/65">
-            后台列表和总览统计已刷新。
+            {feedback.saved === "note" ? "该记录已写入询盘时间线和审计日志。" : "后台列表和总览统计已刷新。"}
           </AlertDescription>
         </Alert>
       )}
       {feedback.error && (
         <Alert className="mt-7 border-amber-500/30 bg-amber-500/8 text-amber-100">
           <Database className="size-4" />
-          <AlertTitle>状态未保存</AlertTitle>
+          <AlertTitle>{feedback.error === "note" ? "跟进记录未保存" : "状态未保存"}</AlertTitle>
           <AlertDescription className="text-amber-100/65">
-            {feedback.error === "database" ? "请先连接 PostgreSQL，再更新询盘状态。" : "请选择有效状态。"}
+            {feedback.error === "database" ? "请先连接 PostgreSQL，再更新询盘。" : feedback.error === "note" ? "请检查跟进内容和下次跟进时间。" : "请选择有效状态。"}
           </AlertDescription>
         </Alert>
       )}
@@ -244,6 +259,101 @@ export default async function AdminInquiryDetailPage({
           </div>
         </CardContent>
       </Card>
+
+      <div className="mt-6 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
+        <Card className="border-white/10 bg-[#1a1e1a] text-white shadow-none">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <NotebookPen className="size-5 text-[#d56a5d]" />
+              新增跟进记录
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form action={createInquiryNoteAction} className="space-y-5">
+              <input type="hidden" name="inquiryId" value={inquiry.id} />
+              <div className="space-y-2">
+                <Label htmlFor="kind">跟进类型</Label>
+                <select
+                  id="kind"
+                  name="kind"
+                  defaultValue="GENERAL"
+                  disabled={!databaseReady}
+                  className="h-9 w-full rounded-lg border border-white/10 bg-black/20 px-3 text-sm disabled:opacity-60"
+                >
+                  {noteKinds.map((kind) => (
+                    <option key={kind} value={kind}>
+                      {noteKindLabel[kind]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="body">跟进内容</Label>
+                <Textarea
+                  id="body"
+                  name="body"
+                  minLength={2}
+                  maxLength={2000}
+                  required
+                  disabled={!databaseReady}
+                  placeholder="例如：已通过 WhatsApp 联系客户，客户需要 4mm SPC 报价和样品寄送方案。"
+                  className="min-h-32 border-white/10 bg-black/20 placeholder:text-white/25 disabled:opacity-60"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="nextFollowUpAt">下次跟进时间（可选）</Label>
+                <Input
+                  id="nextFollowUpAt"
+                  name="nextFollowUpAt"
+                  type="datetime-local"
+                  disabled={!databaseReady}
+                  className="border-white/10 bg-black/20 disabled:opacity-60"
+                />
+              </div>
+              <Button type="submit" disabled={!databaseReady} className="bg-[#a63429] hover:bg-[#8d2b23]">
+                <Save />
+                保存记录
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <Card className="border-white/10 bg-[#1a1e1a] text-white shadow-none">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CalendarClock className="size-5 text-[#d56a5d]" />
+              跟进时间线
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {notes.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-white/10 px-5 py-8 text-sm text-white/40">
+                还没有跟进记录。保存第一条记录后，这里会显示完整沟通历史。
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {notes.map((note) => (
+                  <div key={note.id} className="rounded-xl border border-white/10 bg-black/15 p-4">
+                    <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-start">
+                      <div>
+                        <Badge variant="outline" className="border-white/15 text-white/65">
+                          {noteKindLabel[note.kind]}
+                        </Badge>
+                        <p className="mt-3 whitespace-pre-wrap leading-6 text-white/75">{note.body}</p>
+                      </div>
+                      <p className="shrink-0 text-sm text-white/40">{formatDate(note.createdAt)}</p>
+                    </div>
+                    <div className="mt-4 flex flex-col gap-2 border-t border-white/10 pt-3 text-sm text-white/40 sm:flex-row sm:items-center sm:justify-between">
+                      <span>{note.author ? `${note.author.name} · ${note.author.email}` : "系统"}</span>
+                      {note.nextFollowUpAt && <span>下次跟进：{formatDate(note.nextFollowUpAt)}</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       <Card className="mt-6 border-white/10 bg-[#1a1e1a] text-white shadow-none">
         <CardHeader>

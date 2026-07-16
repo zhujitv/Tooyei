@@ -9,12 +9,12 @@
 - Static generation and one-hour ISR-ready product pages
 - Canonical, hreflang, x-default, sitemap and robots generation
 - Local copies of first-party migration images
-- Prisma 7 schema for products, translations, articles, FAQs, inquiries, media, redirects and audit logs
+- Prisma 7 schema for products, translations, articles, FAQs, inquiries, inquiry notes, media, redirects and audit logs
 - Database-first content repository with a build-safe sample fallback until `DATABASE_URL` is configured
 - Signed, HTTP-only admin sessions with server-side protection for every `/admin/*` management route
 - Content operations dashboard at `/admin/content`
 - Product translation and publishing workflow at `/admin/products`, with an explicit read-only fallback until PostgreSQL is configured
-- Inquiry capture workflow with product-aware public forms, rate limiting, audit logs, admin search/filtering, owner assignment and optional Resend email notification
+- Inquiry capture workflow with product-aware public forms, rate limiting, audit logs, admin search/filtering, owner assignment, follow-up notes, timeline history and optional Resend email notification
 
 ## Content boundary
 
@@ -38,6 +38,6 @@ without changing the content repository or editor pages.
 1. Provision PostgreSQL, deploy the initial migration and seed the five verified samples.
 2. Connect the existing product editor to the provisioned database and verify publish-to-public-page revalidation.
 3. Import the full product and article catalogue.
-4. Add richer sales pipeline reporting and admin user management.
+4. Add richer sales pipeline reporting, CSV export and admin user management.
 5. Replace preview credentials with managed production identity, roles and account recovery.
 6. Generate and verify the complete legacy redirect map.

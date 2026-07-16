@@ -32,6 +32,8 @@ Inquiry email notifications are optional. To enable them in production, set
 they are missing, inquiries are still saved and visible in the admin panel.
 Public inquiry submissions are rate-limited by IP and email with
 `INQUIRY_IP_LIMIT_PER_HOUR` and `INQUIRY_EMAIL_LIMIT_PER_HOUR`.
+The admin inquiry detail page supports sales follow-up notes, note types and
+optional next follow-up dates for timeline-based tracking.
 
 ## Quality checks
 

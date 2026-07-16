@@ -70,6 +70,17 @@ enum InquiryStatus {
   SPAM
 }
 
+enum InquiryNoteKind {
+  GENERAL
+  CALL
+  EMAIL
+  WHATSAPP
+  QUOTE
+  SAMPLE
+  MEETING
+  OTHER
+}
+
 enum AdminRole {
   OWNER
   EDITOR
@@ -302,6 +313,7 @@ model Inquiry {
   assignedToId    String?
   assignedTo      AdminUser?      @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
   products        InquiryProduct[]
+  notes           InquiryNote[]
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
 
@@ -317,6 +329,23 @@ model InquiryProduct {
   product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
 
   @@id([inquiryId, productId])
+}
+
+model InquiryNote {
+  id             String          @id @default(cuid())
+  inquiryId      String
+  inquiry        Inquiry         @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+  authorId       String?
+  author         AdminUser?      @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  kind           InquiryNoteKind @default(GENERAL)
+  body           String
+  nextFollowUpAt DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@index([inquiryId, createdAt])
+  @@index([authorId, createdAt])
+  @@index([nextFollowUpAt])
 }
 
 model Redirect {
@@ -350,6 +379,7 @@ model AdminUser {
   role         AdminRole      @default(EDITOR)
   active       Boolean        @default(true)
   inquiries    Inquiry[]
+  inquiryNotes InquiryNote[]
   sessions     AdminSession[]
   auditLogs    AuditLog[]
   createdAt    DateTime       @default(now())

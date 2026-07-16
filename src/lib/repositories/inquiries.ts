@@ -1,5 +1,6 @@
 import {
   AdminRole,
+  InquiryNoteKind,
   InquiryStatus,
   Locale as DatabaseLocale,
   Prisma,
@@ -62,6 +63,27 @@ export type AdminInquiryDetail = AdminInquirySummary & {
   locale: DatabaseLocale;
   sourcePath: string | null;
   updatedAt: Date;
+};
+
+export type AdminInquiryNote = {
+  id: string;
+  kind: InquiryNoteKind;
+  body: string;
+  nextFollowUpAt: Date | null;
+  createdAt: Date;
+  author: {
+    id: string;
+    name: string;
+    email: string;
+  } | null;
+};
+
+export type CreateInquiryNoteInput = {
+  inquiryId: string;
+  actorEmail: string;
+  kind: InquiryNoteKind;
+  body: string;
+  nextFollowUpAt?: Date | null;
 };
 
 export type AssignableAdminUser = {
@@ -222,6 +244,65 @@ export async function getAdminInquiry(id: string): Promise<AdminInquiryDetail | 
   });
 
   return record ? toDetail(record) : null;
+}
+
+export async function getAdminInquiryNotes(inquiryId: string): Promise<AdminInquiryNote[]> {
+  if (!isDatabaseConfigured()) return [];
+
+  return getPrisma().inquiryNote.findMany({
+    where: { inquiryId },
+    orderBy: { createdAt: "desc" },
+    include: {
+      author: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+    },
+  });
+}
+
+export async function createInquiryNote(input: CreateInquiryNoteInput): Promise<AdminInquiryNote> {
+  if (!isDatabaseConfigured()) {
+    throw new Error("DATABASE_URL is required before inquiry notes can be saved.");
+  }
+
+  const prisma = getPrisma();
+  const actor = await prisma.adminUser.findUnique({
+    where: { email: input.actorEmail.trim().toLowerCase() },
+    select: { id: true },
+  });
+
+  return prisma.$transaction(async (tx) => {
+    const note = await tx.inquiryNote.create({
+      data: {
+        inquiryId: input.inquiryId,
+        authorId: actor?.id,
+        kind: input.kind,
+        body: input.body,
+        nextFollowUpAt: input.nextFollowUpAt ?? null,
+      },
+      include: {
+        author: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    await tx.inquiry.update({
+      where: { id: input.inquiryId },
+      data: { updatedAt: new Date() },
+      select: { id: true },
+    });
+
+    return note;
+  });
 }
 
 export async function updateInquiryFollowUp(id: string, status: InquiryStatus, assignedToId?: string | null) {
