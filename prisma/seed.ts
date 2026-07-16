@@ -47,7 +47,7 @@ async function seed() {
       create: {
         pathname: product.image,
         url: product.image,
-        mimeType: "image/png",
+        mimeType: "image/jpeg",
         alt: product.title.en,
       },
     });
