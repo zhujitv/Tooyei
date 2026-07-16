@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.tooyei.com"),
-  title: { default: "Tooyei Flooring Manufacturer", template: "%s | Tooyei" },
-  description: "Factory-direct SPC, WPC, LVT and laminate flooring for wholesale, commercial and OEM projects.",
+  title: { default: "Tooyei 专业地板制造商", template: "%s | Tooyei" },
+  description: "工厂直供 SPC、WPC、LVT 与强化地板，为批发、商业和 OEM 项目提供稳定品质与出口服务。",
   openGraph: { type: "website", siteName: "Tooyei", locale: "en", images: ["/media/hero-flooring.jpg"] },
   twitter: { card: "summary_large_image", images: ["/media/hero-flooring.jpg"] },
 };
@@ -27,7 +27,7 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="en"
+      lang="zh-CN"
       data-scroll-behavior="smooth"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >

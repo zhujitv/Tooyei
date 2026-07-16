@@ -13,7 +13,7 @@ const connectionString = process.env.DATABASE_URL;
 if (!connectionString) throw new Error("DATABASE_URL is required to seed Tooyei content.");
 
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
-const localeMap = { en: Locale.EN, es: Locale.ES, de: Locale.DE } as const;
+const localeMap = { zh: Locale.ZH, en: Locale.EN, es: Locale.ES, de: Locale.DE } as const;
 
 async function seed() {
   for (const product of products) {
@@ -30,11 +30,11 @@ async function seed() {
     for (const locale of Object.keys(localeMap) as (keyof typeof localeMap)[]) {
       await prisma.categoryTranslation.upsert({
         where: { categoryId_locale: { categoryId: category.id, locale: localeMap[locale] } },
-        update: { name: `${product.category} Flooring`, status: TranslationStatus.PUBLISHED },
+        update: { name: locale === "zh" ? `${product.category} 地板` : `${product.category} Flooring`, status: TranslationStatus.PUBLISHED },
         create: {
           categoryId: category.id,
           locale: localeMap[locale],
-          name: `${product.category} Flooring`,
+          name: locale === "zh" ? `${product.category} 地板` : `${product.category} Flooring`,
           status: TranslationStatus.PUBLISHED,
           publishedAt: new Date(),
         },

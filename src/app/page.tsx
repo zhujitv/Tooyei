@@ -1,2 +1,2 @@
 import { HomePage } from "@/components/home-page";
-export default function Page() { return <HomePage locale="en" />; }
+export default function Page() { return <HomePage locale="zh" />; }

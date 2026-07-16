@@ -1,2 +1,2 @@
 import { ContactPage } from "@/components/contact-page";
-export default function Page() { return <ContactPage locale="en"/>; }
+export default function Page() { return <ContactPage locale="zh"/>; }

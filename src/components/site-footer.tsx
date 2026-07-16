@@ -10,7 +10,7 @@ export function SiteFooter({ locale }: { locale: Locale }) {
       <div className="mx-auto grid max-w-7xl gap-12 px-5 py-16 md:grid-cols-[1.4fr_1fr_1fr] lg:px-8">
         <div>
           <p className="text-xl font-bold tracking-[0.18em]">TOOYEI</p>
-          <p className="mt-5 max-w-md text-sm leading-7 text-white/55">{siteConfig.description}</p>
+          <p className="mt-5 max-w-md text-sm leading-7 text-white/55">{locale === "zh" ? "专业生产 SPC、WPC、LVT 与强化地板，为全球批发、工程及 OEM 客户提供稳定产品与出口服务。" : siteConfig.description}</p>
         </div>
         <div className="space-y-3 text-sm">
           <p className="mb-4 font-semibold">{t.products}</p>
@@ -22,7 +22,7 @@ export function SiteFooter({ locale }: { locale: Locale }) {
           <p className="font-semibold text-white">{t.contact}</p>
           <a className="flex items-center gap-3 hover:text-white" href={`mailto:${siteConfig.email}`}><Mail className="size-4" />{siteConfig.email}</a>
           <a className="flex items-center gap-3 hover:text-white" href={siteConfig.whatsapp}><Phone className="size-4" />{siteConfig.phone}</a>
-          <p className="flex items-start gap-3"><MapPin className="mt-0.5 size-4 shrink-0" />Changzhou, Jiangsu, China</p>
+          <p className="flex items-start gap-3"><MapPin className="mt-0.5 size-4 shrink-0" />{locale === "zh" ? t.location : "Changzhou, Jiangsu, China"}</p>
         </div>
       </div>
       <div className="border-t border-white/10 px-5 py-6 text-center text-xs text-white/40">© {new Date().getFullYear()} {siteConfig.legalName}</div>

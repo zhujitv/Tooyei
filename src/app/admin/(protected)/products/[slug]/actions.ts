@@ -8,13 +8,13 @@ import { requireAdminSession } from "@/lib/admin-auth";
 import { getPrisma, isDatabaseConfigured } from "@/lib/db";
 
 const translationSchema = z.object({
-  locale: z.enum(["en", "es", "de"]),
+  locale: z.enum(["zh", "en", "es", "de"]),
   title: z.string().trim().min(3).max(180),
   summary: z.string().trim().min(20).max(800),
   status: z.enum(["MISSING", "MACHINE_DRAFT", "NEEDS_REVIEW", "PUBLISHED"]),
 });
 
-const localeMap = { en: Locale.EN, es: Locale.ES, de: Locale.DE } as const;
+const localeMap = { zh: Locale.ZH, en: Locale.EN, es: Locale.ES, de: Locale.DE } as const;
 
 export async function updateProductTranslationAction(slug: string, formData: FormData) {
   await requireAdminSession();
@@ -39,7 +39,7 @@ export async function updateProductTranslationAction(slug: string, formData: For
 
   revalidatePath("/products");
   revalidatePath(`/products/${slug}`);
-  revalidatePath(`/${parsed.data.locale}/products/${slug}`);
+  revalidatePath(parsed.data.locale === "zh" ? `/products/${slug}` : `/${parsed.data.locale}/products/${slug}`);
   revalidatePath("/admin/content");
   revalidatePath("/admin/products");
   redirect(`/admin/products/${slug}?saved=${parsed.data.locale}`);

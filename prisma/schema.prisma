@@ -8,6 +8,7 @@ datasource db {
 }
 
 enum Locale {
+  ZH
   EN
   ES
   DE

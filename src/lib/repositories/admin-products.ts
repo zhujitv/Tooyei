@@ -29,6 +29,7 @@ export type AdminEditableProduct = {
 };
 
 const localeMap: Record<Locale, DatabaseLocale> = {
+  zh: DatabaseLocale.ZH,
   en: DatabaseLocale.EN,
   es: DatabaseLocale.ES,
   de: DatabaseLocale.DE,
@@ -56,8 +57,8 @@ export async function getAdminProducts(): Promise<AdminProductSummary[]> {
       slug: product.slug,
       sku: product.sku,
       category: product.category,
-      title: product.title.en,
-      translationStates: { en: "PUBLISHED", es: "PUBLISHED", de: "PUBLISHED" },
+      title: product.title.zh,
+      translationStates: { zh: "PUBLISHED", en: "PUBLISHED", es: "PUBLISHED", de: "PUBLISHED" },
     }));
   }
 
@@ -73,7 +74,7 @@ export async function getAdminProducts(): Promise<AdminProductSummary[]> {
       slug: product.slug,
       sku: product.sku,
       category: product.kind,
-      title: translationFor("en")?.title ?? product.sku,
+      title: translationFor("zh")?.title ?? translationFor("en")?.title ?? product.sku,
       translationStates: Object.fromEntries(
         locales.map((locale) => [locale, translationFor(locale)?.status ?? TranslationStatus.MISSING]),
       ) as Record<Locale, string>,

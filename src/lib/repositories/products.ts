@@ -24,6 +24,7 @@ const productInclude = {
 type DatabaseProduct = Prisma.ProductGetPayload<{ include: typeof productInclude }>;
 
 const databaseLocale: Record<Locale, DatabaseLocale> = {
+  zh: DatabaseLocale.ZH,
   en: DatabaseLocale.EN,
   es: DatabaseLocale.ES,
   de: DatabaseLocale.DE,
@@ -33,8 +34,9 @@ const localizedText = <T extends { locale: DatabaseLocale }>(
   translations: T[],
   read: (translation: T) => string,
 ): LocalizedText => {
+  const chinese = translations.find(({ locale }) => locale === DatabaseLocale.ZH);
   const english = translations.find(({ locale }) => locale === DatabaseLocale.EN);
-  const fallback = english ? read(english) : "";
+  const fallback = chinese ? read(chinese) : english ? read(english) : "";
 
   return Object.fromEntries(
     locales.map((locale) => {
@@ -69,7 +71,7 @@ export async function getPublishedProducts(): Promise<Product[]> {
   const records = await getPrisma().product.findMany({
     where: {
       status: ContentStatus.PUBLISHED,
-      translations: { some: { locale: DatabaseLocale.EN, status: TranslationStatus.PUBLISHED } },
+      translations: { some: { locale: DatabaseLocale.ZH, status: TranslationStatus.PUBLISHED } },
     },
     include: productInclude,
     orderBy: [{ featured: "desc" }, { sortOrder: "asc" }, { createdAt: "desc" }],

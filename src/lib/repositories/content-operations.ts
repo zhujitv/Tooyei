@@ -29,6 +29,7 @@ export async function getContentOperationsSummary(): Promise<ContentOperationsSu
       faqs: 0,
       newInquiries: 0,
       translations: [
+        { locale: "zh", published: products.length, review: 0, machineDraft: 0, missing: 0 },
         { locale: "en", published: products.length, review: 0, machineDraft: 0, missing: 0 },
         { locale: "es", published: products.length, review: 0, machineDraft: 0, missing: 0 },
         { locale: "de", published: products.length, review: 0, machineDraft: 0, missing: 0 },
@@ -50,6 +51,7 @@ export async function getContentOperationsSummary(): Promise<ContentOperationsSu
 
   const progressFor = (locale: Locale): LocaleProgress => {
     const databaseLocale = {
+      zh: DatabaseLocale.ZH,
       en: DatabaseLocale.EN,
       es: DatabaseLocale.ES,
       de: DatabaseLocale.DE,
@@ -74,6 +76,6 @@ export async function getContentOperationsSummary(): Promise<ContentOperationsSu
     articles: articleCount,
     faqs: faqCount,
     newInquiries: newInquiryCount,
-    translations: [progressFor("en"), progressFor("es"), progressFor("de")],
+    translations: [progressFor("zh"), progressFor("en"), progressFor("es"), progressFor("de")],
   };
 }

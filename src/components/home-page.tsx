@@ -44,7 +44,7 @@ export async function HomePage({ locale }: { locale: Locale }) {
 
         <section className="mx-auto max-w-7xl px-5 py-24 lg:px-8 lg:py-32">
           <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
-            <div><p className="text-xs font-bold tracking-[0.18em] text-[#a63429]">01 · COLLECTIONS</p><h2 className="mt-4 text-4xl font-semibold tracking-[-0.035em] sm:text-5xl">{t.featured}</h2><p className="mt-5 max-w-2xl text-base leading-7 text-muted-foreground">{t.featuredBody}</p></div>
+            <div><p className="text-xs font-bold tracking-[0.18em] text-[#a63429]">01 · {locale === "zh" ? t.collectionsLabel : "COLLECTIONS"}</p><h2 className="mt-4 text-4xl font-semibold tracking-[-0.035em] sm:text-5xl">{t.featured}</h2><p className="mt-5 max-w-2xl text-base leading-7 text-muted-foreground">{t.featuredBody}</p></div>
             <Button asChild variant="outline"><Link href={localizedPath(locale, "/products")}>{t.viewAll}<ArrowRight /></Link></Button>
           </div>
           <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-3">{products.slice(0, 3).map((product) => <ProductCard key={product.slug} product={product} locale={locale} />)}</div>
@@ -52,19 +52,19 @@ export async function HomePage({ locale }: { locale: Locale }) {
 
         <section id="company" className="bg-[#1c201d] text-white">
           <div className="mx-auto grid max-w-7xl gap-14 px-5 py-24 lg:grid-cols-[0.85fr_1.15fr] lg:px-8 lg:py-32">
-            <div><p className="text-xs font-bold tracking-[0.18em] text-[#d56a5d]">02 · WHY TOOYEI</p><h2 className="mt-5 text-4xl font-semibold tracking-[-0.035em] sm:text-5xl">{t.proof}</h2><p className="mt-6 max-w-xl leading-7 text-white/60">{t.proofBody}</p></div>
+            <div><p className="text-xs font-bold tracking-[0.18em] text-[#d56a5d]">02 · {locale === "zh" ? t.whyLabel : "WHY TOOYEI"}</p><h2 className="mt-5 text-4xl font-semibold tracking-[-0.035em] sm:text-5xl">{t.proof}</h2><p className="mt-6 max-w-xl leading-7 text-white/60">{t.proofBody}</p></div>
             <div className="grid gap-px overflow-hidden border border-white/10 bg-white/10 sm:grid-cols-2">
-              {[ ["15+", "Export markets"], ["4", "Core flooring systems"], ["OEM", "Flexible specifications"], ["B2B", "Project-first service"] ].map(([value,label]) => <div key={label} className="bg-[#1c201d] p-8"><p className="text-4xl font-semibold text-white">{value}</p><p className="mt-3 text-sm text-white/50">{label}</p></div>)}
+              {[ ["15+", locale === "zh" ? t.exportMarkets : "Export markets"], ["4", locale === "zh" ? t.coreSystems : "Core flooring systems"], ["OEM", locale === "zh" ? t.flexibleSpecs : "Flexible specifications"], ["B2B", locale === "zh" ? t.projectService : "Project-first service"] ].map(([value,label]) => <div key={label} className="bg-[#1c201d] p-8"><p className="text-4xl font-semibold text-white">{value}</p><p className="mt-3 text-sm text-white/50">{label}</p></div>)}
             </div>
           </div>
         </section>
 
         <section id="oem" className="mx-auto grid max-w-7xl gap-12 px-5 py-24 lg:grid-cols-2 lg:items-center lg:px-8 lg:py-32">
           <div className="relative aspect-[4/3] overflow-hidden bg-[#ece7df]"><Image src="/media/product-eir-spc.jpg" alt="OEM flooring finish sample" fill sizes="50vw" className="object-cover" /></div>
-          <div><p className="text-xs font-bold tracking-[0.18em] text-[#a63429]">03 · OEM / ODM</p><h2 className="mt-4 text-4xl font-semibold tracking-[-0.035em]">Built around your market.</h2><p className="mt-6 leading-7 text-muted-foreground">Choose dimensions, wear layers, surface textures, colors, backing, locking systems and packaging. The new content platform will manage each option as structured data instead of static page copy.</p><div className="mt-8 flex flex-wrap gap-2">{["Dimensions", "Wear layer", "EIR texture", "Color & decor", "Backing", "Private label"].map((item)=><Badge key={item} variant="secondary" className="px-3 py-1.5">{item}</Badge>)}</div></div>
+          <div><p className="text-xs font-bold tracking-[0.18em] text-[#a63429]">03 · OEM / ODM</p><h2 className="mt-4 text-4xl font-semibold tracking-[-0.035em]">{locale === "zh" ? t.builtForMarket : "Built around your market."}</h2><p className="mt-6 leading-7 text-muted-foreground">{locale === "zh" ? t.oemBody : "Choose dimensions, wear layers, surface textures, colors, backing, locking systems and packaging. The new content platform will manage each option as structured data instead of static page copy."}</p><div className="mt-8 flex flex-wrap gap-2">{(locale === "zh" ? ["尺寸", "耐磨层", "EIR 纹理", "花色", "底垫", "自有品牌"] : ["Dimensions", "Wear layer", "EIR texture", "Color & decor", "Backing", "Private label"]).map((item)=><Badge key={item} variant="secondary" className="px-3 py-1.5">{item}</Badge>)}</div></div>
         </section>
 
-        <section id="resources" className="bg-[#a63429] text-white"><div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-8 px-5 py-16 md:flex-row md:items-center lg:px-8"><div><Globe2 className="size-7"/><h2 className="mt-5 text-3xl font-semibold">Ready to source your next flooring collection?</h2></div><Button asChild size="lg" className="bg-white text-[#7e241d] hover:bg-white/90"><Link href={localizedPath(locale, "/contact")}>{t.discuss}<ArrowRight /></Link></Button></div></section>
+        <section id="resources" className="bg-[#a63429] text-white"><div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-8 px-5 py-16 md:flex-row md:items-center lg:px-8"><div><Globe2 className="size-7"/><h2 className="mt-5 text-3xl font-semibold">{locale === "zh" ? t.readyTitle : "Ready to source your next flooring collection?"}</h2></div><Button asChild size="lg" className="bg-white text-[#7e241d] hover:bg-white/90"><Link href={localizedPath(locale, "/contact")}>{t.discuss}<ArrowRight /></Link></Button></div></section>
       </main>
       <SiteFooter locale={locale} />
     </div>

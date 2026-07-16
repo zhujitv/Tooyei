@@ -9,9 +9,9 @@ export const siteConfig = {
   whatsapp: "https://api.whatsapp.com/send?phone=8618015007771",
 } as const;
 
-export const locales = ["en", "es", "de"] as const;
+export const locales = ["zh", "en", "es", "de"] as const;
 export type Locale = (typeof locales)[number];
-export const defaultLocale: Locale = "en";
+export const defaultLocale: Locale = "zh";
 
 export const isLocale = (value: string): value is Locale =>
   locales.includes(value as Locale);
@@ -22,6 +22,7 @@ export const localizedPath = (locale: Locale, path = "/") => {
 };
 
 export const languageNames: Record<Locale, string> = {
+  zh: "中文",
   en: "English",
   es: "Español",
   de: "Deutsch",
