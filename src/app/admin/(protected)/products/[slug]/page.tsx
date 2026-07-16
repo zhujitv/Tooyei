@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { ProductAssetUpload } from "@/components/product-asset-upload";
 import { isDatabaseConfigured } from "@/lib/db";
 import { getAdminProduct, getAdminProductCategoryOptions } from "@/lib/repositories/admin-products";
 import { languageNames } from "@/lib/site";
@@ -17,6 +18,7 @@ import {
   updateProductCoreAction,
   updateProductStructuredContentAction,
   updateProductTranslationAction,
+  uploadProductAssetAction,
 } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -98,9 +100,10 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
   const saveCoreAction = updateProductCoreAction.bind(null, slug);
   const saveTranslationAction = updateProductTranslationAction.bind(null, slug);
   const saveStructuredAction = updateProductStructuredContentAction.bind(null, slug);
+  const uploadAssetAction = uploadProductAssetAction.bind(null, slug);
 
   const savedLocale =
-    feedback.saved && !["core", "structured"].includes(feedback.saved) ? feedback.saved.toUpperCase() : undefined;
+    feedback.saved && !["core", "structured", "upload"].includes(feedback.saved) ? feedback.saved.toUpperCase() : undefined;
 
   const mediaValue = serializeRows(
     product.media.map((item) => [
@@ -183,6 +186,8 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
           <AlertTitle>
             {feedback.saved === "core"
               ? "产品基础信息已保存"
+              : feedback.saved === "upload"
+                ? "文件已上传并关联"
               : feedback.saved === "structured"
                 ? "产品结构化内容已保存"
                 : "翻译已保存"}
@@ -190,6 +195,8 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
           <AlertDescription className="text-emerald-100/65">
             {feedback.saved === "core"
               ? "产品列表、公开页面和缓存已刷新。"
+              : feedback.saved === "upload"
+                ? "对象存储和产品媒体关系已更新。"
               : feedback.saved === "structured"
                 ? "图库、规格、卖点、应用场景和下载资料已同步到公开产品页。"
                 : `${savedLocale} 版本、SEO 字段和公开页面缓存已更新。`}
@@ -208,6 +215,8 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
                 ? "请检查 SKU、分类、状态和排序。"
                 : feedback.error === "structured"
                   ? "请检查结构化内容格式，每行使用英文竖线 | 分隔。"
+                  : feedback.error === "upload"
+                    ? "请检查文件类型、大小、Blob 配置和数据库连接。"
                   : "请检查标题、摘要、SEO 字段和发布状态。"}
           </AlertDescription>
         </Alert>
@@ -338,6 +347,7 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
           </div>
         </CardHeader>
         <CardContent>
+          <ProductAssetUpload action={uploadAssetAction} disabled={!databaseReady} />
           <form action={saveStructuredAction} className="space-y-6">
             <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
               <div className="mb-3 flex items-center justify-between gap-3">
@@ -423,7 +433,7 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
             <div className="flex flex-col gap-3 border-t border-white/10 pt-5 sm:flex-row sm:items-center sm:justify-between">
               <p className="flex items-center gap-2 text-sm text-white/35">
                 <ImageIcon className="size-4" />
-                当前阶段管理 URL；文件上传和对象存储可在下一阶段接入。
+                可直接上传到对象存储，也可继续录入已有 URL。
               </p>
               <Button type="submit" disabled={!databaseReady} className="bg-[#b68a4c] text-[#0b1220] hover:bg-[#c59b5c]">
                 <Save />

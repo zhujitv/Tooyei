@@ -46,12 +46,27 @@ updates and password resets. After PostgreSQL is configured, login verifies
 the first owner account and no longer overwrite passwords changed in the admin
 panel.
 
+Product images, videos and downloadable files up to 3.8 MB can be uploaded from
+the product editor to Vercel Blob and attached to the product automatically.
+Link a public Blob store and provide `BLOB_READ_WRITE_TOKEN` before using uploads.
+
+The legacy catalogue migration discovers all product URLs from the existing
+Tooyei sitemap and exports English, Spanish and German content, product images
+and specifications. Newly discovered records remain drafts with translations
+marked for review:
+
+```bash
+npm run catalog:export
+npm run catalog:import
+```
+
 ## Quality checks
 
 ```bash
 npm run lint
 npm run typecheck
 npm run build
+npm run verify:production
 ```
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the migration boundary

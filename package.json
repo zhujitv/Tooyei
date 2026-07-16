@@ -15,12 +15,17 @@
     "db:deploy": "node scripts/deploy-migrations.mjs",
     "db:deploy:prisma": "prisma migrate deploy",
     "db:seed": "prisma db seed",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "catalog:export": "tsx scripts/import-legacy-products.ts --export-only",
+    "catalog:import": "tsx scripts/import-legacy-products.ts",
+    "verify:production": "tsx scripts/verify-production.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
+    "@vercel/blob": "^2.0.1",
     "bcryptjs": "^3.0.3",
+    "cheerio": "^1.2.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "dotenv": "^17.4.2",

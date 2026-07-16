@@ -151,6 +151,20 @@ export type UpdateProductStructuredContentInput = {
   downloads: AdminProductDownloadItem[];
 };
 
+export type AttachUploadedProductAssetInput = {
+  slug: string;
+  pathname: string;
+  url: string;
+  contentType: string;
+  sizeBytes: number;
+  kind: "media" | "download";
+  role?: ProductMediaRole;
+  downloadKind?: ProductDownloadKind;
+  title?: string;
+  alt?: string;
+  caption?: string;
+};
+
 const localeMap: Record<Locale, DatabaseLocale> = {
   zh: DatabaseLocale.ZH,
   en: DatabaseLocale.EN,
@@ -785,5 +799,97 @@ export async function replaceProductStructuredContent(input: UpdateProductStruct
       applications: input.applications.length,
       downloads: input.downloads.length,
     };
+  });
+}
+
+export async function attachUploadedProductAsset(input: AttachUploadedProductAssetInput) {
+  if (!isDatabaseConfigured()) {
+    throw new Error("DATABASE_URL is required before uploaded assets can be attached.");
+  }
+
+  const isImage = input.contentType.startsWith("image/");
+  const isVideo = input.contentType.startsWith("video/");
+  if (input.kind === "media" && !isImage && !isVideo) {
+    throw new Error("Only image and video files can be attached as product media.");
+  }
+  if (input.kind === "download" && (isImage || isVideo)) {
+    throw new Error("Image and video files cannot be attached as product downloads.");
+  }
+  if (input.kind === "media" && isImage && input.role === ProductMediaRole.VIDEO) {
+    throw new Error("An image cannot use the video media role.");
+  }
+
+  return getPrisma().$transaction(async (prisma) => {
+    const product = await prisma.product.findUnique({
+      where: { slug: input.slug },
+      select: { id: true },
+    });
+    if (!product) throw new Error("Product does not exist.");
+
+    const mediaKind = input.kind === "download" ? MediaKind.DOCUMENT : isVideo ? MediaKind.VIDEO : MediaKind.IMAGE;
+    const asset = await prisma.mediaAsset.upsert({
+      where: { pathname: input.pathname },
+      update: {
+        url: input.url,
+        kind: mediaKind,
+        mimeType: input.contentType,
+        sizeBytes: input.sizeBytes,
+        alt: input.alt || input.title || null,
+      },
+      create: {
+        pathname: input.pathname,
+        url: input.url,
+        kind: mediaKind,
+        mimeType: input.contentType,
+        sizeBytes: input.sizeBytes,
+        alt: input.alt || input.title || null,
+      },
+    });
+
+    if (input.kind === "download") {
+      const sortOrder = await prisma.productDownload.count({ where: { productId: product.id } });
+      await prisma.productDownload.create({
+        data: {
+          productId: product.id,
+          assetId: asset.id,
+          kind: input.downloadKind ?? ProductDownloadKind.OTHER,
+          sortOrder,
+          visible: true,
+          translations: {
+            create: {
+              locale: DatabaseLocale.ZH,
+              title: input.title?.trim() || input.pathname.split("/").pop() || "产品资料",
+            },
+          },
+        },
+      });
+    } else {
+      const sortOrder = await prisma.productMedia.count({ where: { productId: product.id } });
+      const role = mediaKind === MediaKind.VIDEO ? ProductMediaRole.VIDEO : input.role ?? ProductMediaRole.GALLERY;
+      await prisma.productMedia.upsert({
+        where: { productId_assetId: { productId: product.id, assetId: asset.id } },
+        update: {
+          role,
+          alt: input.alt || null,
+          caption: input.caption || null,
+          visible: true,
+        },
+        create: {
+          productId: product.id,
+          assetId: asset.id,
+          role,
+          alt: input.alt || null,
+          caption: input.caption || null,
+          sortOrder,
+          visible: true,
+        },
+      });
+
+      if (role === ProductMediaRole.PRIMARY && mediaKind === MediaKind.IMAGE) {
+        await prisma.product.update({ where: { id: product.id }, data: { primaryImageId: asset.id } });
+      }
+    }
+
+    return { assetId: asset.id, pathname: asset.pathname, kind: input.kind };
   });
 }

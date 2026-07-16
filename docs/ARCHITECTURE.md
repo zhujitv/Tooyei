@@ -16,6 +16,9 @@
 - Product operations workflow at `/admin/products`, including search/filtering, status metrics, category assignment, featured/sort controls, translation publishing, SEO fields, gallery media, feature modules, specifications, application scenarios and downloadable documents, with an explicit read-only fallback until PostgreSQL is configured
 - Inquiry capture workflow with product-aware public forms, rate limiting, audit logs, admin search/filtering, owner assignment, follow-up notes, timeline history and optional Resend email notification
 - Owner-only admin user management at `/admin/users`, including account creation, role/status changes, password resets and audit logs
+- Authenticated product image, video and document upload to Vercel Blob with automatic database attachment and orphan cleanup on database failure
+- Repeatable 90-product legacy catalogue export/import sourced from the existing sitemap; new records remain drafts until localization review
+- Production smoke-check script covering public routes, admin route protection and database reachability/counts
 
 ## Content boundary
 
@@ -39,9 +42,9 @@ identity provider without changing the content repository or editor pages.
 
 ## Next implementation slice
 
-1. Add object storage upload support for product images and downloadable files, replacing manual URL entry.
-2. Add per-locale editors for structured product fields after the Chinese-first catalog cleanup is stable.
-3. Import the full product and article catalogue.
+1. Review and publish Chinese content for the imported draft catalogue, then add per-locale editors for structured product fields.
+2. Import the full article catalogue.
+3. Complete live inquiry form, notification, assignment and follow-up acceptance testing.
 4. Add richer sales pipeline reporting and CSV export.
 5. Replace preview credentials with managed production identity, roles and account recovery.
 6. Generate and verify the complete legacy redirect map.
