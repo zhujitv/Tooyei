@@ -11,17 +11,17 @@ import { languageNames } from "@/lib/site";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Content operations preview",
+  title: "内容运营总览",
   robots: { index: false, follow: false },
 };
 
 export default async function ContentOperationsPage() {
   const summary = await getContentOperationsSummary();
   const metrics = [
-    { label: "Products", value: summary.products, icon: Package },
-    { label: "Articles", value: summary.articles, icon: BookOpen },
-    { label: "FAQs", value: summary.faqs, icon: CircleHelp },
-    { label: "New inquiries", value: summary.newInquiries, icon: MessageSquare },
+    { label: "产品", value: summary.products, icon: Package },
+    { label: "文章", value: summary.articles, icon: BookOpen },
+    { label: "常见问题", value: summary.faqs, icon: CircleHelp },
+    { label: "新询盘", value: summary.newInquiries, icon: MessageSquare },
   ];
 
   return (
@@ -31,24 +31,24 @@ export default async function ContentOperationsPage() {
           <div>
             <div className="flex items-center gap-3">
               <span className="grid size-9 place-items-center rounded-sm bg-[#a63429] text-sm font-black">TY</span>
-              <Badge variant="outline" className="border-white/15 text-white/65">PROTECTED ADMIN</Badge>
+              <Badge variant="outline" className="border-white/15 text-white/65">后台管理</Badge>
             </div>
-            <h1 className="mt-8 text-4xl font-semibold tracking-[-0.04em] sm:text-5xl">Content operations</h1>
+            <h1 className="mt-8 text-4xl font-semibold tracking-[-0.04em] sm:text-5xl">内容运营总览</h1>
             <p className="mt-4 max-w-2xl text-sm leading-6 text-white/50">
-              A read-only view of catalogue volume, translation readiness and incoming demand.
+              查看产品目录规模、翻译发布进度和最新询盘需求。
             </p>
           </div>
           <Badge className={summary.source === "database" ? "bg-emerald-600" : "bg-amber-600"}>
-            <Database className="size-3.5" /> {summary.source === "database" ? "PostgreSQL connected" : "Sample repository"}
+            <Database className="size-3.5" /> {summary.source === "database" ? "PostgreSQL 已连接" : "示例数据"}
           </Badge>
         </div>
 
         {summary.source === "sample" && (
           <Alert className="mt-10 border-amber-500/30 bg-amber-500/8 text-amber-100">
             <Database className="size-4" />
-            <AlertTitle>Database connection is not configured</AlertTitle>
+            <AlertTitle>数据库连接未配置</AlertTitle>
             <AlertDescription className="text-amber-100/65">
-              The public site and this dashboard are using the five migration samples. Add DATABASE_URL, deploy the schema and run the seed command to switch to PostgreSQL.
+              当前公开站和后台正在使用迁移示例数据。配置 DATABASE_URL、部署数据库结构并执行种子数据后，将切换为 PostgreSQL 数据。
             </AlertDescription>
           </Alert>
         )}
@@ -70,8 +70,8 @@ export default async function ContentOperationsPage() {
             <div className="flex items-center gap-3">
               <Languages className="size-5 text-[#d56a5d]" />
               <div>
-                <CardTitle>Translation workflow</CardTitle>
-                <p className="mt-1 text-sm text-white/45">Only published translations become indexable pages and hreflang alternatives.</p>
+                <CardTitle>翻译发布流程</CardTitle>
+                <p className="mt-1 text-sm text-white/45">只有已发布的翻译会生成可索引页面和 hreflang 多语言入口。</p>
               </div>
             </div>
           </CardHeader>
@@ -79,12 +79,12 @@ export default async function ContentOperationsPage() {
             <Table>
               <TableHeader>
                 <TableRow className="border-white/10 hover:bg-transparent">
-                  <TableHead className="text-white/45">Language</TableHead>
-                  <TableHead className="text-white/45">Published</TableHead>
-                  <TableHead className="text-white/45">Needs review</TableHead>
-                  <TableHead className="text-white/45">Machine draft</TableHead>
-                  <TableHead className="text-white/45">Missing</TableHead>
-                  <TableHead className="min-w-48 text-white/45">Readiness</TableHead>
+                  <TableHead className="text-white/45">语言</TableHead>
+                  <TableHead className="text-white/45">已发布</TableHead>
+                  <TableHead className="text-white/45">待审核</TableHead>
+                  <TableHead className="text-white/45">机器草稿</TableHead>
+                  <TableHead className="text-white/45">缺失</TableHead>
+                  <TableHead className="min-w-48 text-white/45">完成度</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
