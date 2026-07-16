@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import { getPublishedProductSlugs } from "@/lib/repositories/products";
 import { locales, localizedPath, siteConfig } from "@/lib/site";
+export const dynamic = "force-dynamic";
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const productSlugs = await getPublishedProductSlugs();
   const paths=["/","/products","/contact",...productSlugs.map((slug)=>`/products/${slug}`)];
