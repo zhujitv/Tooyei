@@ -4,6 +4,7 @@ import { compare } from "bcryptjs";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { clearAdminSession, createAdminSession } from "@/lib/admin-auth";
+import { ensureEnvironmentAdminUser } from "@/lib/repositories/inquiries";
 
 const credentialsSchema = z.object({
   email: z.email(),
@@ -31,6 +32,7 @@ export async function loginAction(formData: FormData) {
   const passwordMatches = await compare(parsed.data.password, passwordHash);
   if (!emailMatches || !passwordMatches) redirect("/admin/login?error=invalid");
 
+  await ensureEnvironmentAdminUser();
   await createAdminSession(expectedEmail);
   redirect(safeReturnTo(parsed.data.returnTo));
 }

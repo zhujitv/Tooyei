@@ -1,4 +1,5 @@
 import {
+  AdminRole,
   InquiryStatus,
   Locale as DatabaseLocale,
   Prisma,
@@ -19,6 +20,14 @@ const inquiryProductInclude = {
 
 const inquiryDetailInclude = {
   products: { include: inquiryProductInclude },
+  assignedTo: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+    },
+  },
 } satisfies Prisma.InquiryInclude;
 
 type InquiryWithProducts = Prisma.InquiryGetPayload<{ include: typeof inquiryDetailInclude }>;
@@ -43,6 +52,7 @@ export type AdminInquirySummary = {
   company: string | null;
   country: string | null;
   productLabels: string[];
+  assignedTo: AssignableAdminUser | null;
   createdAt: Date;
 };
 
@@ -52,6 +62,20 @@ export type AdminInquiryDetail = AdminInquirySummary & {
   locale: DatabaseLocale;
   sourcePath: string | null;
   updatedAt: Date;
+};
+
+export type AssignableAdminUser = {
+  id: string;
+  name: string;
+  email: string;
+  role: AdminRole;
+};
+
+export type AdminInquiryFilters = {
+  q?: string;
+  status?: InquiryStatus;
+  assignedToId?: string | null;
+  unassigned?: boolean;
 };
 
 const localeMap: Record<Locale, DatabaseLocale> = {
@@ -72,6 +96,7 @@ const toSummary = (inquiry: InquiryWithProducts): AdminInquirySummary => ({
   company: inquiry.company,
   country: inquiry.country,
   productLabels: inquiry.products.map(productLabel),
+  assignedTo: inquiry.assignedTo,
   createdAt: inquiry.createdAt,
 });
 
@@ -121,10 +146,65 @@ export async function createPublicInquiry(input: PublicInquiryInput) {
   });
 }
 
-export async function getAdminInquiries(): Promise<AdminInquirySummary[]> {
+const searchCondition = (query: string): Prisma.InquiryWhereInput => {
+  const contains = { contains: query, mode: "insensitive" as const };
+
+  return {
+    OR: [
+      { name: contains },
+      { email: contains },
+      { phone: contains },
+      { company: contains },
+      { country: contains },
+      { message: contains },
+      { sourcePath: contains },
+      {
+        products: {
+          some: {
+            product: {
+              OR: [
+                { sku: contains },
+                { slug: contains },
+                {
+                  translations: {
+                    some: {
+                      title: contains,
+                    },
+                  },
+                },
+              ],
+            },
+          },
+        },
+      },
+      {
+        assignedTo: {
+          is: {
+            OR: [{ name: contains }, { email: contains }],
+          },
+        },
+      },
+    ],
+  };
+};
+
+const buildWhere = (filters: AdminInquiryFilters = {}): Prisma.InquiryWhereInput => {
+  const clauses: Prisma.InquiryWhereInput[] = [];
+  const query = filters.q?.trim();
+
+  if (filters.status) clauses.push({ status: filters.status });
+  if (filters.unassigned) clauses.push({ assignedToId: null });
+  if (filters.assignedToId) clauses.push({ assignedToId: filters.assignedToId });
+  if (query) clauses.push(searchCondition(query));
+
+  return clauses.length ? { AND: clauses } : {};
+};
+
+export async function getAdminInquiries(filters: AdminInquiryFilters = {}): Promise<AdminInquirySummary[]> {
   if (!isDatabaseConfigured()) return [];
 
   const records = await getPrisma().inquiry.findMany({
+    where: buildWhere(filters),
     include: inquiryDetailInclude,
     orderBy: { createdAt: "desc" },
     take: 100,
@@ -144,13 +224,72 @@ export async function getAdminInquiry(id: string): Promise<AdminInquiryDetail | 
   return record ? toDetail(record) : null;
 }
 
-export async function updateInquiryStatus(id: string, status: InquiryStatus) {
+export async function updateInquiryFollowUp(id: string, status: InquiryStatus, assignedToId?: string | null) {
   if (!isDatabaseConfigured()) {
     throw new Error("DATABASE_URL is required before inquiries can be updated.");
   }
 
+  const assignee = assignedToId
+    ? await getPrisma().adminUser.findFirst({
+        where: { id: assignedToId, active: true },
+        select: { id: true },
+      })
+    : null;
+
   await getPrisma().inquiry.update({
     where: { id },
-    data: { status },
+    data: {
+      status,
+      ...(assignedToId === undefined
+        ? {}
+        : {
+            assignedToId: assignedToId ? assignee?.id ?? null : null,
+          }),
+    },
+  });
+}
+
+export async function updateInquiryStatus(id: string, status: InquiryStatus) {
+  await updateInquiryFollowUp(id, status, undefined);
+}
+
+export async function ensureEnvironmentAdminUser(): Promise<AssignableAdminUser | null> {
+  if (!isDatabaseConfigured()) return null;
+
+  const email = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  const passwordHash = process.env.ADMIN_PASSWORD_HASH;
+  if (!email || !passwordHash) return null;
+
+  const user = await getPrisma().adminUser.upsert({
+    where: { email },
+    update: {
+      passwordHash,
+      active: true,
+    },
+    create: {
+      email,
+      name: email.split("@")[0] || "Admin",
+      passwordHash,
+      role: AdminRole.OWNER,
+      active: true,
+    },
+    select: { id: true, name: true, email: true, role: true },
+  });
+
+  return user;
+}
+
+export async function getAssignableAdminUsers(): Promise<AssignableAdminUser[]> {
+  if (!isDatabaseConfigured()) return [];
+
+  await ensureEnvironmentAdminUser();
+
+  return getPrisma().adminUser.findMany({
+    where: {
+      active: true,
+      role: { in: [AdminRole.OWNER, AdminRole.EDITOR, AdminRole.SALES] },
+    },
+    orderBy: [{ role: "asc" }, { name: "asc" }],
+    select: { id: true, name: true, email: true, role: true },
   });
 }

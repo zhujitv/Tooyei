@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { createPublicInquiry } from "@/lib/repositories/inquiries";
+import { sendInquiryNotification } from "@/lib/inquiry-notifications";
+import { createPublicInquiry, getAdminInquiry } from "@/lib/repositories/inquiries";
 import { isDatabaseConfigured } from "@/lib/db";
 import { isLocale, localizedPath } from "@/lib/site";
 
@@ -45,7 +46,7 @@ export async function createInquiryAction(formData: FormData) {
   if (!isDatabaseConfigured()) redirect(`${contactPath}?error=database${productQuery}`);
   if (!isLocale(parsed.data.locale)) redirect("/contact?error=validation");
 
-  await createPublicInquiry({
+  const inquiry = await createPublicInquiry({
     name: parsed.data.name,
     email: parsed.data.email,
     phone: emptyToNull(parsed.data.phone),
@@ -56,6 +57,14 @@ export async function createInquiryAction(formData: FormData) {
     sourcePath: parsed.data.sourcePath || contactPath,
     productSlug: emptyToNull(parsed.data.productSlug),
   });
+
+  const notificationInquiry = await getAdminInquiry(inquiry.id);
+  if (notificationInquiry) {
+    const notification = await sendInquiryNotification(notificationInquiry);
+    if (notification.status === "failed") {
+      console.error("Inquiry notification failed", notification.reason);
+    }
+  }
 
   revalidatePath("/admin/content");
   revalidatePath("/admin/inquiries");

@@ -14,6 +14,7 @@
 - Signed, HTTP-only admin sessions with server-side protection for every `/admin/*` management route
 - Content operations dashboard at `/admin/content`
 - Product translation and publishing workflow at `/admin/products`, with an explicit read-only fallback until PostgreSQL is configured
+- Inquiry capture workflow with product-aware public forms, admin search/filtering, owner assignment and optional Resend email notification
 
 ## Content boundary
 
@@ -37,6 +38,6 @@ without changing the content repository or editor pages.
 1. Provision PostgreSQL, deploy the initial migration and seed the five verified samples.
 2. Connect the existing product editor to the provisioned database and verify publish-to-public-page revalidation.
 3. Import the full product and article catalogue.
-4. Add inquiry persistence, email delivery, rate limits and audit logs.
+4. Add inquiry rate limits, audit logs and richer sales pipeline reporting.
 5. Replace preview credentials with managed production identity, roles and account recovery.
 6. Generate and verify the complete legacy redirect map.

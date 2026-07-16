@@ -27,6 +27,10 @@ npm run db:deploy
 npm run db:seed
 ```
 
+Inquiry email notifications are optional. To enable them in production, set
+`RESEND_API_KEY`, `RESEND_FROM_EMAIL` and `INQUIRY_NOTIFICATION_EMAIL`. If
+they are missing, inquiries are still saved and visible in the admin panel.
+
 ## Quality checks
 
 ```bash

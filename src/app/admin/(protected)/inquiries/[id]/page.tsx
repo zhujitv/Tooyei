@@ -9,8 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { isDatabaseConfigured } from "@/lib/db";
-import { getAdminInquiry } from "@/lib/repositories/inquiries";
-import { updateInquiryStatusAction } from "../actions";
+import { getAdminInquiry, getAssignableAdminUsers } from "@/lib/repositories/inquiries";
+import { updateInquiryFollowUpAction } from "../actions";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +50,7 @@ export default async function AdminInquiryDetailPage({
   if (!inquiry) notFound();
 
   const databaseReady = isDatabaseConfigured();
+  const assignees = await getAssignableAdminUsers();
 
   return (
     <main className="mx-auto max-w-5xl px-5 py-10 lg:px-8 lg:py-14">
@@ -129,6 +130,10 @@ export default async function AdminInquiryDetailPage({
                 <p className="mt-1 text-white/70">{inquiry.locale}</p>
               </div>
               <div>
+                <p className="text-sm text-white/40">Owner</p>
+                <p className="mt-1 text-white/70">{inquiry.assignedTo?.name || "Unassigned"}</p>
+              </div>
+              <div>
                 <p className="text-sm text-white/40">Updated</p>
                 <p className="mt-1 text-white/70">{formatDate(inquiry.updatedAt)}</p>
               </div>
@@ -144,28 +149,50 @@ export default async function AdminInquiryDetailPage({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <form action={updateInquiryStatusAction} className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
+            <form action={updateInquiryFollowUpAction} className="space-y-5">
               <input type="hidden" name="id" value={inquiry.id} />
-              <div className="space-y-2">
-                <Label htmlFor="status">Pipeline status</Label>
-                <select
-                  id="status"
-                  name="status"
-                  defaultValue={inquiry.status}
-                  disabled={!databaseReady}
-                  className="h-9 w-full rounded-lg border border-white/10 bg-black/20 px-3 text-sm disabled:opacity-60"
-                >
-                  {statuses.map((status) => (
-                    <option key={status} value={status}>
-                      {status.replaceAll("_", " ")}
-                    </option>
-                  ))}
-                </select>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="status">Pipeline status</Label>
+                  <select
+                    id="status"
+                    name="status"
+                    defaultValue={inquiry.status}
+                    disabled={!databaseReady}
+                    className="h-9 w-full rounded-lg border border-white/10 bg-black/20 px-3 text-sm disabled:opacity-60"
+                  >
+                    {statuses.map((status) => (
+                      <option key={status} value={status}>
+                        {status.replaceAll("_", " ")}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="assignedToId">Owner</Label>
+                  <select
+                    id="assignedToId"
+                    name="assignedToId"
+                    defaultValue={inquiry.assignedTo?.id || ""}
+                    disabled={!databaseReady || assignees.length === 0}
+                    className="h-9 w-full rounded-lg border border-white/10 bg-black/20 px-3 text-sm disabled:opacity-60"
+                  >
+                    <option value="">Unassigned</option>
+                    {assignees.map((user) => (
+                      <option key={user.id} value={user.id}>
+                        {user.name} · {user.role}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
               <Button type="submit" disabled={!databaseReady} className="bg-[#a63429] hover:bg-[#8d2b23]">
                 <Save />
-                Save status
+                Save follow-up
               </Button>
+              {databaseReady && assignees.length === 0 && (
+                <p className="text-sm text-white/40">No active admin users are available for assignment.</p>
+              )}
             </form>
           </CardContent>
         </Card>
