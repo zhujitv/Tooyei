@@ -1,0 +1,371 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Locale {
+  EN
+  ES
+  DE
+  FR
+  RU
+  IT
+  PT
+  NL
+  PL
+  TR
+  AR
+  RO
+  CS
+}
+
+enum ContentStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum TranslationStatus {
+  MISSING
+  MACHINE_DRAFT
+  NEEDS_REVIEW
+  PUBLISHED
+}
+
+enum ProductKind {
+  SPC
+  ESPC
+  VSPC
+  LSPC
+  WPC
+  LVT
+  LAMINATE
+  WALL_PANEL
+  ACCESSORY
+}
+
+enum MediaKind {
+  IMAGE
+  VIDEO
+  DOCUMENT
+}
+
+enum ArticleKind {
+  NEWS
+  GUIDE
+  CASE_STUDY
+}
+
+enum InquiryStatus {
+  NEW
+  QUALIFIED
+  IN_PROGRESS
+  WON
+  LOST
+  SPAM
+}
+
+enum AdminRole {
+  OWNER
+  EDITOR
+  TRANSLATOR
+  SALES
+  VIEWER
+}
+
+model Category {
+  id           String                @id @default(cuid())
+  slug         String                @unique
+  kind         ProductKind
+  status       ContentStatus         @default(DRAFT)
+  sortOrder    Int                   @default(0)
+  parentId     String?
+  parent       Category?             @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children     Category[]            @relation("CategoryTree")
+  translations CategoryTranslation[]
+  products     Product[]
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+
+  @@index([status, sortOrder])
+  @@index([parentId])
+}
+
+model CategoryTranslation {
+  id             String            @id @default(cuid())
+  categoryId     String
+  category       Category          @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  locale         Locale
+  status         TranslationStatus @default(MISSING)
+  name           String
+  description    String?
+  seoTitle       String?
+  seoDescription String?
+  publishedAt    DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@unique([categoryId, locale])
+  @@index([locale, status])
+}
+
+model Product {
+  id             String                 @id @default(cuid())
+  slug           String                 @unique
+  sku            String                 @unique
+  kind           ProductKind
+  status         ContentStatus          @default(DRAFT)
+  featured       Boolean                @default(false)
+  sortOrder      Int                    @default(0)
+  categoryId     String
+  category       Category               @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  primaryImageId String?
+  primaryImage   MediaAsset?            @relation("ProductPrimaryImage", fields: [primaryImageId], references: [id], onDelete: SetNull)
+  translations   ProductTranslation[]
+  features       ProductFeature[]
+  specifications ProductSpecification[]
+  media          ProductMedia[]
+  inquiries      InquiryProduct[]
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  @@index([status, featured, sortOrder])
+  @@index([categoryId])
+}
+
+model ProductTranslation {
+  id             String            @id @default(cuid())
+  productId      String
+  product        Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+  locale         Locale
+  status         TranslationStatus @default(MISSING)
+  title          String
+  summary        String
+  content        Json?
+  seoTitle       String?
+  seoDescription String?
+  publishedAt    DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@unique([productId, locale])
+  @@index([locale, status])
+}
+
+model ProductFeature {
+  id           String                      @id @default(cuid())
+  productId    String
+  product      Product                     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sortOrder    Int                         @default(0)
+  translations ProductFeatureTranslation[]
+
+  @@index([productId, sortOrder])
+}
+
+model ProductFeatureTranslation {
+  id        String         @id @default(cuid())
+  featureId String
+  feature   ProductFeature @relation(fields: [featureId], references: [id], onDelete: Cascade)
+  locale    Locale
+  value     String
+
+  @@unique([featureId, locale])
+}
+
+model ProductSpecification {
+  id           String                            @id @default(cuid())
+  productId    String
+  product      Product                           @relation(fields: [productId], references: [id], onDelete: Cascade)
+  value        String
+  sortOrder    Int                               @default(0)
+  translations ProductSpecificationTranslation[]
+
+  @@index([productId, sortOrder])
+}
+
+model ProductSpecificationTranslation {
+  id              String               @id @default(cuid())
+  specificationId String
+  specification   ProductSpecification @relation(fields: [specificationId], references: [id], onDelete: Cascade)
+  locale          Locale
+  label           String
+
+  @@unique([specificationId, locale])
+}
+
+model MediaAsset {
+  id          String         @id @default(cuid())
+  kind        MediaKind      @default(IMAGE)
+  pathname    String         @unique
+  url         String
+  alt         String?
+  mimeType    String
+  width       Int?
+  height      Int?
+  sizeBytes   Int?
+  checksum    String?
+  products    ProductMedia[]
+  primaryFor  Product[]      @relation("ProductPrimaryImage")
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+}
+
+model ProductMedia {
+  productId String
+  product   Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  assetId   String
+  asset     MediaAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  sortOrder Int        @default(0)
+
+  @@id([productId, assetId])
+  @@index([productId, sortOrder])
+}
+
+model Article {
+  id           String               @id @default(cuid())
+  slug         String               @unique
+  kind         ArticleKind          @default(NEWS)
+  status       ContentStatus        @default(DRAFT)
+  publishedAt  DateTime?
+  translations ArticleTranslation[]
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  @@index([status, publishedAt])
+}
+
+model ArticleTranslation {
+  id             String            @id @default(cuid())
+  articleId      String
+  article        Article           @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  locale         Locale
+  status         TranslationStatus @default(MISSING)
+  title          String
+  excerpt        String?
+  content        Json
+  seoTitle       String?
+  seoDescription String?
+  publishedAt    DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@unique([articleId, locale])
+  @@index([locale, status])
+}
+
+model Faq {
+  id           String           @id @default(cuid())
+  status       ContentStatus    @default(DRAFT)
+  sortOrder    Int              @default(0)
+  translations FaqTranslation[]
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@index([status, sortOrder])
+}
+
+model FaqTranslation {
+  id          String            @id @default(cuid())
+  faqId       String
+  faq         Faq               @relation(fields: [faqId], references: [id], onDelete: Cascade)
+  locale      Locale
+  status      TranslationStatus @default(MISSING)
+  question    String
+  answer      String
+  publishedAt DateTime?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@unique([faqId, locale])
+  @@index([locale, status])
+}
+
+model Inquiry {
+  id              String          @id @default(cuid())
+  status          InquiryStatus   @default(NEW)
+  name            String
+  email           String
+  phone           String?
+  company         String?
+  country         String?
+  message         String
+  locale          Locale          @default(EN)
+  sourcePath      String?
+  utmSource       String?
+  utmMedium       String?
+  utmCampaign     String?
+  assignedToId    String?
+  assignedTo      AdminUser?      @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+  products        InquiryProduct[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([status, createdAt])
+  @@index([email])
+  @@index([assignedToId])
+}
+
+model InquiryProduct {
+  inquiryId String
+  inquiry   Inquiry @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@id([inquiryId, productId])
+}
+
+model Redirect {
+  id         String   @id @default(cuid())
+  source     String   @unique
+  destination String
+  permanent  Boolean  @default(true)
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([active])
+}
+
+model AdminUser {
+  id           String         @id @default(cuid())
+  email        String         @unique
+  name         String
+  passwordHash String
+  role         AdminRole      @default(EDITOR)
+  active       Boolean        @default(true)
+  inquiries    Inquiry[]
+  sessions     AdminSession[]
+  auditLogs    AuditLog[]
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+}
+
+model AdminSession {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  userId    String
+  user      AdminUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model AuditLog {
+  id         String     @id @default(cuid())
+  actorId    String?
+  actor      AdminUser? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  action     String
+  entityType String
+  entityId   String?
+  metadata   Json?
+  createdAt  DateTime   @default(now())
+
+  @@index([actorId, createdAt])
+  @@index([entityType, entityId])
+}
