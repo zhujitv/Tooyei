@@ -3,11 +3,20 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { ContentStatus, TranslationStatus } from "@/generated/prisma/client";
+import { ContentStatus, MediaKind, ProductDownloadKind, ProductMediaRole, TranslationStatus } from "@/generated/prisma/client";
 import { requireAdminSession } from "@/lib/admin-auth";
 import { isDatabaseConfigured } from "@/lib/db";
 import { safeWriteAuditLog } from "@/lib/repositories/audit-logs";
-import { updateProductCore, updateProductTranslation } from "@/lib/repositories/admin-products";
+import {
+  replaceProductStructuredContent,
+  updateProductCore,
+  updateProductTranslation,
+  type AdminProductApplicationItem,
+  type AdminProductDownloadItem,
+  type AdminProductFeatureItem,
+  type AdminProductMediaItem,
+  type AdminProductSpecificationItem,
+} from "@/lib/repositories/admin-products";
 
 const translationSchema = z.object({
   locale: z.enum(["zh", "en", "es", "de"]),
@@ -26,6 +35,14 @@ const coreSchema = z.object({
   sortOrder: z.coerce.number().int().min(0).max(999999),
 });
 
+const structuredSchema = z.object({
+  media: z.string().max(40000),
+  features: z.string().max(40000),
+  specifications: z.string().max(40000),
+  applications: z.string().max(40000),
+  downloads: z.string().max(40000),
+});
+
 const revalidateProductPaths = (slug: string, locale?: string) => {
   revalidatePath("/products");
   revalidatePath(`/products/${slug}`);
@@ -38,6 +55,89 @@ const revalidateProductPaths = (slug: string, locale?: string) => {
   revalidatePath("/admin/products");
   revalidatePath(`/admin/products/${slug}`);
 };
+
+const splitLines = (value: string) =>
+  value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith("#"))
+    .map((line) => line.split("|").map((part) => part.trim()));
+
+const parseSortOrder = (value: string | undefined, fallback: number) => {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : fallback;
+};
+
+const parseVisible = (value: string | undefined) => {
+  if (!value) return true;
+  return !["0", "false", "no", "off", "隐藏", "否", "不显示"].includes(value.toLowerCase());
+};
+
+const parseEnum = <T extends Record<string, string>>(values: T, value: string | undefined, fallback: T[keyof T]) =>
+  Object.values(values).includes(value as T[keyof T]) ? (value as T[keyof T]) : fallback;
+
+const parseMediaRows = (value: string): AdminProductMediaItem[] =>
+  splitLines(value)
+    .map(([role, url, alt, caption, sortOrder, visible], index) => {
+      const parsedRole = parseEnum(ProductMediaRole, role, index === 0 ? ProductMediaRole.PRIMARY : ProductMediaRole.GALLERY);
+      return {
+        role: parsedRole,
+        kind: parsedRole === ProductMediaRole.VIDEO ? MediaKind.VIDEO : MediaKind.IMAGE,
+        url: url ?? "",
+        alt: alt ?? "",
+        caption: caption ?? "",
+        sortOrder: parseSortOrder(sortOrder, index),
+        visible: parseVisible(visible),
+      };
+    })
+    .filter((item) => item.url);
+
+const parseFeatureRows = (value: string): AdminProductFeatureItem[] =>
+  splitLines(value)
+    .map(([title, description, icon, sortOrder, visible], index) => ({
+      title: title ?? "",
+      description: description ?? "",
+      icon: icon ?? "",
+      sortOrder: parseSortOrder(sortOrder, index),
+      visible: parseVisible(visible),
+    }))
+    .filter((item) => item.title);
+
+const parseSpecificationRows = (value: string): AdminProductSpecificationItem[] =>
+  splitLines(value)
+    .map(([group, label, rawValue, unit, sortOrder, visible], index) => ({
+      group: group ?? "",
+      label: label ?? "",
+      value: rawValue ?? "",
+      unit: unit ?? "",
+      sortOrder: parseSortOrder(sortOrder, index),
+      visible: parseVisible(visible),
+    }))
+    .filter((item) => item.label && item.value);
+
+const parseApplicationRows = (value: string): AdminProductApplicationItem[] =>
+  splitLines(value)
+    .map(([title, description, imageUrl, imageAlt, sortOrder, visible], index) => ({
+      title: title ?? "",
+      description: description ?? "",
+      imageUrl: imageUrl ?? "",
+      imageAlt: imageAlt ?? "",
+      sortOrder: parseSortOrder(sortOrder, index),
+      visible: parseVisible(visible),
+    }))
+    .filter((item) => item.title);
+
+const parseDownloadRows = (value: string): AdminProductDownloadItem[] =>
+  splitLines(value)
+    .map(([kind, title, url, description, sortOrder, visible], index) => ({
+      kind: parseEnum(ProductDownloadKind, kind, ProductDownloadKind.OTHER),
+      title: title ?? "",
+      url: url ?? "",
+      description: description ?? "",
+      sortOrder: parseSortOrder(sortOrder, index),
+      visible: parseVisible(visible),
+    }))
+    .filter((item) => item.title && item.url);
 
 export async function updateProductCoreAction(slug: string, formData: FormData) {
   const session = await requireAdminSession();
@@ -113,4 +213,38 @@ export async function updateProductTranslationAction(slug: string, formData: For
 
   revalidateProductPaths(slug, parsed.data.locale);
   redirect(`/admin/products/${slug}?saved=${parsed.data.locale}`);
+}
+
+export async function updateProductStructuredContentAction(slug: string, formData: FormData) {
+  const session = await requireAdminSession();
+  if (!isDatabaseConfigured()) redirect(`/admin/products/${slug}?error=database`);
+
+  const parsed = structuredSchema.safeParse({
+    media: formData.get("media"),
+    features: formData.get("features"),
+    specifications: formData.get("specifications"),
+    applications: formData.get("applications"),
+    downloads: formData.get("downloads"),
+  });
+  if (!parsed.success) redirect(`/admin/products/${slug}?error=structured`);
+
+  const result = await replaceProductStructuredContent({
+    slug,
+    media: parseMediaRows(parsed.data.media),
+    features: parseFeatureRows(parsed.data.features),
+    specifications: parseSpecificationRows(parsed.data.specifications),
+    applications: parseApplicationRows(parsed.data.applications),
+    downloads: parseDownloadRows(parsed.data.downloads),
+  });
+
+  await safeWriteAuditLog({
+    actorEmail: session.email,
+    action: "product.structured_content_updated",
+    entityType: "Product",
+    entityId: slug,
+    metadata: result,
+  });
+
+  revalidateProductPaths(slug);
+  redirect(`/admin/products/${slug}?saved=structured`);
 }

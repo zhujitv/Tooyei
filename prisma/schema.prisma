@@ -55,6 +55,24 @@ enum MediaKind {
   DOCUMENT
 }
 
+enum ProductMediaRole {
+  PRIMARY
+  GALLERY
+  DETAIL
+  APPLICATION
+  PACKAGING
+  VIDEO
+}
+
+enum ProductDownloadKind {
+  CATALOG
+  SPEC_SHEET
+  INSTALLATION_GUIDE
+  WARRANTY
+  CERTIFICATE
+  OTHER
+}
+
 enum ArticleKind {
   NEWS
   GUIDE
@@ -141,6 +159,8 @@ model Product {
   features       ProductFeature[]
   specifications ProductSpecification[]
   media          ProductMedia[]
+  applications   ProductApplication[]
+  downloads      ProductDownload[]
   inquiries      InquiryProduct[]
   createdAt      DateTime               @default(now())
   updatedAt      DateTime               @updatedAt
@@ -172,10 +192,15 @@ model ProductFeature {
   id           String                      @id @default(cuid())
   productId    String
   product      Product                     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  icon         String?
+  visible      Boolean                     @default(true)
   sortOrder    Int                         @default(0)
   translations ProductFeatureTranslation[]
+  createdAt    DateTime                    @default(now())
+  updatedAt    DateTime                    @updatedAt
 
   @@index([productId, sortOrder])
+  @@index([productId, visible, sortOrder])
 }
 
 model ProductFeatureTranslation {
@@ -184,6 +209,7 @@ model ProductFeatureTranslation {
   feature   ProductFeature @relation(fields: [featureId], references: [id], onDelete: Cascade)
   locale    Locale
   value     String
+  description String?
 
   @@unique([featureId, locale])
 }
@@ -192,11 +218,17 @@ model ProductSpecification {
   id           String                            @id @default(cuid())
   productId    String
   product      Product                           @relation(fields: [productId], references: [id], onDelete: Cascade)
+  group        String?
   value        String
+  unit         String?
+  visible      Boolean                           @default(true)
   sortOrder    Int                               @default(0)
   translations ProductSpecificationTranslation[]
+  createdAt    DateTime                          @default(now())
+  updatedAt    DateTime                          @updatedAt
 
   @@index([productId, sortOrder])
+  @@index([productId, visible, sortOrder])
 }
 
 model ProductSpecificationTranslation {
@@ -222,6 +254,8 @@ model MediaAsset {
   checksum    String?
   products    ProductMedia[]
   primaryFor  Product[]      @relation("ProductPrimaryImage")
+  applications ProductApplication[] @relation("ProductApplicationImage")
+  downloads   ProductDownload[] @relation("ProductDownloadAsset")
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 }
@@ -231,10 +265,71 @@ model ProductMedia {
   product   Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
   assetId   String
   asset     MediaAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  role      ProductMediaRole @default(GALLERY)
+  alt       String?
+  caption   String?
+  visible   Boolean    @default(true)
   sortOrder Int        @default(0)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
 
   @@id([productId, assetId])
   @@index([productId, sortOrder])
+  @@index([productId, role, visible, sortOrder])
+}
+
+model ProductApplication {
+  id           String                          @id @default(cuid())
+  productId    String
+  product      Product                         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  imageAssetId String?
+  imageAsset   MediaAsset?                     @relation("ProductApplicationImage", fields: [imageAssetId], references: [id], onDelete: SetNull)
+  visible      Boolean                         @default(true)
+  sortOrder    Int                             @default(0)
+  translations ProductApplicationTranslation[]
+  createdAt    DateTime                        @default(now())
+  updatedAt    DateTime                        @updatedAt
+
+  @@index([productId, visible, sortOrder])
+}
+
+model ProductApplicationTranslation {
+  id            String             @id @default(cuid())
+  applicationId String
+  application   ProductApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  locale        Locale
+  title         String
+  description   String?
+
+  @@unique([applicationId, locale])
+}
+
+model ProductDownload {
+  id           String                       @id @default(cuid())
+  productId    String
+  product      Product                      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  assetId      String
+  asset        MediaAsset                   @relation("ProductDownloadAsset", fields: [assetId], references: [id], onDelete: Cascade)
+  kind         ProductDownloadKind          @default(OTHER)
+  visible      Boolean                      @default(true)
+  sortOrder    Int                          @default(0)
+  translations ProductDownloadTranslation[]
+  createdAt    DateTime                     @default(now())
+  updatedAt    DateTime                     @updatedAt
+
+  @@index([productId, visible, sortOrder])
+  @@index([assetId])
+}
+
+model ProductDownloadTranslation {
+  id          String          @id @default(cuid())
+  downloadId  String
+  download    ProductDownload @relation(fields: [downloadId], references: [id], onDelete: Cascade)
+  locale      Locale
+  title       String
+  description String?
+
+  @@unique([downloadId, locale])
 }
 
 model Article {

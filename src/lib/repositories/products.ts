@@ -2,6 +2,7 @@ import {
   ContentStatus,
   Locale as DatabaseLocale,
   Prisma,
+  ProductMediaRole,
   TranslationStatus,
 } from "@/generated/prisma/client";
 import { products as sampleProducts, type LocalizedText, type Product } from "@/lib/content";
@@ -10,14 +11,31 @@ import { locales, type Locale } from "@/lib/site";
 
 const productInclude = {
   primaryImage: true,
+  media: {
+    where: { visible: true },
+    orderBy: [{ role: "asc" as const }, { sortOrder: "asc" as const }],
+    include: { asset: true },
+  },
   translations: { where: { status: TranslationStatus.PUBLISHED } },
   features: {
+    where: { visible: true },
     orderBy: { sortOrder: "asc" as const },
     include: { translations: true },
   },
   specifications: {
+    where: { visible: true },
     orderBy: { sortOrder: "asc" as const },
     include: { translations: true },
+  },
+  applications: {
+    where: { visible: true },
+    orderBy: { sortOrder: "asc" as const },
+    include: { imageAsset: true, translations: true },
+  },
+  downloads: {
+    where: { visible: true },
+    orderBy: { sortOrder: "asc" as const },
+    include: { asset: true, translations: true },
   },
 } satisfies Prisma.ProductInclude;
 
@@ -46,26 +64,80 @@ const localizedText = <T extends { locale: DatabaseLocale }>(
   ) as LocalizedText;
 };
 
-const toProduct = (product: DatabaseProduct): Product => ({
-  slug: product.slug,
-  sku: product.sku,
-  category: product.kind,
-  title: localizedText(product.translations, ({ title }) => title),
-  summary: localizedText(product.translations, ({ summary }) => summary),
-  seoTitle: localizedText(product.translations, ({ seoTitle, title }) => seoTitle || title),
-  seoDescription: localizedText(product.translations, ({ seoDescription, summary }) => seoDescription || summary),
-  image:
-    product.primaryImage?.url ??
-    sampleProducts.find(({ slug }) => slug === product.slug)?.image ??
-    "/media/product-tile-spc.jpg",
-  features: product.features.map(({ translations }) =>
-    localizedText(translations, ({ value }) => value),
-  ),
-  specifications: product.specifications.map(({ translations, value }) => ({
-    label: localizedText(translations, ({ label }) => label),
-    value,
-  })),
-});
+const isAllowedPublicAssetUrl = (url?: string | null) => {
+  const value = url?.trim();
+  if (!value) return false;
+  if (value.startsWith("/")) return !value.startsWith("//");
+
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "https:" || parsed.protocol === "http:";
+  } catch {
+    return false;
+  }
+};
+
+const toProduct = (product: DatabaseProduct): Product => {
+  const sampleImage = sampleProducts.find(({ slug }) => slug === product.slug)?.image;
+  const media = product.media
+    .filter(({ asset }) => isAllowedPublicAssetUrl(asset.url))
+    .map(({ asset, alt, caption, role }) => ({
+      url: asset.url,
+      alt: alt || asset.alt || product.sku,
+      caption: caption ?? undefined,
+      role,
+    }));
+  const hasPrimaryMedia = media.some(({ url, role }) => role === ProductMediaRole.PRIMARY && url === product.primaryImage?.url);
+
+  if (product.primaryImage && isAllowedPublicAssetUrl(product.primaryImage.url) && !hasPrimaryMedia) {
+    media.unshift({
+      url: product.primaryImage.url,
+      alt: product.primaryImage.alt || product.sku,
+      role: ProductMediaRole.PRIMARY,
+      caption: undefined,
+    });
+  }
+
+  const image = media.find(({ role }) => role === ProductMediaRole.PRIMARY)?.url ?? media[0]?.url ?? sampleImage ?? "/media/product-tile-spc.jpg";
+
+  return {
+    slug: product.slug,
+    sku: product.sku,
+    category: product.kind,
+    title: localizedText(product.translations, ({ title }) => title),
+    summary: localizedText(product.translations, ({ summary }) => summary),
+    seoTitle: localizedText(product.translations, ({ seoTitle, title }) => seoTitle || title),
+    seoDescription: localizedText(product.translations, ({ seoDescription, summary }) => seoDescription || summary),
+    image,
+    media,
+    features: product.features.map(({ translations, icon }) =>
+      Object.assign(localizedText(translations, ({ value }) => value), {
+        description: localizedText(translations, ({ description }) => description ?? ""),
+        icon: icon ?? undefined,
+      }),
+    ),
+    specifications: product.specifications.map(({ translations, group, unit, value }) => ({
+      group: group ?? undefined,
+      label: localizedText(translations, ({ label }) => label),
+      value,
+      unit: unit ?? undefined,
+    })),
+    applications: product.applications.map(({ translations, imageAsset }) => ({
+      title: localizedText(translations, ({ title }) => title),
+      description: localizedText(translations, ({ description }) => description ?? ""),
+      image: isAllowedPublicAssetUrl(imageAsset?.url) ? imageAsset?.url : undefined,
+      imageAlt: imageAsset?.alt ?? undefined,
+    })),
+    downloads: product.downloads
+      .filter(({ asset }) => isAllowedPublicAssetUrl(asset.url))
+      .map(({ translations, asset, kind }) => ({
+        title: localizedText(translations, ({ title }) => title),
+        description: localizedText(translations, ({ description }) => description ?? ""),
+        url: asset.url,
+        kind,
+      })),
+  };
+};
 
 export async function getPublishedProducts(): Promise<Product[]> {
   if (!isDatabaseConfigured()) return sampleProducts;

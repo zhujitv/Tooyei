@@ -5,6 +5,7 @@ import {
   Locale,
   PrismaClient,
   ProductKind,
+  ProductMediaRole,
   TranslationStatus,
 } from "../src/generated/prisma/client";
 import { products } from "../src/lib/content";
@@ -68,6 +69,24 @@ async function seed() {
         primaryImageId: asset.id,
         status: ContentStatus.PUBLISHED,
         featured: true,
+      },
+    });
+
+    await prisma.productMedia.upsert({
+      where: { productId_assetId: { productId: record.id, assetId: asset.id } },
+      update: {
+        role: ProductMediaRole.PRIMARY,
+        alt: product.title.zh,
+        sortOrder: 0,
+        visible: true,
+      },
+      create: {
+        productId: record.id,
+        assetId: asset.id,
+        role: ProductMediaRole.PRIMARY,
+        alt: product.title.zh,
+        sortOrder: 0,
+        visible: true,
       },
     });
 

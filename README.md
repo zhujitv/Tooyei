@@ -36,7 +36,10 @@ The admin inquiry detail page supports sales follow-up notes, note types and
 optional next follow-up dates for timeline-based tracking.
 The admin product module supports product search/filtering, status metrics,
 category assignment, featured/sort controls, translation publishing and SEO
-metadata editing.
+metadata editing. Product detail content is also structured into gallery media,
+feature modules, specifications, application scenarios and downloadable
+documents; the first editor uses Chinese bulk rows so catalog cleanup can move
+quickly before adding drag-and-drop media uploads.
 
 ## Quality checks
 

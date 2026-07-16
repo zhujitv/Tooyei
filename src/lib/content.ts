@@ -2,6 +2,32 @@ import type { Locale } from "@/lib/site";
 
 export type LocalizedText = Record<Locale, string>;
 
+export type ProductFeatureItem = LocalizedText & {
+  description?: LocalizedText;
+  icon?: string;
+};
+
+export type ProductMediaItem = {
+  url: string;
+  alt: string;
+  role: "PRIMARY" | "GALLERY" | "DETAIL" | "APPLICATION" | "PACKAGING" | "VIDEO";
+  caption?: string;
+};
+
+export type ProductApplicationItem = {
+  title: LocalizedText;
+  description: LocalizedText;
+  image?: string;
+  imageAlt?: string;
+};
+
+export type ProductDownloadItem = {
+  title: LocalizedText;
+  description?: LocalizedText;
+  url: string;
+  kind: "CATALOG" | "SPEC_SHEET" | "INSTALLATION_GUIDE" | "WARRANTY" | "CERTIFICATE" | "OTHER";
+};
+
 export type Product = {
   slug: string;
   sku: string;
@@ -11,8 +37,11 @@ export type Product = {
   seoTitle?: LocalizedText;
   seoDescription?: LocalizedText;
   image: string;
-  features: LocalizedText[];
-  specifications: { label: LocalizedText; value: string }[];
+  media?: ProductMediaItem[];
+  features: ProductFeatureItem[];
+  specifications: { group?: string; label: LocalizedText; value: string; unit?: string }[];
+  applications?: ProductApplicationItem[];
+  downloads?: ProductDownloadItem[];
 };
 
 export const products: Product[] = [
