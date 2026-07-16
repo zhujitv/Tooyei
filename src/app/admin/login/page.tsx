@@ -29,12 +29,12 @@ export default async function AdminLoginPage({
   const message = params.error ? messages[params.error] : undefined;
 
   return (
-    <main className="grid min-h-screen place-items-center bg-[#111411] px-5 py-12 text-white">
-      <Card className="w-full max-w-md border-white/10 bg-[#1a1e1a] text-white shadow-2xl">
+    <main className="grid min-h-screen place-items-center bg-[radial-gradient(circle_at_top_left,rgba(182,138,76,0.18),transparent_34%),linear-gradient(135deg,#070b14,#0b1020_52%,#111827)] px-5 py-12 text-white">
+      <Card className="w-full max-w-md rounded-3xl border-white/10 bg-white/[0.07] text-white shadow-[0_30px_90px_rgba(0,0,0,0.35)] backdrop-blur">
         <CardHeader>
-          <span className="mb-5 grid size-10 place-items-center rounded-sm bg-[#a63429] text-sm font-black">TY</span>
-          <CardTitle className="text-2xl">Tooyei 后台管理</CardTitle>
-          <CardDescription className="text-white/45">登录后可管理产品、翻译、发布状态和询盘。</CardDescription>
+          <span className="brand-mark mb-5 size-11 text-sm">TY</span>
+          <CardTitle className="text-2xl tracking-[-0.03em]">Tooyei 后台管理</CardTitle>
+          <CardDescription className="text-white/50">登录后可管理产品、翻译、发布状态、询盘和用户权限。</CardDescription>
         </CardHeader>
         <CardContent>
           {message && (
@@ -48,13 +48,13 @@ export default async function AdminLoginPage({
             <input type="hidden" name="returnTo" value={params.returnTo ?? ""} />
             <div className="space-y-2">
               <Label htmlFor="email">邮箱</Label>
-              <Input id="email" name="email" type="email" autoComplete="username" required className="border-white/10 bg-black/20" />
+              <Input id="email" name="email" type="email" autoComplete="username" required className="admin-field" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">密码</Label>
-              <Input id="password" name="password" type="password" minLength={12} autoComplete="current-password" required className="border-white/10 bg-black/20" />
+              <Input id="password" name="password" type="password" minLength={12} autoComplete="current-password" required className="admin-field" />
             </div>
-            <Button type="submit" className="w-full bg-[#a63429] text-white hover:bg-[#8d2b23]">登录</Button>
+            <Button type="submit" className="w-full bg-[#b68a4c] text-[#0b1220] hover:bg-[#c59b5c]">登录</Button>
           </form>
         </CardContent>
       </Card>

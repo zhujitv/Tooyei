@@ -85,7 +85,7 @@ export default async function AdminUsersPage({
       <div className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
         <div>
           <div className="flex items-center gap-3">
-            <span className="grid size-9 place-items-center rounded-sm bg-[#a63429] text-sm font-black">TY</span>
+            <span className="brand-mark size-9 text-sm">TY</span>
             <Badge variant="outline" className="border-white/15 text-white/65">后台设置</Badge>
           </div>
           <h1 className="mt-8 text-4xl font-semibold tracking-[-0.04em] sm:text-5xl">用户管理</h1>
@@ -126,10 +126,10 @@ export default async function AdminUsersPage({
       ) : null}
 
       <section className="mt-8 grid gap-6 lg:grid-cols-[1fr_380px]">
-        <Card className="border-white/10 bg-[#1a1e1a] text-white shadow-none">
+        <Card className="admin-card rounded-3xl">
           <CardHeader>
             <div className="flex items-center gap-3">
-              <Users className="size-5 text-[#d56a5d]" />
+              <Users className="size-5 text-[#d6b36a]" />
               <div>
                 <CardTitle>后台用户</CardTitle>
                 <p className="mt-1 text-sm text-white/40">当前登录：{session.email}</p>
@@ -158,7 +158,7 @@ export default async function AdminUsersPage({
                         <div className="font-medium">{user.name}</div>
                         <div className="mt-1 font-mono text-xs text-white/45">{user.email}</div>
                         {user.isBootstrapAdmin ? (
-                          <Badge className="mt-3 bg-[#a63429]">
+                          <Badge className="mt-3 bg-[#b68a4c] text-[#0b1220]">
                             <ShieldCheck className="size-3.5" />
                             Bootstrap Owner
                           </Badge>
@@ -190,7 +190,7 @@ export default async function AdminUsersPage({
                             minLength={2}
                             maxLength={80}
                             disabled={!canManageUsers}
-                            className="border-white/10 bg-black/20 disabled:opacity-60"
+                            className="admin-field disabled:opacity-60"
                           />
                           <div className="grid grid-cols-[1fr_auto] gap-3">
                             <select
@@ -198,20 +198,20 @@ export default async function AdminUsersPage({
                               defaultValue={user.role}
                               aria-label={`${user.email} 的角色`}
                               disabled={!canManageUsers || user.isBootstrapAdmin}
-                              className="h-9 rounded-lg border border-white/10 bg-black/20 px-3 text-sm disabled:opacity-60"
+                              className="h-9 rounded-lg admin-field px-3 text-sm disabled:opacity-60"
                             >
                               {Object.values(AdminRole).map((role) => (
                                 <option key={role} value={role}>{roleLabel[role]}</option>
                               ))}
                             </select>
-                            <label className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-3 text-sm text-white/65">
+                            <label className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.05] px-3 text-sm text-white/65">
                               <input
                                 type="checkbox"
                                 name="active"
                                 aria-label={`${user.email} 的启用状态`}
                                 defaultChecked={user.active}
                                 disabled={!canManageUsers || user.isBootstrapAdmin}
-                                className="size-4 accent-[#a63429] disabled:opacity-60"
+                                className="size-4 accent-[#b68a4c] disabled:opacity-60"
                               />
                               启用
                             </label>
@@ -220,7 +220,7 @@ export default async function AdminUsersPage({
                             type="submit"
                             size="sm"
                             disabled={!canManageUsers}
-                            className="bg-[#a63429] text-white hover:bg-[#8d2b23]"
+                            className="bg-[#b68a4c] text-[#0b1220] hover:bg-[#c59b5c]"
                           >
                             保存资料
                           </Button>
@@ -237,7 +237,7 @@ export default async function AdminUsersPage({
                             autoComplete="new-password"
                             placeholder="新密码，至少 12 位"
                             disabled={!canChangePassword}
-                            className="border-white/10 bg-black/20 placeholder:text-white/25 disabled:opacity-60"
+                            className="admin-field placeholder:text-white/25 disabled:opacity-60"
                           />
                           <Input
                             name="confirmPassword"
@@ -248,13 +248,13 @@ export default async function AdminUsersPage({
                             autoComplete="new-password"
                             placeholder="再次输入新密码"
                             disabled={!canChangePassword}
-                            className="border-white/10 bg-black/20 placeholder:text-white/25 disabled:opacity-60"
+                            className="admin-field placeholder:text-white/25 disabled:opacity-60"
                           />
                           <Button
                             type="submit"
                             size="sm"
                             disabled={!canChangePassword}
-                            className="bg-[#a63429] text-white hover:bg-[#8d2b23]"
+                            className="bg-[#b68a4c] text-[#0b1220] hover:bg-[#c59b5c]"
                           >
                             <KeyRound />
                             修改密码
@@ -272,10 +272,10 @@ export default async function AdminUsersPage({
           </CardContent>
         </Card>
 
-        <Card className="h-fit border-white/10 bg-[#1a1e1a] text-white shadow-none">
+        <Card className="h-fit admin-card rounded-3xl">
           <CardHeader>
             <div className="flex items-center gap-3">
-              <UserPlus className="size-5 text-[#d56a5d]" />
+              <UserPlus className="size-5 text-[#d6b36a]" />
               <div>
                 <CardTitle>新增用户</CardTitle>
                 <p className="mt-1 text-sm text-white/40">创建后用户即可用邮箱和密码登录后台。</p>
@@ -293,7 +293,7 @@ export default async function AdminUsersPage({
                   maxLength={80}
                   required
                   disabled={!canManageUsers}
-                  className="border-white/10 bg-black/20 disabled:opacity-60"
+                  className="admin-field disabled:opacity-60"
                 />
               </div>
               <div className="space-y-2">
@@ -305,7 +305,7 @@ export default async function AdminUsersPage({
                   maxLength={180}
                   required
                   disabled={!canManageUsers}
-                  className="border-white/10 bg-black/20 disabled:opacity-60"
+                  className="admin-field disabled:opacity-60"
                 />
               </div>
               <div className="space-y-2">
@@ -315,7 +315,7 @@ export default async function AdminUsersPage({
                   name="role"
                   defaultValue={AdminRole.EDITOR}
                   disabled={!canManageUsers}
-                  className="h-9 w-full rounded-lg border border-white/10 bg-black/20 px-3 text-sm disabled:opacity-60"
+                  className="h-9 w-full rounded-lg admin-field px-3 text-sm disabled:opacity-60"
                 >
                   {Object.values(AdminRole).map((role) => (
                     <option key={role} value={role}>{roleLabel[role]}</option>
@@ -333,7 +333,7 @@ export default async function AdminUsersPage({
                   autoComplete="new-password"
                   required
                   disabled={!canManageUsers}
-                  className="border-white/10 bg-black/20 disabled:opacity-60"
+                  className="admin-field disabled:opacity-60"
                 />
               </div>
               <div className="space-y-2">
@@ -347,13 +347,13 @@ export default async function AdminUsersPage({
                   autoComplete="new-password"
                   required
                   disabled={!canManageUsers}
-                  className="border-white/10 bg-black/20 disabled:opacity-60"
+                  className="admin-field disabled:opacity-60"
                 />
               </div>
               <Button
                 type="submit"
                 disabled={!canManageUsers}
-                className="w-full bg-[#a63429] text-white hover:bg-[#8d2b23]"
+                className="w-full bg-[#b68a4c] text-[#0b1220] hover:bg-[#c59b5c]"
               >
                 <UserPlus />
                 创建用户

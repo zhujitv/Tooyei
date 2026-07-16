@@ -30,7 +30,7 @@ export default async function ContentOperationsPage() {
         <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
           <div>
             <div className="flex items-center gap-3">
-              <span className="grid size-9 place-items-center rounded-sm bg-[#a63429] text-sm font-black">TY</span>
+              <span className="brand-mark size-9 text-sm">TY</span>
               <Badge variant="outline" className="border-white/15 text-white/65">后台管理</Badge>
             </div>
             <h1 className="mt-8 text-4xl font-semibold tracking-[-0.04em] sm:text-5xl">内容运营总览</h1>
@@ -55,20 +55,20 @@ export default async function ContentOperationsPage() {
 
         <section className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {metrics.map(({ label, value, icon: Icon }) => (
-            <Card key={label} className="border-white/10 bg-[#1a1e1a] text-white shadow-none">
+            <Card key={label} className="admin-card rounded-3xl">
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-sm font-medium text-white/55">{label}</CardTitle>
-                <Icon className="size-4 text-[#d56a5d]" />
+                <Icon className="size-4 text-[#d6b36a]" />
               </CardHeader>
               <CardContent><p className="font-mono text-4xl font-semibold">{value}</p></CardContent>
             </Card>
           ))}
         </section>
 
-        <Card className="mt-8 border-white/10 bg-[#1a1e1a] text-white shadow-none">
+        <Card className="mt-8 admin-card rounded-3xl">
           <CardHeader>
             <div className="flex items-center gap-3">
-              <Languages className="size-5 text-[#d56a5d]" />
+              <Languages className="size-5 text-[#d6b36a]" />
               <div>
                 <CardTitle>翻译发布流程</CardTitle>
                 <p className="mt-1 text-sm text-white/45">只有已发布的翻译会生成可索引页面和 hreflang 多语言入口。</p>
@@ -100,7 +100,7 @@ export default async function ContentOperationsPage() {
                       <TableCell className="font-mono text-white/40">{translation.missing}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-3">
-                          <Progress value={readiness} className="h-2 bg-white/10 [&_[data-slot=progress-indicator]]:bg-[#a63429]" />
+                          <Progress value={readiness} className="h-2 bg-white/10 [&_[data-slot=progress-indicator]]:bg-[#b68a4c]" />
                           <span className="w-10 text-right font-mono text-xs text-white/55">{readiness}%</span>
                         </div>
                       </TableCell>

@@ -113,16 +113,16 @@ export function ContactPage({ locale, products, selectedProductSlug, feedback }:
   const sourcePath = selectedProduct ? `${contactPath}?product=${selectedProduct.slug}` : contactPath;
 
   return (
-    <div className="min-h-screen bg-[#fbfaf7]">
+    <div className="site-shell">
       <SiteHeader locale={locale} />
       <main>
-        <section className="bg-[#1c201d] text-white">
+        <section className="site-dark-panel">
           <div className="mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
-            <p className="text-xs font-bold tracking-[0.18em] text-[#d56a5d]">
+            <p className="brand-eyebrow">
               {locale === "zh" ? t.enquiryEyebrow : "PROJECT ENQUIRY"}
             </p>
-            <h1 className="mt-5 text-5xl font-semibold tracking-[-0.04em]">{t.discuss}</h1>
-            <p className="mt-5 max-w-2xl leading-7 text-white/60">
+            <h1 className="mt-5 text-5xl font-semibold tracking-[-0.05em] sm:text-6xl">{t.discuss}</h1>
+            <p className="mt-6 max-w-2xl leading-8 text-white/65">
               {locale === "zh"
                 ? t.enquiryBody
                 : "Tell us the product system, specifications, quantity and destination market. Our export team will help shape the right solution."}
@@ -131,7 +131,7 @@ export function ContactPage({ locale, products, selectedProductSlug, feedback }:
         </section>
 
         <section className="mx-auto grid max-w-7xl gap-8 px-5 py-20 lg:grid-cols-[1.15fr_0.85fr] lg:px-8">
-          <Card className="border-[#d7d0c5] bg-white shadow-none">
+          <Card className="site-card rounded-3xl">
             <CardHeader>
               <CardTitle className="text-2xl">{formLabels.formTitle}</CardTitle>
               <p className="text-sm leading-6 text-muted-foreground">{formLabels.formBody}</p>
@@ -215,7 +215,7 @@ export function ContactPage({ locale, products, selectedProductSlug, feedback }:
                     className="min-h-36"
                   />
                 </div>
-                <Button type="submit" size="lg" className="w-full bg-[#a63429] hover:bg-[#8d2b23] sm:w-fit">
+                <Button type="submit" size="lg" className="w-full site-primary-button sm:w-fit">
                   {formLabels.submit}
                 </Button>
               </form>
@@ -223,18 +223,18 @@ export function ContactPage({ locale, products, selectedProductSlug, feedback }:
           </Card>
 
           <div className="grid gap-6 self-start">
-            <Card>
+            <Card className="site-card rounded-3xl">
               <CardHeader><CardTitle>{locale === "zh" ? "电子邮件" : "Email"}</CardTitle></CardHeader>
               <CardContent>
                 <p className="mb-6 text-sm leading-6 text-muted-foreground">
                   {locale === "zh" ? t.emailHelp : "Best for specifications, drawings, catalog requests and project documents."}
                 </p>
-                <Button asChild className="bg-[#a63429] hover:bg-[#8d2b23]">
+                <Button asChild className="site-primary-button">
                   <a href={`mailto:${siteConfig.email}?subject=Flooring project enquiry`}><Mail /> {siteConfig.email}</a>
                 </Button>
               </CardContent>
             </Card>
-            <Card>
+            <Card className="site-card rounded-3xl">
               <CardHeader><CardTitle>WhatsApp</CardTitle></CardHeader>
               <CardContent>
                 <p className="mb-6 text-sm leading-6 text-muted-foreground">

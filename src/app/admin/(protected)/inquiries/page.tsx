@@ -25,7 +25,7 @@ const statusColor: Record<string, string> = {
   IN_PROGRESS: "bg-amber-500/12 text-amber-300",
   WON: "bg-emerald-500/12 text-emerald-300",
   LOST: "bg-rose-500/12 text-rose-300",
-  SPAM: "bg-white/8 text-white/35",
+  SPAM: "bg-white/10 text-white/35",
 };
 
 const statuses = ["NEW", "QUALIFIED", "IN_PROGRESS", "WON", "LOST", "SPAM"] as const;
@@ -68,7 +68,7 @@ export default async function AdminInquiriesPage({
     <main className="mx-auto max-w-7xl px-5 py-10 lg:px-8 lg:py-14">
       <div className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
         <div>
-          <p className="text-xs font-bold tracking-[0.18em] text-[#d56a5d]">销售线索</p>
+          <p className="text-xs font-bold tracking-[0.18em] text-[#d6b36a]">销售线索</p>
           <h1 className="mt-4 text-4xl font-semibold tracking-[-0.04em]">询盘管理</h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-white/45">
             公开联系表单会保存到这里，方便按产品意向、负责人和跟进状态管理。
@@ -98,12 +98,12 @@ export default async function AdminInquiriesPage({
         </Alert>
       )}
 
-      <Card className="mt-8 border-white/10 bg-[#1a1e1a] text-white shadow-none">
+      <Card className="mt-8 admin-card rounded-3xl">
         <CardHeader>
           <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <Inbox className="size-5 text-[#d56a5d]" />
+                <Inbox className="size-5 text-[#d6b36a]" />
                 最新询盘
               </CardTitle>
               <p className="mt-2 text-sm text-white/40">共 {inquiries.length} 条匹配记录，按最新提交排序。</p>
@@ -114,7 +114,7 @@ export default async function AdminInquiriesPage({
           </div>
         </CardHeader>
         <CardContent>
-          <form action="/admin/inquiries" className="mb-6 grid gap-4 rounded-xl border border-white/10 bg-black/15 p-4 lg:grid-cols-[1.2fr_0.8fr_0.8fr_auto] lg:items-end">
+          <form action="/admin/inquiries" className="mb-6 grid gap-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4 lg:grid-cols-[1.2fr_0.8fr_0.8fr_auto] lg:items-end">
             <div className="space-y-2">
               <Label htmlFor="q">搜索</Label>
               <div className="relative">
@@ -124,7 +124,7 @@ export default async function AdminInquiriesPage({
                   name="q"
                   defaultValue={feedback.q || ""}
                   placeholder="姓名、邮箱、公司、留言、产品"
-                  className="border-white/10 bg-black/20 pl-9 text-white placeholder:text-white/30"
+                  className="admin-field pl-9 text-white placeholder:text-white/30"
                 />
               </div>
             </div>
@@ -134,7 +134,7 @@ export default async function AdminInquiriesPage({
                 id="status"
                 name="status"
                 defaultValue={feedback.status || ""}
-                className="h-9 w-full rounded-lg border border-white/10 bg-black/20 px-3 text-sm text-white"
+                className="h-9 w-full rounded-lg admin-field px-3 text-sm text-white"
               >
                 <option value="">全部状态</option>
                 {statuses.map((item) => (
@@ -150,7 +150,7 @@ export default async function AdminInquiriesPage({
                 id="assignedToId"
                 name="assignedToId"
                 defaultValue={feedback.assignedToId || ""}
-                className="h-9 w-full rounded-lg border border-white/10 bg-black/20 px-3 text-sm text-white"
+                className="h-9 w-full rounded-lg admin-field px-3 text-sm text-white"
               >
                 <option value="">全部负责人</option>
                 <option value="unassigned">未分配</option>
@@ -161,7 +161,7 @@ export default async function AdminInquiriesPage({
                 ))}
               </select>
             </div>
-            <Button type="submit" className="bg-[#a63429] hover:bg-[#8d2b23]">
+            <Button type="submit" className="bg-[#b68a4c] text-[#0b1220] hover:bg-[#c59b5c]">
               <Filter />
               筛选
             </Button>

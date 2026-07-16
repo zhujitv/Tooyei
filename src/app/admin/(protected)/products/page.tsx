@@ -17,12 +17,12 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "产品管理", robots: { index: false, follow: false } };
 
 const statusColor: Record<string, string> = {
-  DRAFT: "bg-white/8 text-white/45",
+  DRAFT: "bg-white/10 text-white/45",
   ARCHIVED: "bg-rose-500/12 text-rose-300",
   PUBLISHED: "bg-emerald-500/12 text-emerald-300",
   NEEDS_REVIEW: "bg-amber-500/12 text-amber-300",
   MACHINE_DRAFT: "bg-sky-500/12 text-sky-300",
-  MISSING: "bg-white/8 text-white/35",
+  MISSING: "bg-white/10 text-white/35",
 };
 
 const statusLabel: Record<string, string> = {
@@ -80,14 +80,14 @@ export default async function AdminProductsPage({
   const metricCards = [
     { label: "全部产品", value: stats.total, tone: "text-white", icon: Package },
     { label: "已发布", value: stats.published, tone: "text-emerald-300", icon: Database },
-    { label: "精选产品", value: stats.featured, tone: "text-[#d56a5d]", icon: Star },
+    { label: "精选产品", value: stats.featured, tone: "text-[#d6b36a]", icon: Star },
     { label: "待处理翻译", value: stats.needsReview + stats.missing, tone: "text-amber-300", icon: Languages },
   ];
 
   return (
     <main className="mx-auto max-w-7xl px-5 py-10 lg:px-8 lg:py-14">
       <div className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
-        <div><p className="text-xs font-bold tracking-[0.18em] text-[#d56a5d]">产品目录</p><h1 className="mt-4 text-4xl font-semibold tracking-[-0.04em]">产品管理</h1><p className="mt-3 max-w-2xl text-sm leading-6 text-white/45">管理产品基础信息、发布状态、精选排序、分类和多语言 SEO 内容。</p></div>
+        <div><p className="text-xs font-bold tracking-[0.18em] text-[#d6b36a]">产品目录</p><h1 className="mt-4 text-4xl font-semibold tracking-[-0.04em]">产品管理</h1><p className="mt-3 max-w-2xl text-sm leading-6 text-white/45">管理产品基础信息、发布状态、精选排序、分类和多语言 SEO 内容。</p></div>
         <Badge className={databaseReady ? "bg-emerald-600" : "bg-amber-600"}><Database className="size-3.5" />{databaseReady ? "可编辑" : "示例只读"}</Badge>
       </div>
 
@@ -95,10 +95,10 @@ export default async function AdminProductsPage({
 
       <section className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {metricCards.map(({ label, value, tone, icon: Icon }) => (
-          <Card key={label} className="border-white/10 bg-[#1a1e1a] text-white shadow-none">
+          <Card key={label} className="admin-card rounded-3xl">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-medium text-white/55">{label}</CardTitle>
-              <Icon className="size-4 text-[#d56a5d]" />
+              <Icon className="size-4 text-[#d6b36a]" />
             </CardHeader>
             <CardContent>
               <p className={`font-mono text-3xl font-semibold ${tone}`}>{value}</p>
@@ -107,11 +107,11 @@ export default async function AdminProductsPage({
         ))}
       </section>
 
-      <Card className="mt-8 border-white/10 bg-[#1a1e1a] text-white shadow-none">
+      <Card className="mt-8 admin-card rounded-3xl">
         <CardHeader>
           <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
             <div>
-              <CardTitle className="flex items-center gap-2"><Languages className="size-5 text-[#d56a5d]"/>产品运营清单</CardTitle>
+              <CardTitle className="flex items-center gap-2"><Languages className="size-5 text-[#d6b36a]"/>产品运营清单</CardTitle>
               <p className="mt-2 text-sm text-white/40">当前筛选结果：{products.length} 个产品。</p>
             </div>
             <Button asChild variant="ghost" className="w-fit text-white/60 hover:bg-white/10 hover:text-white">
@@ -120,7 +120,7 @@ export default async function AdminProductsPage({
           </div>
         </CardHeader>
         <CardContent>
-          <form action="/admin/products" className="mb-6 grid gap-4 rounded-xl border border-white/10 bg-black/15 p-4 lg:grid-cols-[1.2fr_0.8fr_0.8fr_auto] lg:items-end">
+          <form action="/admin/products" className="mb-6 grid gap-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4 lg:grid-cols-[1.2fr_0.8fr_0.8fr_auto] lg:items-end">
             <div className="space-y-2">
               <Label htmlFor="q">搜索产品</Label>
               <div className="relative">
@@ -130,7 +130,7 @@ export default async function AdminProductsPage({
                   name="q"
                   defaultValue={filters.q || ""}
                   placeholder="产品名、SKU、slug、分类"
-                  className="border-white/10 bg-black/20 pl-9 text-white placeholder:text-white/30"
+                  className="admin-field pl-9 text-white placeholder:text-white/30"
                 />
               </div>
             </div>
@@ -140,7 +140,7 @@ export default async function AdminProductsPage({
                 id="status"
                 name="status"
                 defaultValue={status || ""}
-                className="h-9 w-full rounded-lg border border-white/10 bg-black/20 px-3 text-sm text-white"
+                className="h-9 w-full rounded-lg admin-field px-3 text-sm text-white"
               >
                 <option value="">全部状态</option>
                 {productStatuses.map((item) => (
@@ -154,7 +154,7 @@ export default async function AdminProductsPage({
                 id="kind"
                 name="kind"
                 defaultValue={kind || ""}
-                className="h-9 w-full rounded-lg border border-white/10 bg-black/20 px-3 text-sm text-white"
+                className="h-9 w-full rounded-lg admin-field px-3 text-sm text-white"
               >
                 <option value="">全部类型</option>
                 {productKinds.map((item) => (
@@ -162,7 +162,7 @@ export default async function AdminProductsPage({
                 ))}
               </select>
             </div>
-            <Button type="submit" className="bg-[#a63429] hover:bg-[#8d2b23]">
+            <Button type="submit" className="bg-[#b68a4c] text-[#0b1220] hover:bg-[#c59b5c]">
               <Filter />
               筛选
             </Button>
@@ -193,7 +193,7 @@ export default async function AdminProductsPage({
                     <p>{product.category}</p>
                     <p className="mt-1 text-white/35">{kindLabel[product.kind]}</p>
                   </TableCell>
-                  <TableCell>{product.featured ? <Badge className="bg-[#a63429] text-white">精选</Badge> : <span className="text-white/30">—</span>}</TableCell>
+                  <TableCell>{product.featured ? <Badge className="bg-[#b68a4c] text-[#0b1220]">精选</Badge> : <span className="text-white/30">—</span>}</TableCell>
                   <TableCell className="font-mono text-white/55">{product.sortOrder}</TableCell>
                   {locales.map((locale)=><TableCell key={locale}><Badge className={statusColor[product.translationStates[locale]]}>{statusLabel[product.translationStates[locale]]}</Badge></TableCell>)}
                   <TableCell className="whitespace-nowrap text-sm text-white/45">{formatDate(product.updatedAt)}</TableCell>

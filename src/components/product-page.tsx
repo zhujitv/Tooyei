@@ -84,7 +84,7 @@ export function ProductPage({ product, locale }: { product: Product; locale: Loc
   const hasFeatureDescriptions = product.features.some((feature) => feature.description?.[locale]);
 
   return (
-    <div className="min-h-screen bg-[#fbfaf7]">
+    <div className="site-shell">
       <SiteHeader locale={locale} />
       <main>
         <section className="mx-auto max-w-7xl px-5 py-10 lg:px-8 lg:py-16">
@@ -97,7 +97,7 @@ export function ProductPage({ product, locale }: { product: Product; locale: Loc
 
           <div className="grid gap-12 lg:grid-cols-2 lg:items-start">
             <div className="space-y-4">
-              <div className="relative aspect-square overflow-hidden bg-[#ece7df]">
+              <div className="relative aspect-square overflow-hidden rounded-3xl bg-[#e7eaf0] shadow-[0_24px_70px_rgba(15,23,42,0.12)]">
                 <ProductVisual media={primaryMedia} priority />
               </div>
               {gallery.length ? (
@@ -105,7 +105,7 @@ export function ProductPage({ product, locale }: { product: Product; locale: Loc
                   <p className="mb-3 text-xs font-bold tracking-[0.16em] text-muted-foreground">{labels.gallery}</p>
                   <div className="grid grid-cols-3 gap-3">
                     {gallery.map((item) => (
-                      <div key={`${item.role}-${item.url}`} className="relative aspect-square overflow-hidden bg-[#ece7df]">
+                      <div key={`${item.role}-${item.url}`} className="relative aspect-square overflow-hidden rounded-2xl bg-[#e7eaf0]">
                         <ProductVisual media={item} />
                       </div>
                     ))}
@@ -117,7 +117,7 @@ export function ProductPage({ product, locale }: { product: Product; locale: Loc
             <div className="lg:pt-8">
               <div className="flex items-center gap-3">
                 <Badge>{product.category}</Badge>
-                <span className="text-xs font-bold tracking-[0.16em] text-[#a63429]">{product.sku}</span>
+                <span className="brand-eyebrow">{product.sku}</span>
               </div>
               <h1 className="mt-6 text-4xl font-semibold tracking-[-0.04em] sm:text-5xl">{product.title[locale]}</h1>
               <p className="mt-6 text-lg leading-8 text-muted-foreground">{product.summary[locale]}</p>
@@ -131,12 +131,12 @@ export function ProductPage({ product, locale }: { product: Product; locale: Loc
                         key={feature.zh || feature.en}
                         className={
                           hasFeatureDescriptions
-                            ? "rounded-2xl border border-black/8 bg-white p-4 shadow-sm"
+                            ? "rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
                             : "flex items-center gap-2 text-sm font-medium"
                         }
                       >
                         <div className="flex items-center gap-2 text-sm font-semibold">
-                          <span className="grid size-6 shrink-0 place-items-center rounded-full bg-[#a63429]/10 text-[#a63429]">
+                          <span className="grid size-6 shrink-0 place-items-center rounded-full bg-[#b68a4c]/15 text-[#8a6530]">
                             <Check className="size-3.5" />
                           </span>
                           {feature[locale]}
@@ -154,7 +154,7 @@ export function ProductPage({ product, locale }: { product: Product; locale: Loc
 
               <div>
                 <h2 className="flex items-center gap-2 text-lg font-semibold">
-                  <Layers className="size-5 text-[#a63429]" />
+                  <Layers className="size-5 text-[#b68a4c]" />
                   {labels.specs}
                 </h2>
                 <dl className="mt-5 divide-y divide-black/8 border-y border-black/8">
@@ -173,7 +173,7 @@ export function ProductPage({ product, locale }: { product: Product; locale: Loc
                 </dl>
               </div>
 
-              <Button asChild size="lg" className="mt-10 bg-[#a63429] hover:bg-[#8d2b23]">
+              <Button asChild size="lg" className="mt-10 site-primary-button">
                 <Link href={contactHref}>
                   {t.discuss}
                   <ArrowRight />
@@ -184,17 +184,17 @@ export function ProductPage({ product, locale }: { product: Product; locale: Loc
         </section>
 
         {product.applications?.length ? (
-          <section className="border-y border-black/8 bg-white">
+          <section className="border-y border-slate-200 bg-white">
             <div className="mx-auto max-w-7xl px-5 py-16 lg:px-8">
               <h2 className="flex items-center gap-2 text-3xl font-semibold tracking-[-0.03em]">
-                <MapPin className="size-6 text-[#a63429]" />
+                <MapPin className="size-6 text-[#b68a4c]" />
                 {labels.applications}
               </h2>
               <div className="mt-8 grid gap-5 md:grid-cols-3">
                 {product.applications.map((application) => (
-                  <Card key={application.title.zh || application.title.en} className="overflow-hidden border-black/8 shadow-none">
+                  <Card key={application.title.zh || application.title.en} className="overflow-hidden rounded-3xl border-slate-200 shadow-none">
                     {application.image ? (
-                      <div className="relative aspect-[4/3] bg-[#ece7df]">
+                      <div className="relative aspect-[4/3] bg-[#e7eaf0]">
                         <ProductVisual
                           media={{
                             url: application.image,
@@ -217,7 +217,7 @@ export function ProductPage({ product, locale }: { product: Product; locale: Loc
 
         {product.downloads?.length ? (
           <section className="mx-auto max-w-7xl px-5 py-16 lg:px-8">
-            <div className="rounded-3xl bg-[#1c201d] p-6 text-white lg:p-8">
+            <div className="site-dark-panel rounded-3xl p-6 lg:p-8">
               <h2 className="text-2xl font-semibold tracking-[-0.03em]">{labels.downloads}</h2>
               <div className="mt-6 grid gap-4 md:grid-cols-2">
                 {product.downloads.map((download) => (
@@ -226,9 +226,9 @@ export function ProductPage({ product, locale }: { product: Product; locale: Loc
                     href={download.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="rounded-2xl border border-white/10 bg-white/5 p-5 transition hover:border-[#d56a5d]/50 hover:bg-white/8"
+                    className="rounded-2xl border border-white/10 bg-white/5 p-5 transition hover:border-[#d6b36a]/50 hover:bg-white/10"
                   >
-                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#d56a5d]">
+                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#d6b36a]">
                       {downloadKindLabel[download.kind]?.[locale] ?? downloadKindLabel.OTHER[locale]}
                     </p>
                     <div className="mt-3 flex items-start justify-between gap-4">

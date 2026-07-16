@@ -163,7 +163,7 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
 
       <div className="mt-7 flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
-          <p className="font-mono text-xs tracking-[0.16em] text-[#d56a5d]">
+          <p className="font-mono text-xs tracking-[0.16em] text-[#d6b36a]">
             {product.sku} · {product.slug}
           </p>
           <h1 className="mt-3 text-4xl font-semibold tracking-[-0.04em]">产品编辑器</h1>
@@ -213,7 +213,7 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
         </Alert>
       ) : null}
 
-      <Card className="mt-8 border-white/10 bg-[#1a1e1a] text-white shadow-none">
+      <Card className="mt-8 admin-card rounded-3xl">
         <CardHeader>
           <CardTitle>基础信息</CardTitle>
           <p className="text-sm text-white/40">这些字段直接影响产品列表排序、公开可见性和产品分类。</p>
@@ -223,7 +223,7 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
             <div className="grid gap-5 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="slug">URL Slug</Label>
-                <Input id="slug" value={product.slug} readOnly className="border-white/10 bg-black/30 text-white/55" />
+                <Input id="slug" value={product.slug} readOnly className="border-white/10 bg-white/[0.07] text-white/55" />
                 <p className="text-xs text-white/35">Slug 暂时只读；修改 URL 需要同步创建旧链接跳转。</p>
               </div>
               <div className="space-y-2">
@@ -236,7 +236,7 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
                   maxLength={80}
                   required
                   disabled={!databaseReady}
-                  className="border-white/10 bg-black/20 disabled:opacity-60"
+                  className="admin-field disabled:opacity-60"
                 />
               </div>
               <div className="space-y-2">
@@ -247,7 +247,7 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
                   defaultValue={product.categoryId ?? ""}
                   required
                   disabled={!databaseReady}
-                  className="h-9 w-full rounded-lg border border-white/10 bg-black/20 px-3 text-sm disabled:opacity-60"
+                  className="h-9 w-full rounded-lg admin-field px-3 text-sm disabled:opacity-60"
                 >
                   <option value="" disabled>
                     请选择分类
@@ -266,7 +266,7 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
                   name="status"
                   defaultValue={product.status}
                   disabled={!databaseReady}
-                  className="h-9 w-full rounded-lg border border-white/10 bg-black/20 px-3 text-sm disabled:opacity-60"
+                  className="h-9 w-full rounded-lg admin-field px-3 text-sm disabled:opacity-60"
                 >
                   {Object.values(ContentStatus).map((status) => (
                     <option key={status} value={status}>
@@ -285,29 +285,29 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
                   max={999999}
                   defaultValue={product.sortOrder}
                   disabled={!databaseReady}
-                  className="border-white/10 bg-black/20 disabled:opacity-60"
+                  className="admin-field disabled:opacity-60"
                 />
               </div>
               <div className="space-y-2">
                 <Label>当前类型</Label>
-                <div className="flex h-9 items-center rounded-lg border border-white/10 bg-black/20 px-3 text-sm text-white/60">
+                <div className="flex h-9 items-center rounded-lg border border-white/10 bg-white/[0.05] px-3 text-sm text-white/60">
                   {kindLabel[product.kind]}
                 </div>
               </div>
             </div>
-            <label className="flex items-center gap-3 rounded-lg border border-white/10 bg-black/15 px-4 py-3 text-sm text-white/70">
+            <label className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white/70">
               <input
                 type="checkbox"
                 name="featured"
                 defaultChecked={product.featured}
                 disabled={!databaseReady}
-                className="size-4 accent-[#a63429] disabled:opacity-60"
+                className="size-4 accent-[#b68a4c] disabled:opacity-60"
               />
               设为精选产品，用于首页和产品排序优先展示
             </label>
             <div className="flex flex-col gap-3 border-t border-white/10 pt-5 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm text-white/35">最后更新：{formatDate(product.updatedAt)}</p>
-              <Button type="submit" disabled={!databaseReady} className="bg-[#a63429] hover:bg-[#8d2b23]">
+              <Button type="submit" disabled={!databaseReady} className="bg-[#b68a4c] text-[#0b1220] hover:bg-[#c59b5c]">
                 <Save />
                 保存基础信息
               </Button>
@@ -316,12 +316,12 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
         </CardContent>
       </Card>
 
-      <Card className="mt-8 border-white/10 bg-[#1a1e1a] text-white shadow-none">
+      <Card className="mt-8 admin-card rounded-3xl">
         <CardHeader>
           <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <ListChecks className="size-5 text-[#d56a5d]" />
+                <ListChecks className="size-5 text-[#d6b36a]" />
                 结构化内容
               </CardTitle>
               <p className="mt-2 text-sm text-white/40">
@@ -329,17 +329,17 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
               </p>
             </div>
             <div className="grid grid-cols-5 gap-2 text-center text-xs text-white/45">
-              <span className="rounded-lg bg-black/20 px-3 py-2">图库 {product.media.length}</span>
-              <span className="rounded-lg bg-black/20 px-3 py-2">卖点 {product.features.length}</span>
-              <span className="rounded-lg bg-black/20 px-3 py-2">参数 {product.specifications.length}</span>
-              <span className="rounded-lg bg-black/20 px-3 py-2">场景 {product.applications.length}</span>
-              <span className="rounded-lg bg-black/20 px-3 py-2">资料 {product.downloads.length}</span>
+              <span className="rounded-lg bg-white/[0.05] px-3 py-2">图库 {product.media.length}</span>
+              <span className="rounded-lg bg-white/[0.05] px-3 py-2">卖点 {product.features.length}</span>
+              <span className="rounded-lg bg-white/[0.05] px-3 py-2">参数 {product.specifications.length}</span>
+              <span className="rounded-lg bg-white/[0.05] px-3 py-2">场景 {product.applications.length}</span>
+              <span className="rounded-lg bg-white/[0.05] px-3 py-2">资料 {product.downloads.length}</span>
             </div>
           </div>
         </CardHeader>
         <CardContent>
           <form action={saveStructuredAction} className="space-y-6">
-            <div className="rounded-xl border border-white/10 bg-black/15 p-4">
+            <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <Label htmlFor="media">产品图片 / 图库</Label>
                 <Badge variant="outline" className="border-white/15 text-white/50">
@@ -352,13 +352,13 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
                 defaultValue={mediaValue}
                 disabled={!databaseReady}
                 placeholder="PRIMARY | /media/product.jpg | 图片ALT | 图片说明 | 0 | 显示"
-                className="min-h-36 border-white/10 bg-black/30 font-mono text-xs disabled:opacity-60"
+                className="min-h-36 border-white/10 bg-white/[0.07] font-mono text-xs disabled:opacity-60"
               />
               <p className="mt-2 text-xs text-white/35">格式：角色 | 图片URL | ALT | 说明 | 排序 | 显示/隐藏</p>
             </div>
 
             <div className="grid gap-6 lg:grid-cols-2">
-              <div className="rounded-xl border border-white/10 bg-black/15 p-4">
+              <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
                 <Label htmlFor="features">卖点模块</Label>
                 <Textarea
                   id="features"
@@ -366,12 +366,12 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
                   defaultValue={featureValue}
                   disabled={!databaseReady}
                   placeholder="100% 防水 | 适合厨房、浴室和商业空间 | shield | 0 | 显示"
-                  className="mt-3 min-h-44 border-white/10 bg-black/30 font-mono text-xs disabled:opacity-60"
+                  className="mt-3 min-h-44 border-white/10 bg-white/[0.07] font-mono text-xs disabled:opacity-60"
                 />
                 <p className="mt-2 text-xs text-white/35">格式：标题 | 描述 | 图标代号 | 排序 | 显示/隐藏</p>
               </div>
 
-              <div className="rounded-xl border border-white/10 bg-black/15 p-4">
+              <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
                 <Label htmlFor="specifications">产品参数表</Label>
                 <Textarea
                   id="specifications"
@@ -379,14 +379,14 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
                   defaultValue={specificationValue}
                   disabled={!databaseReady}
                   placeholder="结构 | 总厚度 | 5.0 | mm | 0 | 显示"
-                  className="mt-3 min-h-44 border-white/10 bg-black/30 font-mono text-xs disabled:opacity-60"
+                  className="mt-3 min-h-44 border-white/10 bg-white/[0.07] font-mono text-xs disabled:opacity-60"
                 />
                 <p className="mt-2 text-xs text-white/35">格式：分组 | 参数名 | 参数值 | 单位 | 排序 | 显示/隐藏</p>
               </div>
             </div>
 
             <div className="grid gap-6 lg:grid-cols-2">
-              <div className="rounded-xl border border-white/10 bg-black/15 p-4">
+              <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
                 <Label htmlFor="applications">应用场景</Label>
                 <Textarea
                   id="applications"
@@ -394,12 +394,12 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
                   defaultValue={applicationValue}
                   disabled={!databaseReady}
                   placeholder="酒店客房 | 防水耐磨，适合中高人流项目 | /media/hotel.jpg | 酒店地板应用 | 0 | 显示"
-                  className="mt-3 min-h-44 border-white/10 bg-black/30 font-mono text-xs disabled:opacity-60"
+                  className="mt-3 min-h-44 border-white/10 bg-white/[0.07] font-mono text-xs disabled:opacity-60"
                 />
                 <p className="mt-2 text-xs text-white/35">格式：标题 | 描述 | 图片URL | 图片ALT | 排序 | 显示/隐藏</p>
               </div>
 
-              <div className="rounded-xl border border-white/10 bg-black/15 p-4">
+              <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <Label htmlFor="downloads">下载资料</Label>
                   <Badge variant="outline" className="border-white/15 text-white/50">
@@ -414,7 +414,7 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
                   defaultValue={downloadValue}
                   disabled={!databaseReady}
                   placeholder="SPEC_SHEET | TY602 规格表 | /downloads/ty602.pdf | 含尺寸、包装和技术参数 | 0 | 显示"
-                  className="min-h-44 border-white/10 bg-black/30 font-mono text-xs disabled:opacity-60"
+                  className="min-h-44 border-white/10 bg-white/[0.07] font-mono text-xs disabled:opacity-60"
                 />
                 <p className="mt-2 text-xs text-white/35">格式：类型 | 标题 | 文件URL | 描述 | 排序 | 显示/隐藏</p>
               </div>
@@ -425,7 +425,7 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
                 <ImageIcon className="size-4" />
                 当前阶段管理 URL；文件上传和对象存储可在下一阶段接入。
               </p>
-              <Button type="submit" disabled={!databaseReady} className="bg-[#a63429] hover:bg-[#8d2b23]">
+              <Button type="submit" disabled={!databaseReady} className="bg-[#b68a4c] text-[#0b1220] hover:bg-[#c59b5c]">
                 <Save />
                 保存结构化内容
               </Button>
@@ -436,7 +436,7 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
 
       <div className="mt-8 space-y-6">
         {product.translations.map((translation) => (
-          <Card key={translation.locale} className="border-white/10 bg-[#1a1e1a] text-white shadow-none">
+          <Card key={translation.locale} className="admin-card rounded-3xl">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle>{languageNames[translation.locale]}</CardTitle>
@@ -459,7 +459,7 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
                     maxLength={180}
                     required
                     disabled={!databaseReady}
-                    className="border-white/10 bg-black/20 disabled:opacity-60"
+                    className="admin-field disabled:opacity-60"
                   />
                 </div>
                 <div className="space-y-2">
@@ -472,7 +472,7 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
                     maxLength={800}
                     required
                     disabled={!databaseReady}
-                    className="min-h-28 border-white/10 bg-black/20 disabled:opacity-60"
+                    className="min-h-28 admin-field disabled:opacity-60"
                   />
                 </div>
                 <div className="grid gap-5 sm:grid-cols-2">
@@ -485,7 +485,7 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
                       maxLength={220}
                       disabled={!databaseReady}
                       placeholder="为空时使用产品标题"
-                      className="border-white/10 bg-black/20 placeholder:text-white/25 disabled:opacity-60"
+                      className="admin-field placeholder:text-white/25 disabled:opacity-60"
                     />
                   </div>
                   <div className="space-y-2">
@@ -495,7 +495,7 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
                       name="status"
                       defaultValue={translation.status}
                       disabled={!databaseReady}
-                      className="h-9 w-full rounded-lg border border-white/10 bg-black/20 px-3 text-sm disabled:opacity-60"
+                      className="h-9 w-full rounded-lg admin-field px-3 text-sm disabled:opacity-60"
                     >
                       {statuses.map((status) => (
                         <option key={status} value={status}>
@@ -514,11 +514,11 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
                     maxLength={360}
                     disabled={!databaseReady}
                     placeholder="为空时使用产品摘要"
-                    className="min-h-20 border-white/10 bg-black/20 placeholder:text-white/25 disabled:opacity-60"
+                    className="min-h-20 admin-field placeholder:text-white/25 disabled:opacity-60"
                   />
                 </div>
                 <div className="flex justify-end">
-                  <Button type="submit" disabled={!databaseReady} className="bg-[#a63429] hover:bg-[#8d2b23]">
+                  <Button type="submit" disabled={!databaseReady} className="bg-[#b68a4c] text-[#0b1220] hover:bg-[#c59b5c]">
                     <Save />
                     保存 {translation.locale.toUpperCase()}
                   </Button>

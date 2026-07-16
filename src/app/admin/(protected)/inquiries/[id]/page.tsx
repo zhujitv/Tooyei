@@ -49,7 +49,7 @@ const statusColor: Record<string, string> = {
   IN_PROGRESS: "bg-amber-500/12 text-amber-300",
   WON: "bg-emerald-500/12 text-emerald-300",
   LOST: "bg-rose-500/12 text-rose-300",
-  SPAM: "bg-white/8 text-white/35",
+  SPAM: "bg-white/10 text-white/35",
 };
 
 const formatDate = (date: Date) =>
@@ -103,7 +103,7 @@ export default async function AdminInquiryDetailPage({
 
       <div className="mt-7 flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
-          <p className="text-xs font-bold tracking-[0.18em] text-[#d56a5d]">询盘详情</p>
+          <p className="text-xs font-bold tracking-[0.18em] text-[#d6b36a]">询盘详情</p>
           <h1 className="mt-3 text-4xl font-semibold tracking-[-0.04em]">{inquiry.name}</h1>
           <p className="mt-3 text-sm text-white/45">提交时间：{formatDate(inquiry.createdAt)}</p>
         </div>
@@ -136,14 +136,14 @@ export default async function AdminInquiryDetailPage({
       )}
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
-        <Card className="border-white/10 bg-[#1a1e1a] text-white shadow-none">
+        <Card className="admin-card rounded-3xl">
           <CardHeader>
             <CardTitle>联系方式</CardTitle>
           </CardHeader>
           <CardContent className="space-y-5">
             <div>
               <p className="text-sm text-white/40">邮箱</p>
-              <a href={`mailto:${inquiry.email}`} className="mt-1 inline-flex items-center gap-2 text-white hover:text-[#d56a5d]">
+              <a href={`mailto:${inquiry.email}`} className="mt-1 inline-flex items-center gap-2 text-white hover:text-[#d6b36a]">
                 <Mail className="size-4" />
                 {inquiry.email}
               </a>
@@ -181,10 +181,10 @@ export default async function AdminInquiryDetailPage({
           </CardContent>
         </Card>
 
-        <Card className="border-white/10 bg-[#1a1e1a] text-white shadow-none">
+        <Card className="admin-card rounded-3xl">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <MessageSquare className="size-5 text-[#d56a5d]" />
+              <MessageSquare className="size-5 text-[#d6b36a]" />
               跟进信息
             </CardTitle>
           </CardHeader>
@@ -199,7 +199,7 @@ export default async function AdminInquiryDetailPage({
                     name="status"
                     defaultValue={inquiry.status}
                     disabled={!databaseReady}
-                    className="h-9 w-full rounded-lg border border-white/10 bg-black/20 px-3 text-sm disabled:opacity-60"
+                    className="h-9 w-full rounded-lg admin-field px-3 text-sm disabled:opacity-60"
                   >
                     {statuses.map((status) => (
                       <option key={status} value={status}>
@@ -215,7 +215,7 @@ export default async function AdminInquiryDetailPage({
                     name="assignedToId"
                     defaultValue={inquiry.assignedTo?.id || ""}
                     disabled={!databaseReady || assignees.length === 0}
-                    className="h-9 w-full rounded-lg border border-white/10 bg-black/20 px-3 text-sm disabled:opacity-60"
+                    className="h-9 w-full rounded-lg admin-field px-3 text-sm disabled:opacity-60"
                   >
                     <option value="">未分配</option>
                     {assignees.map((user) => (
@@ -226,7 +226,7 @@ export default async function AdminInquiryDetailPage({
                   </select>
                 </div>
               </div>
-              <Button type="submit" disabled={!databaseReady} className="bg-[#a63429] hover:bg-[#8d2b23]">
+              <Button type="submit" disabled={!databaseReady} className="bg-[#b68a4c] text-[#0b1220] hover:bg-[#c59b5c]">
                 <Save />
                 保存跟进
               </Button>
@@ -238,7 +238,7 @@ export default async function AdminInquiryDetailPage({
         </Card>
       </div>
 
-      <Card className="mt-6 border-white/10 bg-[#1a1e1a] text-white shadow-none">
+      <Card className="mt-6 admin-card rounded-3xl">
         <CardHeader>
           <CardTitle>项目需求</CardTitle>
         </CardHeader>
@@ -261,10 +261,10 @@ export default async function AdminInquiryDetailPage({
       </Card>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
-        <Card className="border-white/10 bg-[#1a1e1a] text-white shadow-none">
+        <Card className="admin-card rounded-3xl">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <NotebookPen className="size-5 text-[#d56a5d]" />
+              <NotebookPen className="size-5 text-[#d6b36a]" />
               新增跟进记录
             </CardTitle>
           </CardHeader>
@@ -278,7 +278,7 @@ export default async function AdminInquiryDetailPage({
                   name="kind"
                   defaultValue="GENERAL"
                   disabled={!databaseReady}
-                  className="h-9 w-full rounded-lg border border-white/10 bg-black/20 px-3 text-sm disabled:opacity-60"
+                  className="h-9 w-full rounded-lg admin-field px-3 text-sm disabled:opacity-60"
                 >
                   {noteKinds.map((kind) => (
                     <option key={kind} value={kind}>
@@ -297,7 +297,7 @@ export default async function AdminInquiryDetailPage({
                   required
                   disabled={!databaseReady}
                   placeholder="例如：已通过 WhatsApp 联系客户，客户需要 4mm SPC 报价和样品寄送方案。"
-                  className="min-h-32 border-white/10 bg-black/20 placeholder:text-white/25 disabled:opacity-60"
+                  className="min-h-32 admin-field placeholder:text-white/25 disabled:opacity-60"
                 />
               </div>
               <div className="space-y-2">
@@ -307,10 +307,10 @@ export default async function AdminInquiryDetailPage({
                   name="nextFollowUpAt"
                   type="datetime-local"
                   disabled={!databaseReady}
-                  className="border-white/10 bg-black/20 disabled:opacity-60"
+                  className="admin-field disabled:opacity-60"
                 />
               </div>
-              <Button type="submit" disabled={!databaseReady} className="bg-[#a63429] hover:bg-[#8d2b23]">
+              <Button type="submit" disabled={!databaseReady} className="bg-[#b68a4c] text-[#0b1220] hover:bg-[#c59b5c]">
                 <Save />
                 保存记录
               </Button>
@@ -318,10 +318,10 @@ export default async function AdminInquiryDetailPage({
           </CardContent>
         </Card>
 
-        <Card className="border-white/10 bg-[#1a1e1a] text-white shadow-none">
+        <Card className="admin-card rounded-3xl">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <CalendarClock className="size-5 text-[#d56a5d]" />
+              <CalendarClock className="size-5 text-[#d6b36a]" />
               跟进时间线
             </CardTitle>
           </CardHeader>
@@ -333,7 +333,7 @@ export default async function AdminInquiryDetailPage({
             ) : (
               <div className="space-y-4">
                 {notes.map((note) => (
-                  <div key={note.id} className="rounded-xl border border-white/10 bg-black/15 p-4">
+                  <div key={note.id} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
                     <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-start">
                       <div>
                         <Badge variant="outline" className="border-white/15 text-white/65">
@@ -355,7 +355,7 @@ export default async function AdminInquiryDetailPage({
         </Card>
       </div>
 
-      <Card className="mt-6 border-white/10 bg-[#1a1e1a] text-white shadow-none">
+      <Card className="mt-6 admin-card rounded-3xl">
         <CardHeader>
           <CardTitle>活动记录</CardTitle>
         </CardHeader>
@@ -365,7 +365,7 @@ export default async function AdminInquiryDetailPage({
           ) : (
             <div className="space-y-4">
               {auditLogs.map((log) => (
-                <div key={log.id} className="rounded-xl border border-white/10 bg-black/15 p-4">
+                <div key={log.id} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
                   <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
                     <div>
                       <p className="font-medium">{actionLabel(log.action)}</p>

@@ -42,7 +42,7 @@ const buildHtml = (inquiry: AdminInquiryDetail) => {
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;background:#ffffff;border-radius:16px;padding:32px;border:1px solid #e7e0d6;">
             <tr>
               <td>
-                <p style="margin:0 0 8px;color:#a63429;font-size:12px;font-weight:700;letter-spacing:.14em;">TOOYEI INQUIRY</p>
+                <p style="margin:0 0 8px;color:#b68a4c;font-size:12px;font-weight:700;letter-spacing:.14em;">TOOYEI INQUIRY</p>
                 <h1 style="margin:0 0 16px;font-size:28px;line-height:1.2;">New website inquiry</h1>
                 <p style="margin:0 0 24px;color:#6b7280;line-height:1.6;">A visitor submitted the public inquiry form. Open the admin page to assign ownership and continue follow-up.</p>
                 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-top:1px solid #eee7dd;border-bottom:1px solid #eee7dd;padding:12px 0;margin-bottom:24px;">
@@ -56,7 +56,7 @@ const buildHtml = (inquiry: AdminInquiryDetail) => {
                 </table>
                 <p style="margin:0 0 8px;color:#6b7280;font-size:13px;">Message</p>
                 <div style="white-space:pre-wrap;margin:0 0 24px;padding:16px;border-radius:12px;background:#f8f7f4;color:#111827;line-height:1.6;">${escapeHtml(inquiry.message)}</div>
-                <a href="${adminUrl}" style="display:inline-block;background:#a63429;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:10px;font-weight:700;">Open inquiry</a>
+                <a href="${adminUrl}" style="display:inline-block;background:#0b1220;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:10px;font-weight:700;">Open inquiry</a>
               </td>
             </tr>
           </table>
