@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BookOpen, LayoutDashboard, LogOut, Package } from "lucide-react";
+import { BookOpen, LayoutDashboard, LogOut, MessageSquare, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { AdminSession } from "@/lib/admin-auth";
 import { logoutAction } from "@/app/admin/login/actions";
@@ -14,6 +14,7 @@ export function AdminShell({ session, children }: { session: AdminSession; child
             <nav className="hidden items-center gap-5 md:flex">
               <Link href="/admin/content" className="inline-flex items-center gap-2 text-sm text-white/55 hover:text-white"><LayoutDashboard className="size-4" />Overview</Link>
               <Link href="/admin/products" className="inline-flex items-center gap-2 text-sm text-white/55 hover:text-white"><Package className="size-4" />Products</Link>
+              <Link href="/admin/inquiries" className="inline-flex items-center gap-2 text-sm text-white/55 hover:text-white"><MessageSquare className="size-4" />Inquiries</Link>
               <span className="inline-flex items-center gap-2 text-sm text-white/25"><BookOpen className="size-4" />Articles</span>
             </nav>
           </div>
