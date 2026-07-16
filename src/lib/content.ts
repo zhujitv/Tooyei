@@ -28,7 +28,7 @@ export const products: Product[] = [
       es: "Aspecto de pizarra natural sobre un núcleo rígido e impermeable para interiores residenciales y comerciales.",
       de: "Natürliche Schieferoptik auf einem wasserfesten Rigid-Core für Wohn- und Gewerberäume.",
     },
-    image: "/media/product-tile-spc.png",
+    image: "/media/product-tile-spc.jpg",
     features: [
       { en: "100% waterproof", es: "100 % impermeable", de: "100 % wasserfest" },
       { en: "Scratch resistant", es: "Resistente a rayones", de: "Kratzfest" },
@@ -50,7 +50,7 @@ export const products: Product[] = [
       es: "El relieve sincronizado alinea veta y textura para lograr un acabado de madera convincente.",
       de: "Synchronprägung verbindet Maserung und Struktur zu einer authentischen Holzoberfläche.",
     },
-    image: "/media/product-eir-spc.png",
+    image: "/media/product-eir-spc.jpg",
     features: [
       { en: "Embossed in register", es: "Relieve sincronizado", de: "Synchronprägung" },
       { en: "Low maintenance", es: "Fácil mantenimiento", de: "Pflegeleicht" },
@@ -72,7 +72,7 @@ export const products: Product[] = [
       es: "Composición clásica en espiga diseñada para resistir el agua y el uso diario intensivo.",
       de: "Klassisches Fischgrätbild mit wasserfester Konstruktion für intensive tägliche Nutzung.",
     },
-    image: "/media/product-herringbone.png",
+    image: "/media/product-herringbone.jpg",
     features: [
       { en: "Herringbone pattern", es: "Patrón en espiga", de: "Fischgrätmuster" },
       { en: "High traffic ready", es: "Para alto tránsito", de: "Für hohe Beanspruchung" },
@@ -94,7 +94,7 @@ export const products: Product[] = [
       es: "Diseño de roble cálido con núcleo WPC resistente para interiores cómodos y silenciosos.",
       de: "Warme Eichenoptik mit elastischem WPC-Kern für komfortable, ruhige Innenräume.",
     },
-    image: "/media/product-wpc.png",
+    image: "/media/product-wpc.jpg",
     features: [
       { en: "Comfort underfoot", es: "Confort al pisar", de: "Angenehmes Laufgefühl" },
       { en: "Sound reducing", es: "Reducción acústica", de: "Schalldämmend" },
@@ -116,7 +116,7 @@ export const products: Product[] = [
       es: "Acabado de madera detallado en formato LVT para proyectos residenciales, hoteleros y comerciales.",
       de: "Detailreiche Holzoptik im vielseitigen LVT-Format für Wohnen, Handel und Hotellerie.",
     },
-    image: "/media/product-lvt.png",
+    image: "/media/product-lvt.jpg",
     features: [
       { en: "Natural wood look", es: "Aspecto de madera natural", de: "Natürliche Holzoptik" },
       { en: "Easy care", es: "Fácil de cuidar", de: "Pflegeleicht" },

@@ -53,7 +53,7 @@ const toProduct = (product: DatabaseProduct): Product => ({
   image:
     product.primaryImage?.url ??
     sampleProducts.find(({ slug }) => slug === product.slug)?.image ??
-    "/media/product-tile-spc.png",
+    "/media/product-tile-spc.jpg",
   features: product.features.map(({ translations }) =>
     localizedText(translations, ({ value }) => value),
   ),

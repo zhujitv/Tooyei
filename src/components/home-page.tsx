@@ -21,7 +21,7 @@ export async function HomePage({ locale }: { locale: Locale }) {
       <SiteHeader locale={locale} />
       <main>
         <section className="relative min-h-[640px] overflow-hidden bg-[#171a18] text-white lg:min-h-[720px]">
-          <Image src="/media/product-tile-spc.png" alt="Modern interior featuring Tooyei tile-look flooring" fill priority sizes="100vw" className="object-cover object-center opacity-72" />
+          <Image src="/media/product-tile-spc.jpg" alt="Modern interior featuring Tooyei tile-look flooring" fill priority sizes="100vw" className="object-cover object-center opacity-72" />
           <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/55 to-transparent" />
           <div className="relative mx-auto flex min-h-[640px] max-w-7xl items-center px-5 py-24 lg:min-h-[720px] lg:px-8">
             <div className="max-w-2xl">
@@ -60,7 +60,7 @@ export async function HomePage({ locale }: { locale: Locale }) {
         </section>
 
         <section id="oem" className="mx-auto grid max-w-7xl gap-12 px-5 py-24 lg:grid-cols-2 lg:items-center lg:px-8 lg:py-32">
-          <div className="relative aspect-[4/3] overflow-hidden bg-[#ece7df]"><Image src="/media/product-eir-spc.png" alt="OEM flooring finish sample" fill sizes="50vw" className="object-cover" /></div>
+          <div className="relative aspect-[4/3] overflow-hidden bg-[#ece7df]"><Image src="/media/product-eir-spc.jpg" alt="OEM flooring finish sample" fill sizes="50vw" className="object-cover" /></div>
           <div><p className="text-xs font-bold tracking-[0.18em] text-[#a63429]">03 · OEM / ODM</p><h2 className="mt-4 text-4xl font-semibold tracking-[-0.035em]">Built around your market.</h2><p className="mt-6 leading-7 text-muted-foreground">Choose dimensions, wear layers, surface textures, colors, backing, locking systems and packaging. The new content platform will manage each option as structured data instead of static page copy.</p><div className="mt-8 flex flex-wrap gap-2">{["Dimensions", "Wear layer", "EIR texture", "Color & decor", "Backing", "Private label"].map((item)=><Badge key={item} variant="secondary" className="px-3 py-1.5">{item}</Badge>)}</div></div>
         </section>
 
