@@ -8,6 +8,8 @@ export type Product = {
   category: string;
   title: LocalizedText;
   summary: LocalizedText;
+  seoTitle?: LocalizedText;
+  seoDescription?: LocalizedText;
   image: string;
   features: LocalizedText[];
   specifications: { label: LocalizedText; value: string }[];

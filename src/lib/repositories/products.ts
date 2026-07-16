@@ -52,6 +52,8 @@ const toProduct = (product: DatabaseProduct): Product => ({
   category: product.kind,
   title: localizedText(product.translations, ({ title }) => title),
   summary: localizedText(product.translations, ({ summary }) => summary),
+  seoTitle: localizedText(product.translations, ({ seoTitle, title }) => seoTitle || title),
+  seoDescription: localizedText(product.translations, ({ seoDescription, summary }) => seoDescription || summary),
   image:
     product.primaryImage?.url ??
     sampleProducts.find(({ slug }) => slug === product.slug)?.image ??

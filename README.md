@@ -34,6 +34,9 @@ Public inquiry submissions are rate-limited by IP and email with
 `INQUIRY_IP_LIMIT_PER_HOUR` and `INQUIRY_EMAIL_LIMIT_PER_HOUR`.
 The admin inquiry detail page supports sales follow-up notes, note types and
 optional next follow-up dates for timeline-based tracking.
+The admin product module supports product search/filtering, status metrics,
+category assignment, featured/sort controls, translation publishing and SEO
+metadata editing.
 
 ## Quality checks
 
