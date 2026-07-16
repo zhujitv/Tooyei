@@ -30,6 +30,8 @@ npm run db:seed
 Inquiry email notifications are optional. To enable them in production, set
 `RESEND_API_KEY`, `RESEND_FROM_EMAIL` and `INQUIRY_NOTIFICATION_EMAIL`. If
 they are missing, inquiries are still saved and visible in the admin panel.
+Public inquiry submissions are rate-limited by IP and email with
+`INQUIRY_IP_LIMIT_PER_HOUR` and `INQUIRY_EMAIL_LIMIT_PER_HOUR`.
 
 ## Quality checks
 

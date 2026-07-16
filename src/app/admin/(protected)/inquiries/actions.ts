@@ -6,6 +6,7 @@ import { z } from "zod";
 import { InquiryStatus } from "@/generated/prisma/client";
 import { requireAdminSession } from "@/lib/admin-auth";
 import { isDatabaseConfigured } from "@/lib/db";
+import { safeWriteAuditLog } from "@/lib/repositories/audit-logs";
 import { updateInquiryFollowUp } from "@/lib/repositories/inquiries";
 
 const followUpSchema = z.object({
@@ -15,7 +16,7 @@ const followUpSchema = z.object({
 });
 
 export async function updateInquiryFollowUpAction(formData: FormData) {
-  await requireAdminSession();
+  const session = await requireAdminSession();
 
   const parsed = followUpSchema.safeParse({
     id: formData.get("id"),
@@ -31,6 +32,16 @@ export async function updateInquiryFollowUpAction(formData: FormData) {
     InquiryStatus[parsed.data.status],
     parsed.data.assignedToId || null,
   );
+  await safeWriteAuditLog({
+    actorEmail: session.email,
+    action: "inquiry.follow_up_updated",
+    entityType: "Inquiry",
+    entityId: parsed.data.id,
+    metadata: {
+      status: parsed.data.status,
+      assignedToId: parsed.data.assignedToId || null,
+    },
+  });
   revalidatePath("/admin/content");
   revalidatePath("/admin/inquiries");
   revalidatePath(`/admin/inquiries/${parsed.data.id}`);

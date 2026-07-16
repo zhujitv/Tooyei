@@ -1,9 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { consumeInquiryRateLimit, getRequestIp } from "@/lib/inquiry-rate-limit";
 import { sendInquiryNotification } from "@/lib/inquiry-notifications";
+import { safeWriteAuditLog } from "@/lib/repositories/audit-logs";
 import { createPublicInquiry, getAdminInquiry } from "@/lib/repositories/inquiries";
 import { isDatabaseConfigured } from "@/lib/db";
 import { isLocale, localizedPath } from "@/lib/site";
@@ -46,6 +49,28 @@ export async function createInquiryAction(formData: FormData) {
   if (!isDatabaseConfigured()) redirect(`${contactPath}?error=database${productQuery}`);
   if (!isLocale(parsed.data.locale)) redirect("/contact?error=validation");
 
+  const requestHeaders = await headers();
+  const requestIp = getRequestIp(requestHeaders);
+  const rateLimit = await consumeInquiryRateLimit({
+    email: parsed.data.email,
+    ip: requestIp,
+  });
+
+  if (!rateLimit.allowed) {
+    await safeWriteAuditLog({
+      action: "inquiry.rate_limited",
+      entityType: "Inquiry",
+      metadata: {
+        reason: rateLimit.reason,
+        retryAfterSeconds: rateLimit.retryAfterSeconds,
+        sourcePath: parsed.data.sourcePath || contactPath,
+        productSlug: parsed.data.productSlug || null,
+        emailDomain: parsed.data.email.split("@")[1] || null,
+      },
+    });
+    redirect(`${contactPath}?error=rate_limit${productQuery}`);
+  }
+
   const inquiry = await createPublicInquiry({
     name: parsed.data.name,
     email: parsed.data.email,
@@ -64,6 +89,17 @@ export async function createInquiryAction(formData: FormData) {
     if (notification.status === "failed") {
       console.error("Inquiry notification failed", notification.reason);
     }
+    await safeWriteAuditLog({
+      action: "inquiry.created",
+      entityType: "Inquiry",
+      entityId: inquiry.id,
+      metadata: {
+        sourcePath: notificationInquiry.sourcePath,
+        locale: notificationInquiry.locale,
+        productLabels: notificationInquiry.productLabels,
+        notification,
+      },
+    });
   }
 
   revalidatePath("/admin/content");

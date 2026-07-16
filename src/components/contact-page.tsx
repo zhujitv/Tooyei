@@ -41,6 +41,7 @@ const labels = {
     validationTitle: "提交失败",
     validationBody: "请检查姓名、邮箱和项目需求，需求内容至少 20 个字符。",
     databaseBody: "当前数据库未连接，询盘暂时无法保存。",
+    rateLimitBody: "提交过于频繁，请稍后再试，或直接通过邮箱 / WhatsApp 联系我们。",
   },
   en: {
     formTitle: "Send project details",
@@ -60,6 +61,7 @@ const labels = {
     validationTitle: "Submission failed",
     validationBody: "Check name, email and project requirements. The message must be at least 20 characters.",
     databaseBody: "The database is not connected, so inquiries cannot be saved yet.",
+    rateLimitBody: "Too many submissions. Please try again later, or contact us by email / WhatsApp.",
   },
   es: {
     formTitle: "Enviar detalles del proyecto",
@@ -79,6 +81,7 @@ const labels = {
     validationTitle: "No se pudo enviar",
     validationBody: "Revise nombre, email y requisitos. El mensaje debe tener al menos 20 caracteres.",
     databaseBody: "La base de datos no está conectada; la consulta no puede guardarse todavía.",
+    rateLimitBody: "Demasiados envíos. Inténtelo más tarde o contáctenos por email / WhatsApp.",
   },
   de: {
     formTitle: "Projektdetails senden",
@@ -98,6 +101,7 @@ const labels = {
     validationTitle: "Senden fehlgeschlagen",
     validationBody: "Bitte Name, E-Mail und Anforderungen prüfen. Die Nachricht benötigt mindestens 20 Zeichen.",
     databaseBody: "Die Datenbank ist nicht verbunden; Anfragen können noch nicht gespeichert werden.",
+    rateLimitBody: "Zu viele Einsendungen. Bitte später erneut versuchen oder per E-Mail / WhatsApp kontaktieren.",
   },
 } as const;
 
@@ -144,7 +148,11 @@ export function ContactPage({ locale, products, selectedProductSlug, feedback }:
                 <Alert className="mb-6 border-amber-500/30 bg-amber-500/8 text-amber-900">
                   <AlertTitle>{formLabels.validationTitle}</AlertTitle>
                   <AlertDescription>
-                    {feedback.error === "database" ? formLabels.databaseBody : formLabels.validationBody}
+                    {feedback.error === "database"
+                      ? formLabels.databaseBody
+                      : feedback.error === "rate_limit"
+                        ? formLabels.rateLimitBody
+                        : formLabels.validationBody}
                   </AlertDescription>
                 </Alert>
               )}

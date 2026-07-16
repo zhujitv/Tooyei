@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { isDatabaseConfigured } from "@/lib/db";
+import { getEntityAuditLogs } from "@/lib/repositories/audit-logs";
 import { getAdminInquiry, getAssignableAdminUsers } from "@/lib/repositories/inquiries";
 import { updateInquiryFollowUpAction } from "../actions";
 
@@ -37,6 +38,18 @@ const formatDate = (date: Date) =>
     timeZone: "Asia/Shanghai",
   }).format(date);
 
+const actionLabel = (action: string) =>
+  action
+    .replace(/^inquiry\./, "")
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+
+const metadataPreview = (metadata: unknown) => {
+  if (!metadata || metadata === null) return null;
+  const value = JSON.stringify(metadata);
+  return value.length > 220 ? `${value.slice(0, 220)}…` : value;
+};
+
 export default async function AdminInquiryDetailPage({
   params,
   searchParams,
@@ -51,6 +64,7 @@ export default async function AdminInquiryDetailPage({
 
   const databaseReady = isDatabaseConfigured();
   const assignees = await getAssignableAdminUsers();
+  const auditLogs = await getEntityAuditLogs("Inquiry", inquiry.id);
 
   return (
     <main className="mx-auto max-w-5xl px-5 py-10 lg:px-8 lg:py-14">
@@ -217,6 +231,38 @@ export default async function AdminInquiryDetailPage({
             <p className="text-sm text-white/40">Source path</p>
             <p className="mt-2 break-all font-mono text-sm text-white/50">{inquiry.sourcePath || "—"}</p>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="mt-6 border-white/10 bg-[#1a1e1a] text-white shadow-none">
+        <CardHeader>
+          <CardTitle>Activity</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {auditLogs.length === 0 ? (
+            <p className="text-sm text-white/40">No audit events have been recorded for this inquiry yet.</p>
+          ) : (
+            <div className="space-y-4">
+              {auditLogs.map((log) => (
+                <div key={log.id} className="rounded-xl border border-white/10 bg-black/15 p-4">
+                  <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+                    <div>
+                      <p className="font-medium">{actionLabel(log.action)}</p>
+                      <p className="mt-1 text-sm text-white/40">
+                        {log.actor ? `${log.actor.name} · ${log.actor.email}` : "System"}
+                      </p>
+                    </div>
+                    <p className="text-sm text-white/40">{formatDate(log.createdAt)}</p>
+                  </div>
+                  {metadataPreview(log.metadata) && (
+                    <pre className="mt-3 overflow-x-auto rounded-lg bg-black/25 p-3 text-xs leading-5 text-white/45">
+                      {metadataPreview(log.metadata)}
+                    </pre>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </main>
