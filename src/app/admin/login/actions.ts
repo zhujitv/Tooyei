@@ -1,10 +1,9 @@
 "use server";
 
-import { compare } from "bcryptjs";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { clearAdminSession, createAdminSession } from "@/lib/admin-auth";
-import { ensureEnvironmentAdminUser } from "@/lib/repositories/inquiries";
+import { verifyAdminCredentials } from "@/lib/repositories/admin-users";
 
 const credentialsSchema = z.object({
   email: z.email(),
@@ -24,16 +23,10 @@ export async function loginAction(formData: FormData) {
 
   if (!parsed.success) redirect("/admin/login?error=invalid");
 
-  const expectedEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
-  const passwordHash = process.env.ADMIN_PASSWORD_HASH;
-  if (!expectedEmail || !passwordHash) redirect("/admin/login?error=unconfigured");
+  const user = await verifyAdminCredentials(parsed.data.email, parsed.data.password);
+  if (!user) redirect("/admin/login?error=invalid");
 
-  const emailMatches = parsed.data.email.trim().toLowerCase() === expectedEmail;
-  const passwordMatches = await compare(parsed.data.password, passwordHash);
-  if (!emailMatches || !passwordMatches) redirect("/admin/login?error=invalid");
-
-  await ensureEnvironmentAdminUser();
-  await createAdminSession(expectedEmail);
+  await createAdminSession(user.email);
   redirect(safeReturnTo(parsed.data.returnTo));
 }
 

@@ -1,11 +1,15 @@
 import {
-  AdminRole,
   InquiryNoteKind,
   InquiryStatus,
   Locale as DatabaseLocale,
   Prisma,
 } from "@/generated/prisma/client";
 import { getPrisma, isDatabaseConfigured } from "@/lib/db";
+import {
+  ensureEnvironmentAdminUser,
+  getAssignableAdminUsers,
+  type AssignableAdminUser,
+} from "@/lib/repositories/admin-users";
 import type { Locale } from "@/lib/site";
 
 const inquiryProductInclude = {
@@ -84,13 +88,6 @@ export type CreateInquiryNoteInput = {
   kind: InquiryNoteKind;
   body: string;
   nextFollowUpAt?: Date | null;
-};
-
-export type AssignableAdminUser = {
-  id: string;
-  name: string;
-  email: string;
-  role: AdminRole;
 };
 
 export type AdminInquiryFilters = {
@@ -334,43 +331,4 @@ export async function updateInquiryStatus(id: string, status: InquiryStatus) {
   await updateInquiryFollowUp(id, status, undefined);
 }
 
-export async function ensureEnvironmentAdminUser(): Promise<AssignableAdminUser | null> {
-  if (!isDatabaseConfigured()) return null;
-
-  const email = process.env.ADMIN_EMAIL?.trim().toLowerCase();
-  const passwordHash = process.env.ADMIN_PASSWORD_HASH;
-  if (!email || !passwordHash) return null;
-
-  const user = await getPrisma().adminUser.upsert({
-    where: { email },
-    update: {
-      passwordHash,
-      active: true,
-    },
-    create: {
-      email,
-      name: email.split("@")[0] || "Admin",
-      passwordHash,
-      role: AdminRole.OWNER,
-      active: true,
-    },
-    select: { id: true, name: true, email: true, role: true },
-  });
-
-  return user;
-}
-
-export async function getAssignableAdminUsers(): Promise<AssignableAdminUser[]> {
-  if (!isDatabaseConfigured()) return [];
-
-  await ensureEnvironmentAdminUser();
-
-  return getPrisma().adminUser.findMany({
-    where: {
-      active: true,
-      role: { in: [AdminRole.OWNER, AdminRole.EDITOR, AdminRole.SALES] },
-    },
-    orderBy: [{ role: "asc" }, { name: "asc" }],
-    select: { id: true, name: true, email: true, role: true },
-  });
-}
+export { ensureEnvironmentAdminUser, getAssignableAdminUsers };

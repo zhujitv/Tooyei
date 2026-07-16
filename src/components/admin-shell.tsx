@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BookOpen, LayoutDashboard, LogOut, MessageSquare, Package } from "lucide-react";
+import { BookOpen, LayoutDashboard, LogOut, MessageSquare, Package, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { AdminSession } from "@/lib/admin-auth";
 import { logoutAction } from "@/app/admin/login/actions";
@@ -15,6 +15,7 @@ export function AdminShell({ session, children }: { session: AdminSession; child
               <Link href="/admin/content" className="inline-flex items-center gap-2 text-sm text-white/55 hover:text-white"><LayoutDashboard className="size-4" />总览</Link>
               <Link href="/admin/products" className="inline-flex items-center gap-2 text-sm text-white/55 hover:text-white"><Package className="size-4" />产品</Link>
               <Link href="/admin/inquiries" className="inline-flex items-center gap-2 text-sm text-white/55 hover:text-white"><MessageSquare className="size-4" />询盘</Link>
+              <Link href="/admin/users" className="inline-flex items-center gap-2 text-sm text-white/55 hover:text-white"><Users className="size-4" />用户</Link>
               <span className="inline-flex items-center gap-2 text-sm text-white/25"><BookOpen className="size-4" />文章</span>
             </nav>
           </div>

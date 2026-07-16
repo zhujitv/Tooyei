@@ -40,6 +40,11 @@ metadata editing. Product detail content is also structured into gallery media,
 feature modules, specifications, application scenarios and downloadable
 documents; the first editor uses Chinese bulk rows so catalog cleanup can move
 quickly before adding drag-and-drop media uploads.
+The admin user module supports owner-managed account creation, role/status
+updates and password resets. After PostgreSQL is configured, login verifies
+`AdminUser.passwordHash`; `ADMIN_EMAIL` and `ADMIN_PASSWORD_HASH` only bootstrap
+the first owner account and no longer overwrite passwords changed in the admin
+panel.
 
 ## Quality checks
 

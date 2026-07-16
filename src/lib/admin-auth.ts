@@ -3,6 +3,8 @@ import "server-only";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { isDatabaseConfigured } from "@/lib/db";
+import { getCurrentAdminUser } from "@/lib/repositories/admin-users";
 
 const cookieName = "tooyei_admin_session";
 const sessionDurationSeconds = 60 * 60 * 8;
@@ -79,5 +81,12 @@ export async function getAdminSession(): Promise<AdminSession | null> {
 export async function requireAdminSession(): Promise<AdminSession> {
   const session = await getAdminSession();
   if (!session) redirect("/admin/login");
+  if (isDatabaseConfigured()) {
+    const user = await getCurrentAdminUser(session.email);
+    if (!user?.active) {
+      await clearAdminSession();
+      redirect("/admin/login");
+    }
+  }
   return session;
 }
