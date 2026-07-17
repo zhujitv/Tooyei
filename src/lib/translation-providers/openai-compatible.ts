@@ -1,5 +1,6 @@
 import "server-only";
 
+import OpenAI from "openai";
 import type {
   StructuredTranslationRequest,
   StructuredTranslationResult,
@@ -7,41 +8,30 @@ import type {
   TranslationProviderConfig,
 } from "@/lib/translation-providers/types";
 
-type ChatCompletionsPayload = {
-  id?: string;
-  choices?: Array<{ message?: { content?: string | Array<{ type?: string; text?: string }>; refusal?: string } }>;
-  usage?: { prompt_tokens?: number; completion_tokens?: number };
-  error?: { message?: string } | null;
-};
-
-const messageText = (payload: ChatCompletionsPayload) => {
-  const message = payload.choices?.[0]?.message;
-  if (message?.refusal) throw new Error(`模型拒绝了翻译任务：${message.refusal}`);
-  if (typeof message?.content === "string" && message.content.trim()) return message.content;
-  if (Array.isArray(message?.content)) {
-    const text = message.content.map((part) => part.text ?? "").join("").trim();
-    if (text) return text;
-  }
-  throw new Error("Provider 没有返回可用的结构化内容。");
-};
-
 export class OpenAICompatibleProvider implements TranslationProvider {
-  readonly id = "openai-compatible" as const;
-  readonly label = "OpenAI-compatible API";
+  readonly id: TranslationProviderConfig["id"];
+  readonly label: string;
 
-  constructor(private readonly config: TranslationProviderConfig) {}
+  constructor(private readonly config: TranslationProviderConfig) {
+    this.id = config.id;
+    this.label = config.label;
+  }
 
   async generateStructured(request: StructuredTranslationRequest): Promise<StructuredTranslationResult> {
     const responseFormat = this.config.responseFormat === "json_object"
-      ? { type: "json_object" }
+      ? { type: "json_object" as const }
       : {
-          type: "json_schema",
+          type: "json_schema" as const,
           json_schema: { name: request.schemaName, schema: request.schema, strict: true },
         };
-    const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${this.config.apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
+    const client = new OpenAI({
+      apiKey: this.config.apiKey,
+      baseURL: this.config.baseUrl,
+      timeout: this.config.timeoutMs,
+      maxRetries: 2,
+    });
+    try {
+      const completion = await client.chat.completions.create({
         model: this.config.model,
         messages: [
           { role: "system", content: request.systemPrompt },
@@ -49,19 +39,22 @@ export class OpenAICompatibleProvider implements TranslationProvider {
         ],
         response_format: responseFormat,
         max_tokens: request.maxOutputTokens,
-      }),
-      signal: AbortSignal.timeout(this.config.timeoutMs),
-    });
-    const payload = (await response.json().catch(() => null)) as ChatCompletionsPayload | null;
-    if (!response.ok || !payload) {
-      throw new Error(payload?.error?.message || `${this.label} 请求失败（HTTP ${response.status}）。`);
+      });
+      const message = completion.choices[0]?.message;
+      if (message?.refusal) throw new Error(`模型拒绝了翻译任务：${message.refusal}`);
+      if (!message?.content?.trim()) throw new Error("Provider 没有返回可用的结构化内容。");
+      return {
+        responseId: completion.id || null,
+        outputText: message.content,
+        inputTokens: completion.usage?.prompt_tokens ?? 0,
+        outputTokens: completion.usage?.completion_tokens ?? 0,
+      };
+    } catch (error) {
+      if (error instanceof OpenAI.APIError) {
+        const details = [error.status ? `HTTP ${error.status}` : null, error.code].filter(Boolean).join(" / ");
+        throw new Error(`${this.label} 请求失败${details ? `（${details}）` : ""}：${error.message}`);
+      }
+      throw error;
     }
-    if (payload.error?.message) throw new Error(payload.error.message);
-    return {
-      responseId: payload.id ?? null,
-      outputText: messageText(payload),
-      inputTokens: payload.usage?.prompt_tokens ?? 0,
-      outputTokens: payload.usage?.completion_tokens ?? 0,
-    };
   }
 }

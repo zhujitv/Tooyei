@@ -13,7 +13,11 @@ import {
   generateProductTranslation,
   type ProductTranslationOutput,
 } from "@/lib/product-translation-service";
-import { getTranslationProviderState } from "@/lib/translation-providers/config";
+import {
+  getTranslationProviderState,
+  getTranslationProviderStates,
+} from "@/lib/translation-providers/config";
+import type { TranslationProviderId } from "@/lib/translation-providers/types";
 
 export const translationLocales = [
   Locale.EN,
@@ -32,6 +36,7 @@ export type TranslationJobScope = "MISSING" | "NON_PUBLISHED";
 
 export type CreateTranslationJobInput = {
   actorEmail: string;
+  provider: TranslationProviderId;
   sourceLocale: TranslationLocale;
   targetLocales: TranslationLocale[];
   scope: TranslationJobScope;
@@ -44,7 +49,8 @@ const assertDatabase = () => {
   if (!isDatabaseConfigured()) throw new Error("DATABASE_URL 尚未配置，无法管理翻译任务。");
 };
 
-export const getTranslationServiceState = () => getTranslationProviderState();
+export const getTranslationServiceState = (provider?: string) => getTranslationProviderState(provider);
+export const getTranslationServiceStates = () => getTranslationProviderStates();
 
 export async function getTranslationDashboard() {
   if (!isDatabaseConfigured()) {
@@ -124,8 +130,10 @@ export async function getTranslationProductOptions(query = "") {
 
 export async function createProductTranslationJob(input: CreateTranslationJobInput) {
   assertDatabase();
-  const service = getTranslationProviderState();
-  if (!service.provider || !service.model) throw new Error(service.error || "翻译 Provider 配置无效。");
+  const service = getTranslationProviderState(input.provider);
+  if (!service.configured || !service.provider || !service.model) {
+    throw new Error(service.error || "翻译 Provider 配置无效。");
+  }
   const targetLocales = Array.from(new Set(input.targetLocales)).filter((locale) => locale !== input.sourceLocale);
   if (!targetLocales.length) throw new Error("请至少选择一种不同于源语言的目标语言。");
 
@@ -355,9 +363,17 @@ async function refreshJobSummary(jobId: string) {
 
 export async function processNextProductTranslationJobItem(jobId: string) {
   assertDatabase();
-  const service = getTranslationProviderState();
-  if (!service.configured) throw new Error(service.error || "翻译 Provider 尚未配置完整，任务已保留但不能执行。");
   const prisma = getPrisma();
+  const jobConfig = await prisma.productTranslationJob.findUnique({
+    where: { id: jobId },
+    select: { provider: true, model: true },
+  });
+  if (!jobConfig) throw new Error("翻译任务不存在。");
+  const service = getTranslationProviderState(jobConfig.provider);
+  if (!service.configured) throw new Error(service.error || "该任务的翻译 Provider 尚未配置完整，任务已保留但不能执行。");
+  if (service.model !== jobConfig.model) {
+    throw new Error(`任务使用 ${jobConfig.provider} / ${jobConfig.model}，该 Provider 当前模型为 ${service.model}；请恢复模型配置或新建任务。`);
+  }
 
   await prisma.productTranslationJobItem.updateMany({
     where: {

@@ -49,8 +49,9 @@ export default async function TranslationJobPage({
   searchParams: Promise<{ saved?: string; error?: string }>;
 }) {
   const [{ id }, feedback] = await Promise.all([params, searchParams]);
-  const [job, service] = await Promise.all([getProductTranslationJob(id), Promise.resolve(getTranslationServiceState())]);
+  const job = await getProductTranslationJob(id);
   if (!job) notFound();
+  const service = getTranslationServiceState(job.provider);
 
   const finished = job.completedItems + job.failedItems + job.skippedItems;
   const warnings = job.items.reduce((sum, item) => sum + warningList(item.warnings).length, 0);

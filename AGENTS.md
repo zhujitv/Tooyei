@@ -10,3 +10,4 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - Add provider-specific request and response handling only under `src/lib/translation-providers/` and register the adapter in `registry.ts`.
 - Keep provider, base URL, model, response format, timeout, and API credentials in server-only environment variables. Never expose or commit provider secrets.
 - Preserve provider and model metadata on each translation job so historical runs remain auditable.
+- Resolve the adapter recorded on the job; do not require all queued jobs to match a single global default provider.

@@ -1,6 +1,12 @@
 import "server-only";
 
-export type TranslationProviderId = "openai-responses" | "openai-compatible";
+export const translationProviderIds = [
+  "openai-responses",
+  "openai-compatible",
+  "volcengine-doubao",
+] as const;
+
+export type TranslationProviderId = (typeof translationProviderIds)[number];
 export type TranslationResponseFormat = "json_schema" | "json_object";
 
 export type TranslationProviderConfig = {

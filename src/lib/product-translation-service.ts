@@ -109,10 +109,10 @@ export async function generateProductTranslation(
   expected?: { provider: string; model: string },
 ): Promise<GeneratedProductTranslation> {
   if (sourceLocale === targetLocale) throw new Error("源语言和目标语言不能相同。");
-  const state = getTranslationProviderState();
+  const state = getTranslationProviderState(expected?.provider);
   if (!state.configured || !state.provider) throw new Error(state.error || "翻译 Provider 尚未配置完整。");
-  if (expected && (expected.provider !== state.provider || expected.model !== state.model)) {
-    throw new Error(`任务使用 ${expected.provider} / ${expected.model}，当前配置为 ${state.provider} / ${state.model}；请切换配置或新建任务。`);
+  if (expected && expected.model !== state.model) {
+    throw new Error(`任务使用 ${expected.provider} / ${expected.model}，该 Provider 当前模型为 ${state.model}；请恢复模型配置或新建任务。`);
   }
 
   const prisma = getPrisma();
@@ -203,7 +203,7 @@ export async function generateProductTranslation(
     "Write a concise SEO title no longer than 70 characters and an accurate SEO description no longer than 180 characters in the target language.",
     "For Arabic, use natural Modern Standard Arabic. For Chinese, use Simplified Chinese. For Japanese, use natural Japanese industry terminology.",
   ].join(" ");
-  const generated = await getTranslationProvider().generateStructured({
+  const generated = await getTranslationProvider(state.provider).generateStructured({
     systemPrompt,
     sourceJson,
     schemaName: "tooyei_product_translation",

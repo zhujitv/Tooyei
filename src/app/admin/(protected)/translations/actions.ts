@@ -10,9 +10,11 @@ import {
   retryFailedProductTranslationJobItems,
   translationLocales,
 } from "@/lib/repositories/product-translation-jobs";
+import { translationProviderIds } from "@/lib/translation-providers/types";
 
 const localeSchema = z.enum(translationLocales);
 const createJobSchema = z.object({
+  provider: z.enum(translationProviderIds),
   sourceLocale: localeSchema,
   targetLocales: z.array(localeSchema).min(1),
   scope: z.enum(["MISSING", "NON_PUBLISHED"]),
@@ -30,6 +32,7 @@ export async function createTranslationJobAction(formData: FormData) {
   const session = await requireTranslationManagerSession();
   const kindValue = formData.get("kind");
   const parsed = createJobSchema.safeParse({
+    provider: formData.get("provider"),
     sourceLocale: formData.get("sourceLocale"),
     targetLocales: formData.getAll("targetLocales"),
     scope: formData.get("scope"),
@@ -37,12 +40,13 @@ export async function createTranslationJobAction(formData: FormData) {
     productIds: formData.getAll("productIds"),
     productLimit: formData.get("productLimit") || 10,
   });
-  if (!parsed.success) redirect("/admin/translations?error=请检查源语言、目标语言和批次数量。 ");
+  if (!parsed.success) redirect("/admin/translations?error=请检查翻译引擎、源语言、目标语言和批次数量。 ");
 
   let job: { id: string; totalItems: number };
   try {
     job = await createProductTranslationJob({
       actorEmail: session.email,
+      provider: parsed.data.provider,
       sourceLocale: parsed.data.sourceLocale,
       targetLocales: parsed.data.targetLocales,
       scope: parsed.data.scope,
@@ -57,6 +61,7 @@ export async function createTranslationJobAction(formData: FormData) {
       entityId: job.id,
       metadata: {
         sourceLocale: parsed.data.sourceLocale,
+        provider: parsed.data.provider,
         targetLocales: parsed.data.targetLocales,
         scope: parsed.data.scope,
         kind: parsed.data.kind ?? null,

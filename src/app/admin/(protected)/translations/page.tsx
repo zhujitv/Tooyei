@@ -22,6 +22,7 @@ import {
   getTranslationDashboard,
   getTranslationProductOptions,
   getTranslationServiceState,
+  getTranslationServiceStates,
   translationLocales,
 } from "@/lib/repositories/product-translation-jobs";
 import { createTranslationJobAction } from "./actions";
@@ -85,7 +86,12 @@ export default async function TranslationCenterPage({
 }) {
   const filters = await searchParams;
   const databaseReady = isDatabaseConfigured();
-  const service = getTranslationServiceState();
+  const defaultService = getTranslationServiceState();
+  const services = getTranslationServiceStates();
+  const configuredServices = services.filter((service) => service.configured && service.provider);
+  const selectedProvider = defaultService.configured && defaultService.provider
+    ? defaultService.provider
+    : configuredServices[0]?.provider;
   const [dashboard, products] = await Promise.all([
     getTranslationDashboard(),
     getTranslationProductOptions(filters.q),
@@ -106,7 +112,7 @@ export default async function TranslationCenterPage({
             <Database className="size-3.5" />{databaseReady ? "数据库已连接" : "数据库未连接"}
           </span>
           <span className="inline-flex items-center gap-2 rounded-md border border-[#E4E7EC] bg-white px-3 py-2 text-xs text-[#475467]">
-            <Bot className="size-3.5" />{service.configured ? `${service.providerLabel} · ${service.model}` : "翻译服务尚未配置"}
+            <Bot className="size-3.5" />{configuredServices.length}/{services.length} 个翻译引擎可用
           </span>
         </div>
       </header>
@@ -118,11 +124,11 @@ export default async function TranslationCenterPage({
           <AlertDescription>{filters.error}</AlertDescription>
         </Alert>
       ) : null}
-      {!service.configured ? (
+      {!configuredServices.length ? (
         <Alert className="mt-5 border-amber-200 bg-amber-50 text-amber-900">
           <TriangleAlert className="size-4" />
           <AlertTitle>需要配置翻译 Provider</AlertTitle>
-          <AlertDescription>{service.error || "请配置 TRANSLATION_PROVIDER、TRANSLATION_API_KEY、TRANSLATION_API_BASE_URL 和 TRANSLATION_MODEL。"}任务数据和现有产品不受影响。</AlertDescription>
+          <AlertDescription>OpenAI 或豆包至少需要配置一个可用的 API Key。任务数据和现有产品不受影响。</AlertDescription>
         </Alert>
       ) : null}
 
@@ -160,6 +166,47 @@ export default async function TranslationCenterPage({
           </div>
 
           <form action={createTranslationJobAction} className="mt-5 space-y-5">
+            <fieldset>
+              <legend className="admin-label">翻译引擎</legend>
+              <div className="mt-2 grid gap-2 lg:grid-cols-2">
+                {services.map((service) => (
+                  <label
+                    key={service.provider}
+                    className={`relative rounded-lg border px-3.5 py-3 transition-colors ${
+                      service.configured
+                        ? "cursor-pointer border-[#D0D5DD] bg-white hover:border-[#98A2B3]"
+                        : "cursor-not-allowed border-[#EAECF0] bg-[#F9FAFB] opacity-70"
+                    }`}
+                  >
+                    <span className="flex items-start gap-3">
+                      <input
+                        type="radio"
+                        name="provider"
+                        value={service.provider ?? ""}
+                        required
+                        disabled={!service.configured}
+                        defaultChecked={service.provider === selectedProvider}
+                        className="mt-1 size-4 accent-[#25344F]"
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="text-sm font-semibold text-[#344054]">{service.providerLabel}</span>
+                          <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${service.configured ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+                            {service.configured ? "可用" : "待配置"}
+                          </span>
+                        </span>
+                        <span className="mt-1 block truncate font-mono text-[11px] text-[#667085]">{service.model || "未设置模型"}</span>
+                        <span className="mt-1 block truncate text-[11px] text-[#98A2B3]">
+                          {service.configured ? service.baseUrl : service.error || service.baseUrl}
+                        </span>
+                      </span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-[#98A2B3]">任务会永久记录所选引擎和模型；API Key 仅保存在服务端环境变量中。</p>
+            </fieldset>
+
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="source-locale" className="admin-label">源语言</Label>
@@ -223,7 +270,7 @@ export default async function TranslationCenterPage({
               </div>
             </details>
 
-            <Button type="submit" disabled={!databaseReady} className="bg-[#25344F] text-white hover:bg-[#172033]">
+            <Button type="submit" disabled={!databaseReady || !configuredServices.length} className="bg-[#25344F] text-white hover:bg-[#172033]">
               <Sparkles className="size-4" />创建可恢复翻译任务
             </Button>
           </form>

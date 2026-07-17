@@ -14,8 +14,9 @@ Product translation service
 TranslationProvider interface
         |
 Provider registry
-   |                 |
-OpenAI Responses   OpenAI-compatible Chat Completions
+   |                  |                         |
+OpenAI Responses    OpenAI-compatible SDK     Volcengine Doubao
+                                                (OpenAI SDK mode)
 ```
 
 The service sends every adapter the same request:
@@ -44,18 +45,31 @@ TRANSLATION_API_BASE_URL="https://api.openai.com/v1"
 TRANSLATION_MODEL="gpt-5.6-sol"
 TRANSLATION_RESPONSE_FORMAT="json_schema"
 TRANSLATION_REQUEST_TIMEOUT_MS="110000"
+
+# Volcengine Ark / Doubao (server-only)
+DOUBAO_API_KEY=""
+DOUBAO_API_BASE_URL="https://ark.cn-beijing.volces.com/api/v3"
+DOUBAO_MODEL="doubao-seed-2-0-lite-260215"
+DOUBAO_RESPONSE_FORMAT="json_object"
+DOUBAO_REQUEST_TIMEOUT_MS="110000"
 ```
 
 Included provider IDs:
 
 - `openai-responses`: calls `{baseUrl}/responses` with strict Structured Outputs.
-- `openai-compatible`: calls `{baseUrl}/chat/completions`. It supports
-  `json_schema` and the more widely supported `json_object` response mode.
+- `openai-compatible`: uses the official OpenAI Node SDK against a compatible
+  `{baseUrl}/chat/completions` endpoint.
+- `volcengine-doubao`: uses the same OpenAI Node SDK compatibility transport,
+  with the Ark base URL, a Doubao model or endpoint ID, and a separate API key.
+  It defaults to `json_object`, then applies the shared Zod validation and
+  stable-ID checks before any database write.
 
 For a compatible vendor, set its API base URL, API key and model. Use
 `TRANSLATION_RESPONSE_FORMAT=json_object` when that provider does not implement
 JSON Schema response formats. Restart or redeploy after changing Vercel runtime
-environment variables.
+environment variables. The translation center shows every adapter and its
+configuration state. Operators select a configured adapter for each new job,
+so OpenAI and Doubao can coexist without redeploying between batches.
 
 ## Adding a non-compatible provider
 
@@ -68,10 +82,11 @@ environment variables.
 
 ## Job consistency
 
-Each job stores its provider and model. A queued job will stop with an explicit
-error when the runtime provider or model no longer matches its recorded values.
-This prevents a provider switch from silently changing the meaning, cost or
-quality profile of an existing batch.
+Each job stores its provider and model. The runner resolves that exact adapter
+instead of the current default. A queued job stops with an explicit error if
+its provider is no longer configured or its model changed. This prevents a
+provider switch from silently changing the meaning, cost or quality profile of
+an existing batch.
 
 ## Secrets
 
