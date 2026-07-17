@@ -39,20 +39,23 @@ enum TranslationStatus {
 }
 
 enum TranslationJobStatus {
-  QUEUED
+  PENDING
   RUNNING
+  PAUSED
   COMPLETED
-  PARTIAL
+  PARTIAL_FAILED
   FAILED
   CANCELLED
+  CLOSED
 }
 
 enum TranslationJobItemStatus {
-  QUEUED
+  PENDING
   RUNNING
   COMPLETED
   FAILED
   SKIPPED
+  CANCELLED
 }
 
 enum ProductKind {
@@ -227,7 +230,7 @@ model ProductTranslation {
 
 model ProductTranslationJob {
   id             String                   @id @default(cuid())
-  status         TranslationJobStatus     @default(QUEUED)
+  status         TranslationJobStatus     @default(PENDING)
   sourceLocale   Locale
   targetLocales  Locale[]
   provider       String                   @default("openai-responses")
@@ -236,15 +239,23 @@ model ProductTranslationJob {
   completedItems Int                      @default(0)
   failedItems    Int                      @default(0)
   skippedItems   Int                      @default(0)
-  inputTokens    Int                      @default(0)
-  outputTokens   Int                      @default(0)
+  cancelledItems Int                     @default(0)
+  promptTokens   Int?
+  completionTokens Int?
+  totalTokens    Int?
   lastError      String?
+  executionId    String?                  @unique
+  lockedAt       DateTime?
+  lockedBy       String?
   requestedById  String?
   requestedBy    AdminUser?               @relation(fields: [requestedById], references: [id], onDelete: SetNull)
   items          ProductTranslationJobItem[]
+  logs           ProductTranslationLog[]
   createdAt      DateTime                 @default(now())
   startedAt      DateTime?
   completedAt    DateTime?
+  cancelledAt    DateTime?
+  closedAt       DateTime?
   updatedAt      DateTime                 @updatedAt
 
   @@index([status, createdAt])
@@ -260,15 +271,22 @@ model ProductTranslationJobItem {
   productSlug  String
   productSku   String
   targetLocale Locale
-  status       TranslationJobItemStatus @default(QUEUED)
+  status       TranslationJobItemStatus @default(PENDING)
   inputHash    String?
   responseId   String?
   output       Json?
   warnings     Json?
-  error        String?
-  inputTokens  Int                      @default(0)
-  outputTokens Int                      @default(0)
-  attempts     Int                      @default(0)
+  errorType    String?
+  errorMessage String?
+  rawResponse  String?                  @db.Text
+  promptTokens Int?
+  completionTokens Int?
+  totalTokens  Int?
+  attemptCount Int                      @default(0)
+  retryCount   Int                      @default(0)
+  currentRunAttemptCount Int            @default(0)
+  durationMs   Int?
+  logs         ProductTranslationLog[]
   createdAt    DateTime                 @default(now())
   startedAt    DateTime?
   completedAt  DateTime?
@@ -277,6 +295,32 @@ model ProductTranslationJobItem {
   @@unique([jobId, productId, targetLocale])
   @@index([jobId, status, createdAt])
   @@index([productId, targetLocale, createdAt])
+}
+
+model ProductTranslationLog {
+  id                String                    @id @default(cuid())
+  jobId             String
+  job               ProductTranslationJob     @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  itemId            String
+  item              ProductTranslationJobItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  provider          String
+  model             String
+  targetLocale      Locale
+  promptVersion     String
+  attemptNumber     Int
+  errorType         String?
+  errorMessage      String?                   @db.Text
+  rawResponse       String?                   @db.Text
+  requestStartedAt  DateTime
+  requestFinishedAt DateTime
+  durationMs        Int
+  promptTokens      Int?
+  completionTokens  Int?
+  totalTokens       Int?
+  createdAt         DateTime                  @default(now())
+
+  @@index([jobId, createdAt])
+  @@index([itemId, createdAt])
 }
 
 model ProductFeature {

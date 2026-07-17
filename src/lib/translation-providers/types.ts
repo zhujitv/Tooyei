@@ -30,9 +30,31 @@ export type StructuredTranslationRequest = {
 export type StructuredTranslationResult = {
   responseId: string | null;
   outputText: string;
-  inputTokens: number;
-  outputTokens: number;
+  promptTokens: number | null;
+  completionTokens: number | null;
+  totalTokens: number | null;
 };
+
+export type TranslationProviderErrorType =
+  | "TIMEOUT"
+  | "RATE_LIMIT"
+  | "NETWORK"
+  | "PROVIDER_5XX"
+  | "PROVIDER_4XX"
+  | "PROVIDER_RESPONSE";
+
+export class TranslationProviderRequestError extends Error {
+  readonly name = "TranslationProviderRequestError";
+
+  constructor(
+    message: string,
+    readonly errorType: TranslationProviderErrorType,
+    readonly retryable: boolean,
+    readonly status: number | null = null,
+  ) {
+    super(message);
+  }
+}
 
 export interface TranslationProvider {
   readonly id: TranslationProviderId;

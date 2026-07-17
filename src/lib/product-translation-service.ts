@@ -6,6 +6,37 @@ import { Locale } from "@/generated/prisma/client";
 import { getPrisma } from "@/lib/db";
 import { getTranslationProviderState } from "@/lib/translation-providers/config";
 import { getTranslationProvider } from "@/lib/translation-providers/registry";
+import {
+  normalizeTranslationCoreFields,
+  parseTranslationResponse,
+  readTranslationString,
+  TranslationResponseParseError,
+} from "@/lib/translation-response-parser";
+
+export const productTranslationPromptVersion = "tooyei-product-json-v2";
+
+export class TranslationBusinessError extends Error {
+  readonly name = "TranslationBusinessError";
+  readonly errorType = "BUSINESS";
+  readonly retryable = false;
+}
+
+export class TranslationResponseValidationError extends Error {
+  readonly name = "TranslationResponseValidationError";
+  readonly errorType = "RESPONSE_VALIDATION";
+  readonly retryable = true;
+
+  constructor(
+    message: string,
+    readonly rawResponse: string,
+    readonly responseId: string | null,
+    readonly promptTokens: number | null,
+    readonly completionTokens: number | null,
+    readonly totalTokens: number | null,
+  ) {
+    super(message);
+  }
+}
 
 const localeNames: Record<Locale, string> = {
   ZH: "Simplified Chinese", EN: "English", DE: "German", FR: "French", ES: "Spanish",
@@ -20,10 +51,10 @@ const textItemSchema = z.object({
 });
 
 export const productTranslationOutputSchema = z.object({
-  title: z.string().trim().min(1).max(180),
-  summary: z.string().trim().min(1).max(800),
-  seoTitle: z.string().trim().min(1).max(70),
-  seoDescription: z.string().trim().min(1).max(180),
+  title: z.string().trim().max(180),
+  summary: z.string().trim().max(800),
+  seoTitle: z.string().trim().max(70),
+  seoDescription: z.string().trim().max(180),
   media: z.array(z.object({ id: z.string().min(1), alt: z.string().max(240), caption: z.string().max(500) })),
   features: z.array(textItemSchema),
   specifications: z.array(z.object({
@@ -87,18 +118,59 @@ const equalIds = (source: Array<{ id: string }>, output: Array<{ id: string }>) 
   return left.length === right.length && left.every((id, index) => id === right[index]);
 };
 
-const parseProviderJson = (value: string) => {
-  const trimmed = value.trim();
-  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
-  return JSON.parse(fenced?.[1] ?? trimmed) as unknown;
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  value !== null && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+
+const normalizeStructuredItems = (
+  value: unknown,
+  sourceItems: Array<{ id: string }>,
+  fields: Record<string, readonly string[]>,
+  label: string,
+  warnings: string[],
+) => {
+  const rows = Array.isArray(value) ? value.map(asRecord).filter((row): row is Record<string, unknown> => Boolean(row)) : [];
+  if (!Array.isArray(value)) warnings.push(`模型响应缺少${label}数组，已按源内容补齐空字符串。`);
+
+  const rowsById = new Map<string, Record<string, unknown>>();
+  for (const row of rows) {
+    const id = readTranslationString(row, ["id"]);
+    if (id && !rowsById.has(id)) rowsById.set(id, row);
+  }
+
+  let missingItems = 0;
+  const missingFields = new Set<string>();
+  const normalized = sourceItems.map((sourceItem) => {
+    const row = rowsById.get(sourceItem.id);
+    if (!row) missingItems += 1;
+    const item: Record<string, string> = { id: sourceItem.id };
+    for (const [field, aliases] of Object.entries(fields)) {
+      if (!row || !aliases.some((alias) => Object.hasOwn(row, alias))) missingFields.add(field);
+      item[field] = row ? readTranslationString(row, aliases) : "";
+    }
+    return item;
+  });
+
+  if (missingItems) warnings.push(`${label}缺少 ${missingItems} 个源项目，已保留 ID 并使用空字符串。`);
+  if (missingFields.size) warnings.push(`${label}存在缺失字段：${Array.from(missingFields).join("、")}；已使用空字符串。`);
+  const extraItems = rows.filter((row) => {
+    const id = readTranslationString(row, ["id"]);
+    return id && !sourceItems.some((item) => item.id === id);
+  }).length;
+  if (extraItems) warnings.push(`${label}返回了 ${extraItems} 个未知 ID，已忽略以避免写入错误记录。`);
+  return normalized;
 };
 
 export type GeneratedProductTranslation = {
   output: ProductTranslationOutput;
   inputHash: string;
   responseId: string | null;
-  inputTokens: number;
-  outputTokens: number;
+  promptTokens: number | null;
+  completionTokens: number | null;
+  totalTokens: number | null;
+  rawResponse: string;
+  promptVersion: string;
   warnings: string[];
 };
 
@@ -108,11 +180,11 @@ export async function generateProductTranslation(
   targetLocale: Locale,
   expected?: { provider: string; model: string },
 ): Promise<GeneratedProductTranslation> {
-  if (sourceLocale === targetLocale) throw new Error("源语言和目标语言不能相同。");
+  if (sourceLocale === targetLocale) throw new TranslationBusinessError("源语言和目标语言不能相同。");
   const state = getTranslationProviderState(expected?.provider);
-  if (!state.configured || !state.provider) throw new Error(state.error || "翻译 Provider 尚未配置完整。");
+  if (!state.configured || !state.provider) throw new TranslationBusinessError(state.error || "翻译 Provider 尚未配置完整。");
   if (expected && expected.model !== state.model) {
-    throw new Error(`任务使用 ${expected.provider} / ${expected.model}，该 Provider 当前模型为 ${state.model}；请恢复模型配置或新建任务。`);
+    throw new TranslationBusinessError(`任务使用 ${expected.provider} / ${expected.model}，该 Provider 当前模型为 ${state.model}；请恢复模型配置或新建任务。`);
   }
 
   const prisma = getPrisma();
@@ -146,11 +218,11 @@ export async function generateProductTranslation(
       },
     },
   });
-  if (!product) throw new Error("产品不存在或已被删除。");
+  if (!product) throw new TranslationBusinessError("产品不存在或已被删除。");
 
   const main = product.translations.find(({ locale }) => locale === sourceLocale);
   if (!main?.title.trim() || !main.summary.trim()) {
-    throw new Error(`产品 ${product.sku} 缺少完整的 ${localeNames[sourceLocale]} 源语言标题或摘要。`);
+    throw new TranslationBusinessError(`产品 ${product.sku} 缺少完整的 ${localeNames[sourceLocale]} 源语言标题或摘要。`);
   }
 
   const source = {
@@ -195,13 +267,15 @@ export async function generateProductTranslation(
     .update(`${state.provider}:${state.model}:${sourceLocale}:${targetLocale}:${sourceJson}`)
     .digest("hex");
   const systemPrompt = [
-    `You are a senior localization editor for an international flooring manufacturer. Translate the supplied product content from ${localeNames[sourceLocale]} to ${localeNames[targetLocale]}.`,
+    `You are a senior localization editor for an international flooring manufacturer. Translate the supplied product content from ${localeNames[sourceLocale]} (${sourceLocale.toLowerCase()}) to ${localeNames[targetLocale]} (${targetLocale.toLowerCase()}).`,
     "Return professional native-language B2B copy suitable for architects, distributors, importers, and project buyers.",
     "Preserve the brand TOOYEI, SKU, model identifiers, technical meanings, all numbers, dimensions, standards, percentages, units, URLs, and item IDs exactly.",
     "Do not invent certifications, performance claims, warranties, applications, materials, or technical facts that are absent from the source.",
     "Translate every supplied visitor-facing field. Empty source fields must remain empty. Return every array item exactly once with the same id.",
     "Write a concise SEO title no longer than 70 characters and an accurate SEO description no longer than 180 characters in the target language.",
     "For Arabic, use natural Modern Standard Arabic. For Chinese, use Simplified Chinese. For Japanese, use natural Japanese industry terminology.",
+    "Return one valid JSON object only. Do not return Markdown, explanations, headings, comments, or ```json fences.",
+    "Do not rename or omit fields. Every schema field must be present and every field value defined as a string must be a JSON string, including HTML content.",
   ].join(" ");
   const generated = await getTranslationProvider(state.provider).generateStructured({
     systemPrompt,
@@ -210,7 +284,64 @@ export async function generateProductTranslation(
     schema: productTranslationJsonSchema,
     maxOutputTokens: 12000,
   });
-  const output = productTranslationOutputSchema.parse(parseProviderJson(generated.outputText));
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = parseTranslationResponse(generated.outputText);
+  } catch (error) {
+    if (error instanceof TranslationResponseParseError) {
+      throw error.withContext({
+        responseId: generated.responseId,
+        promptTokens: generated.promptTokens,
+        completionTokens: generated.completionTokens,
+        totalTokens: generated.totalTokens,
+      });
+    }
+    throw error;
+  }
+
+  const normalizedCore = normalizeTranslationCoreFields({
+    ...parsed,
+    // Product rich content is managed by the existing structured modules;
+    // supply an explicit empty core field so its absence is not reported as a
+    // translation defect for this workflow.
+    content: Object.hasOwn(parsed, "content") || Object.hasOwn(parsed, "body")
+      ? (parsed.content ?? parsed.body)
+      : "",
+  });
+  const warnings = normalizedCore.warnings.filter((warning) => !warning.includes("content"));
+  const normalized = {
+    title: normalizedCore.output.title,
+    summary: normalizedCore.output.summary,
+    seoTitle: normalizedCore.output.seoTitle,
+    seoDescription: normalizedCore.output.seoDescription,
+    media: normalizeStructuredItems(parsed.media, source.media, {
+      alt: ["alt"], caption: ["caption"],
+    }, "媒体", warnings),
+    features: normalizeStructuredItems(parsed.features, source.features, {
+      title: ["title", "value", "name"], description: ["description", "summary"],
+    }, "卖点", warnings),
+    specifications: normalizeStructuredItems(parsed.specifications, source.specifications, {
+      group: ["group"], label: ["label", "name", "title"], displayValue: ["displayValue", "display_value", "value"],
+    }, "参数", warnings),
+    applications: normalizeStructuredItems(parsed.applications, source.applications, {
+      title: ["title", "name"], description: ["description", "summary"], imageAlt: ["imageAlt", "image_alt", "alt"],
+    }, "应用场景", warnings),
+    downloads: normalizeStructuredItems(parsed.downloads, source.downloads, {
+      title: ["title", "name"], description: ["description", "summary"],
+    }, "下载资料", warnings),
+  };
+  const validated = productTranslationOutputSchema.safeParse(normalized);
+  if (!validated.success) {
+    throw new TranslationResponseValidationError(
+      `模型响应字段标准化后仍未通过校验：${z.prettifyError(validated.error)}`,
+      generated.outputText,
+      generated.responseId,
+      generated.promptTokens,
+      generated.completionTokens,
+      generated.totalTokens,
+    );
+  }
+  const output = validated.data;
 
   const structuredPairs = [
     ["媒体", source.media, output.media],
@@ -220,10 +351,9 @@ export async function generateProductTranslation(
     ["下载资料", source.downloads, output.downloads],
   ] as const;
   for (const [label, inputItems, outputItems] of structuredPairs) {
-    if (!equalIds(inputItems, outputItems)) throw new Error(`${label}的项目 ID 与源内容不一致，已阻止写入。`);
+    if (!equalIds(inputItems, outputItems)) throw new TranslationBusinessError(`${label}的项目 ID 与源内容不一致，已阻止写入。`);
   }
 
-  const warnings: string[] = [];
   for (const sourceItem of source.specifications) {
     const translated = output.specifications.find(({ id }) => id === sourceItem.id);
     if (translated && numericTokens(sourceItem.displayValue).join("|") !== numericTokens(translated.displayValue).join("|")) {
@@ -235,8 +365,11 @@ export async function generateProductTranslation(
     output,
     inputHash,
     responseId: generated.responseId,
-    inputTokens: generated.inputTokens,
-    outputTokens: generated.outputTokens,
+    promptTokens: generated.promptTokens,
+    completionTokens: generated.completionTokens,
+    totalTokens: generated.totalTokens,
+    rawResponse: generated.outputText,
+    promptVersion: productTranslationPromptVersion,
     warnings,
   };
 }

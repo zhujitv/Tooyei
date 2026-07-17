@@ -45,14 +45,14 @@ jobs:
       - name: Link Vercel project
         run: npx vercel@56.2.1 pull --yes --environment=production --token="$VERCEL_TOKEN"
 
-      - name: Apply database migrations
-        run: npm run db:deploy
-
       - name: Verify source
-        run: npm run lint && npm run typecheck
+        run: npm run lint && npm run typecheck && npm run test:translation
 
       - name: Build production output
         run: npx vercel@56.2.1 build --prod --token="$VERCEL_TOKEN"
+
+      - name: Apply database migrations
+        run: npm run db:deploy
 
       - name: Deploy production output
         run: |

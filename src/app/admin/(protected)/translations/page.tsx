@@ -1,22 +1,22 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
-  ArrowRight,
   Bot,
   CheckCircle2,
   Clock3,
   Database,
-  Languages,
   ListFilter,
   Search,
   Sparkles,
   TriangleAlert,
 } from "lucide-react";
 import { ProductKind, TranslationJobStatus } from "@/generated/prisma/client";
+import { TranslationJobActions } from "@/components/translation-job-actions";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { getProductManagerSession } from "@/lib/admin-auth";
 import { isDatabaseConfigured } from "@/lib/db";
 import {
   getTranslationDashboard,
@@ -55,22 +55,37 @@ const kindLabels: Record<ProductKind, string> = {
 };
 
 const jobLabel: Record<TranslationJobStatus, string> = {
-  QUEUED: "等待执行",
+  PENDING: "等待执行",
   RUNNING: "执行中",
+  PAUSED: "已暂停",
   COMPLETED: "已完成",
-  PARTIAL: "部分失败",
+  PARTIAL_FAILED: "部分失败",
   FAILED: "执行失败",
-  CANCELLED: "已取消",
+  CANCELLED: "已停止",
+  CLOSED: "已关闭",
 };
 
 const statusTone: Record<TranslationJobStatus, string> = {
-  QUEUED: "bg-slate-100 text-slate-600",
+  PENDING: "bg-slate-100 text-slate-600",
   RUNNING: "bg-violet-50 text-violet-700",
+  PAUSED: "bg-blue-50 text-blue-700",
   COMPLETED: "bg-emerald-50 text-emerald-700",
-  PARTIAL: "bg-amber-50 text-amber-700",
+  PARTIAL_FAILED: "bg-amber-50 text-amber-700",
   FAILED: "bg-rose-50 text-rose-700",
   CANCELLED: "bg-slate-100 text-slate-500",
+  CLOSED: "bg-zinc-100 text-zinc-500",
 };
+
+const statusFilters: Array<[TranslationJobStatus | "", string]> = [
+  ["", "全部"],
+  [TranslationJobStatus.PENDING, "等待"],
+  [TranslationJobStatus.RUNNING, "执行中"],
+  [TranslationJobStatus.COMPLETED, "已完成"],
+  [TranslationJobStatus.PARTIAL_FAILED, "部分失败"],
+  [TranslationJobStatus.FAILED, "失败"],
+  [TranslationJobStatus.CANCELLED, "已停止"],
+  [TranslationJobStatus.CLOSED, "已关闭"],
+];
 
 const dateTime = new Intl.DateTimeFormat("zh-CN", {
   month: "2-digit",
@@ -82,9 +97,12 @@ const dateTime = new Intl.DateTimeFormat("zh-CN", {
 export default async function TranslationCenterPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; error?: string }>;
+  searchParams: Promise<{ q?: string; error?: string; status?: string; saved?: string }>;
 }) {
   const filters = await searchParams;
+  const selectedStatus = Object.values(TranslationJobStatus).includes(filters.status as TranslationJobStatus)
+    ? filters.status as TranslationJobStatus
+    : undefined;
   const databaseReady = isDatabaseConfigured();
   const defaultService = getTranslationServiceState();
   const services = getTranslationServiceStates();
@@ -92,9 +110,10 @@ export default async function TranslationCenterPage({
   const selectedProvider = defaultService.configured && defaultService.provider
     ? defaultService.provider
     : configuredServices[0]?.provider;
-  const [dashboard, products] = await Promise.all([
-    getTranslationDashboard(),
+  const [dashboard, products, productManager] = await Promise.all([
+    getTranslationDashboard(selectedStatus),
     getTranslationProductOptions(filters.q),
+    getProductManagerSession(),
   ]);
 
   return (
@@ -122,6 +141,13 @@ export default async function TranslationCenterPage({
           <TriangleAlert className="size-4" />
           <AlertTitle>任务创建失败</AlertTitle>
           <AlertDescription>{filters.error}</AlertDescription>
+        </Alert>
+      ) : null}
+      {filters.saved === "deleted" ? (
+        <Alert className="mt-5 border-emerald-200 bg-emerald-50 text-emerald-800">
+          <CheckCircle2 className="size-4" />
+          <AlertTitle>翻译任务已删除</AlertTitle>
+          <AlertDescription>任务明细和执行日志已清理，已经写入产品的译文保持不变。</AlertDescription>
         </Alert>
       ) : null}
       {!configuredServices.length ? (
@@ -279,30 +305,35 @@ export default async function TranslationCenterPage({
         <article className="admin-card overflow-hidden">
           <div className="flex items-center justify-between border-b border-[#E4E7EC] px-5 py-4">
             <div><h2 className="text-base font-semibold">最近任务</h2><p className="mt-1 text-xs text-[#98A2B3]">点击任务查看逐项进度与错误。</p></div>
-            <Languages className="size-4 text-[#98A2B3]" />
+            <form method="get" className="flex items-center gap-2">
+              <select name="status" defaultValue={selectedStatus ?? ""} className="admin-select h-9 min-w-28 px-2 text-xs" aria-label="任务状态筛选">
+                {statusFilters.map(([value, label]) => <option key={value || "ALL"} value={value}>{label}</option>)}
+              </select>
+              <Button type="submit" size="sm" variant="outline"><ListFilter className="size-3.5" />筛选</Button>
+            </form>
           </div>
           <div className="divide-y divide-[#EAECF0]">
             {dashboard.jobs.map((job) => {
-              const finished = job.completedItems + job.failedItems + job.skippedItems;
+              const finished = job.completedItems + job.failedItems + job.skippedItems + job.cancelledItems;
               const progress = job.totalItems ? Math.round((finished / job.totalItems) * 100) : 0;
               return (
-                <Link key={job.id} href={`/admin/translations/${job.id}`} className="group block px-5 py-4 transition-colors hover:bg-[#F9FAFB]">
+                <div key={job.id} className="group px-5 py-4 transition-colors hover:bg-[#F9FAFB]">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
+                    <Link href={`/admin/translations/${job.id}`} className="min-w-0 flex-1 rounded outline-none focus-visible:ring-2 focus-visible:ring-[#98A2B3]">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusTone[job.status]}`}>{jobLabel[job.status]}</span>
                         <span className="text-xs text-[#667085]">{localeMeta[job.sourceLocale as keyof typeof localeMeta]?.[1] ?? job.sourceLocale} → {job.targetLocales.length} 种语言</span>
                       </div>
                       <p className="mt-2 truncate text-sm font-medium text-[#344054]">{job.provider} · {job.model}</p>
                       <p className="mt-1 text-xs text-[#98A2B3]">{dateTime.format(job.createdAt)} · {job.requestedBy?.name ?? job.requestedBy?.email ?? "管理员"}</p>
-                    </div>
-                    <ArrowRight className="mt-1 size-4 shrink-0 text-[#98A2B3] group-hover:text-[#344054]" />
+                    </Link>
+                    <TranslationJobActions jobId={job.id} status={job.status} failedItems={job.failedItems} canDelete={Boolean(productManager)} mode="menu" />
                   </div>
                   <div className="mt-3 flex items-center gap-3">
                     <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#EAECF0]"><div className="h-full rounded-full bg-[#667085]" style={{ width: `${progress}%` }} /></div>
                     <span className="w-12 text-right text-xs font-medium text-[#667085]">{finished}/{job.totalItems}</span>
                   </div>
-                </Link>
+                </div>
               );
             })}
             {!dashboard.jobs.length ? (

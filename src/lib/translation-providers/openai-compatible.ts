@@ -1,6 +1,7 @@
 import "server-only";
 
 import OpenAI from "openai";
+import { TranslationProviderRequestError } from "@/lib/translation-providers/types";
 import type {
   StructuredTranslationRequest,
   StructuredTranslationResult,
@@ -28,7 +29,9 @@ export class OpenAICompatibleProvider implements TranslationProvider {
       apiKey: this.config.apiKey,
       baseURL: this.config.baseUrl,
       timeout: this.config.timeoutMs,
-      maxRetries: 2,
+      // Retries are coordinated by the persisted job worker so every real
+      // provider call is reflected in attemptCount and the attempt log.
+      maxRetries: 0,
     });
     try {
       const completion = await client.chat.completions.create({
@@ -46,15 +49,49 @@ export class OpenAICompatibleProvider implements TranslationProvider {
       return {
         responseId: completion.id || null,
         outputText: message.content,
-        inputTokens: completion.usage?.prompt_tokens ?? 0,
-        outputTokens: completion.usage?.completion_tokens ?? 0,
+        promptTokens: completion.usage?.prompt_tokens ?? null,
+        completionTokens: completion.usage?.completion_tokens ?? null,
+        totalTokens: completion.usage?.total_tokens ?? (
+          completion.usage?.prompt_tokens !== undefined && completion.usage?.completion_tokens !== undefined
+            ? completion.usage.prompt_tokens + completion.usage.completion_tokens
+            : null
+        ),
       };
     } catch (error) {
+      if (error instanceof OpenAI.APIConnectionTimeoutError) {
+        throw new TranslationProviderRequestError(`${this.label} 请求超时。`, "TIMEOUT", true);
+      }
+      if (error instanceof OpenAI.APIConnectionError) {
+        throw new TranslationProviderRequestError(`${this.label} 网络请求失败：${error.message}`, "NETWORK", true);
+      }
       if (error instanceof OpenAI.APIError) {
         const details = [error.status ? `HTTP ${error.status}` : null, error.code].filter(Boolean).join(" / ");
-        throw new Error(`${this.label} 请求失败${details ? `（${details}）` : ""}：${error.message}`);
+        const status = error.status ?? null;
+        const errorType = status === 429
+          ? "RATE_LIMIT"
+          : status !== null && status >= 500
+            ? "PROVIDER_5XX"
+            : status === 408
+              ? "TIMEOUT"
+              : "PROVIDER_4XX";
+        throw new TranslationProviderRequestError(
+          `${this.label} 请求失败${details ? `（${details}）` : ""}：${error.message}`,
+          errorType,
+          status === 408 || status === 409 || status === 429 || (status !== null && status >= 500),
+          status,
+        );
       }
-      throw error;
+      if (error instanceof Error && (error.name === "AbortError" || /timeout|timed out/i.test(error.message))) {
+        throw new TranslationProviderRequestError(`${this.label} 请求超时。`, "TIMEOUT", true);
+      }
+      if (error instanceof TypeError) {
+        throw new TranslationProviderRequestError(`${this.label} 网络请求失败：${error.message}`, "NETWORK", true);
+      }
+      throw new TranslationProviderRequestError(
+        error instanceof Error ? error.message : `${this.label} 返回了不可用的响应。`,
+        "PROVIDER_RESPONSE",
+        false,
+      );
     }
   }
 }

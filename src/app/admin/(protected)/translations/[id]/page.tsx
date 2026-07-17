@@ -10,14 +10,14 @@ import {
   Clock3,
   FileWarning,
   Languages,
-  RotateCcw,
 } from "lucide-react";
 import { TranslationJobItemStatus, TranslationJobStatus } from "@/generated/prisma/client";
+import { TranslationJobActions } from "@/components/translation-job-actions";
 import { TranslationJobRunner } from "@/components/translation-job-runner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { getProductManagerSession } from "@/lib/admin-auth";
 import { getProductTranslationJob, getTranslationServiceState } from "@/lib/repositories/product-translation-jobs";
-import { retryTranslationJobAction } from "../actions";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "翻译任务", robots: { index: false, follow: false } };
@@ -28,13 +28,13 @@ const localeMeta = {
 } as const;
 
 const jobLabels: Record<TranslationJobStatus, string> = {
-  QUEUED: "等待执行", RUNNING: "执行中", COMPLETED: "已完成", PARTIAL: "部分失败", FAILED: "执行失败", CANCELLED: "已取消",
+  PENDING: "等待执行", RUNNING: "执行中", PAUSED: "已暂停", COMPLETED: "已完成", PARTIAL_FAILED: "部分失败", FAILED: "执行失败", CANCELLED: "已停止", CLOSED: "已关闭",
 };
 const itemLabels: Record<TranslationJobItemStatus, string> = {
-  QUEUED: "等待", RUNNING: "执行中", COMPLETED: "已生成", FAILED: "失败", SKIPPED: "已跳过",
+  PENDING: "等待", RUNNING: "执行中", COMPLETED: "已生成", FAILED: "失败", SKIPPED: "已跳过", CANCELLED: "已取消",
 };
 const itemTone: Record<TranslationJobItemStatus, string> = {
-  QUEUED: "bg-slate-100 text-slate-600", RUNNING: "bg-violet-50 text-violet-700", COMPLETED: "bg-emerald-50 text-emerald-700", FAILED: "bg-rose-50 text-rose-700", SKIPPED: "bg-amber-50 text-amber-700",
+  PENDING: "bg-slate-100 text-slate-600", RUNNING: "bg-violet-50 text-violet-700", COMPLETED: "bg-emerald-50 text-emerald-700", FAILED: "bg-rose-50 text-rose-700", SKIPPED: "bg-amber-50 text-amber-700", CANCELLED: "bg-slate-100 text-slate-500",
 };
 
 const formatter = new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
@@ -46,22 +46,21 @@ export default async function TranslationJobPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ saved?: string; error?: string }>;
+  searchParams: Promise<{ saved?: string; error?: string; run?: string }>;
 }) {
   const [{ id }, feedback] = await Promise.all([params, searchParams]);
-  const job = await getProductTranslationJob(id);
+  const [job, productManager] = await Promise.all([getProductTranslationJob(id), getProductManagerSession()]);
   if (!job) notFound();
   const service = getTranslationServiceState(job.provider);
 
-  const finished = job.completedItems + job.failedItems + job.skippedItems;
+  const finished = job.completedItems + job.failedItems + job.skippedItems + job.cancelledItems;
   const warnings = job.items.reduce((sum, item) => sum + warningList(item.warnings).length, 0);
-  const canRetry = job.failedItems > 0;
   const metrics = [
     { label: "总任务项", value: job.totalItems, icon: Languages },
     { label: "已完成", value: job.completedItems, icon: CheckCircle2 },
     { label: "失败", value: job.failedItems, icon: AlertCircle },
     { label: "质检提示", value: warnings, icon: FileWarning },
-    { label: "Token", value: job.inputTokens + job.outputTokens, icon: Bot },
+    { label: "Token", value: job.totalTokens?.toLocaleString() ?? "—", icon: Bot },
   ];
 
   return (
@@ -78,9 +77,12 @@ export default async function TranslationJobPage({
           <h1 className="mt-3 text-2xl font-semibold tracking-[-0.035em] text-[#172033]">翻译任务</h1>
           <p className="mt-2 font-mono text-xs text-[#98A2B3]">{job.id}</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2 text-xs text-[#667085]">
-          <span className="inline-flex items-center gap-2 rounded-md border border-[#E4E7EC] bg-white px-3 py-2"><Bot className="size-3.5" />{job.provider} · {job.model}</span>
-          <span className="inline-flex items-center gap-2 rounded-md border border-[#E4E7EC] bg-white px-3 py-2"><Clock3 className="size-3.5" />{formatter.format(job.createdAt)}</span>
+        <div className="flex flex-col items-end gap-3">
+          <div className="flex flex-wrap items-center justify-end gap-2 text-xs text-[#667085]">
+            <span className="inline-flex items-center gap-2 rounded-md border border-[#E4E7EC] bg-white px-3 py-2"><Bot className="size-3.5" />{job.provider} · {job.model}</span>
+            <span className="inline-flex items-center gap-2 rounded-md border border-[#E4E7EC] bg-white px-3 py-2"><Clock3 className="size-3.5" />{formatter.format(job.createdAt)}</span>
+          </div>
+          <TranslationJobActions jobId={job.id} status={job.status} failedItems={job.failedItems} canDelete={Boolean(productManager)} />
         </div>
       </header>
 
@@ -89,7 +91,7 @@ export default async function TranslationJobPage({
 
       <section className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         {metrics.map(({ label, value, icon: Icon }) => (
-          <div key={label} className="admin-card p-4"><div className="flex items-center justify-between"><span className="text-xs text-[#667085]">{label}</span><Icon className="size-3.5 text-[#98A2B3]" /></div><p className="mt-3 font-mono text-2xl font-semibold tracking-tight text-[#172033]">{value.toLocaleString()}</p></div>
+          <div key={label} className="admin-card p-4"><div className="flex items-center justify-between"><span className="text-xs text-[#667085]">{label}</span><Icon className="size-3.5 text-[#98A2B3]" /></div><p className="mt-3 font-mono text-2xl font-semibold tracking-tight text-[#172033]">{typeof value === "number" ? value.toLocaleString() : value}</p></div>
         ))}
       </section>
 
@@ -97,16 +99,10 @@ export default async function TranslationJobPage({
         <TranslationJobRunner
           jobId={job.id}
           configured={service.configured}
-          initial={{ status: job.status, totalItems: job.totalItems, completedItems: job.completedItems, failedItems: job.failedItems, skippedItems: job.skippedItems }}
+          autoStart={feedback.run === "1"}
+          initial={{ status: job.status, totalItems: job.totalItems, completedItems: job.completedItems, failedItems: job.failedItems, skippedItems: job.skippedItems, cancelledItems: job.cancelledItems }}
         />
       </section>
-
-      {canRetry ? (
-        <form action={retryTranslationJobAction} className="mt-3 flex justify-end">
-          <input type="hidden" name="jobId" value={job.id} />
-          <Button type="submit" variant="outline"><RotateCcw className="size-4" />将 {job.failedItems} 个失败项重新排队</Button>
-        </form>
-      ) : null}
 
       <section className="admin-card mt-5 overflow-hidden">
         <div className="flex items-center justify-between border-b border-[#E4E7EC] px-5 py-4"><div><h2 className="text-base font-semibold">任务明细</h2><p className="mt-1 text-xs text-[#98A2B3]">{finished}/{job.totalItems} 已处理；机器译文仍需人工审核发布。</p></div></div>
@@ -121,11 +117,32 @@ export default async function TranslationJobPage({
                   <tr key={item.id} className="align-top hover:bg-[#FCFCFD]">
                     <td className="px-5 py-4"><p className="max-w-xs truncate font-medium text-[#344054]">{title}</p><p className="mt-1 font-mono text-xs text-[#98A2B3]">{item.productSku}</p></td>
                     <td className="px-4 py-4 text-[#475467]">{localeMeta[item.targetLocale as keyof typeof localeMeta]?.[0]} {localeMeta[item.targetLocale as keyof typeof localeMeta]?.[1] ?? item.targetLocale}</td>
-                    <td className="px-4 py-4"><span className={`rounded-full px-2 py-1 text-xs font-medium ${itemTone[item.status]}`}>{itemLabels[item.status]}</span><p className="mt-2 text-xs text-[#98A2B3]">尝试 {item.attempts} 次</p></td>
+                    <td className="px-4 py-4"><span className={`rounded-full px-2 py-1 text-xs font-medium ${itemTone[item.status]}`}>{itemLabels[item.status]}</span><p className="mt-2 text-xs text-[#98A2B3]">总尝试 {item.attemptCount} 次 · 本轮重试 {item.retryCount} 次</p></td>
                     <td className="max-w-md px-4 py-4">
-                      {item.error ? <p className="line-clamp-3 text-xs leading-5 text-rose-700">{item.error}</p> : itemWarnings.length ? <ul className="space-y-1 text-xs leading-5 text-amber-700">{itemWarnings.slice(0, 3).map((warning) => <li key={warning}>• {warning}</li>)}</ul> : <span className="text-xs text-[#98A2B3]">—</span>}
+                      {item.errorMessage ? <p className="line-clamp-3 text-xs leading-5 text-rose-700">{item.errorMessage}</p> : itemWarnings.length ? <ul className="space-y-1 text-xs leading-5 text-amber-700">{itemWarnings.slice(0, 3).map((warning) => <li key={warning}>• {warning}</li>)}</ul> : <span className="text-xs text-[#98A2B3]">—</span>}
+                      {item.logs.length ? (
+                        <details className="mt-2 rounded-md border border-[#E4E7EC] bg-[#FCFCFD] text-left">
+                          <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-[#475467]">查看错误详情与执行记录</summary>
+                          <div className="max-h-96 space-y-3 overflow-y-auto border-t border-[#E4E7EC] p-3">
+                            {item.logs.map((log) => (
+                              <article key={log.id} className="rounded-md bg-white p-3 text-xs text-[#475467]">
+                                <div className="grid gap-1 sm:grid-cols-2">
+                                  <p><span className="text-[#98A2B3]">类型：</span>{log.errorType ?? "成功"}</p>
+                                  <p><span className="text-[#98A2B3]">模型：</span>{log.provider} · {log.model}</p>
+                                  <p><span className="text-[#98A2B3]">尝试：</span>{log.attemptNumber}</p>
+                                  <p><span className="text-[#98A2B3]">耗时：</span>{log.durationMs.toLocaleString()} ms</p>
+                                  <p><span className="text-[#98A2B3]">Token：</span>{log.totalTokens?.toLocaleString() ?? "—"}</p>
+                                  <p><span className="text-[#98A2B3]">时间：</span>{formatter.format(log.requestFinishedAt)}</p>
+                                </div>
+                                {log.errorMessage ? <p className="mt-2 whitespace-pre-wrap text-rose-700">{log.errorMessage}</p> : null}
+                                {log.rawResponse ? <pre className="mt-2 max-h-44 overflow-auto whitespace-pre-wrap break-words rounded bg-[#101828] p-3 font-mono text-[11px] leading-5 text-white/75">{log.rawResponse}</pre> : null}
+                              </article>
+                            ))}
+                          </div>
+                        </details>
+                      ) : null}
                     </td>
-                    <td className="px-4 py-4 font-mono text-xs text-[#667085]">{(item.inputTokens + item.outputTokens).toLocaleString()}</td>
+                    <td className="px-4 py-4 font-mono text-xs text-[#667085]">{item.totalTokens?.toLocaleString() ?? "—"}</td>
                     <td className="px-5 py-4 text-right"><Button asChild size="sm" variant="ghost" className="text-[#475467] hover:bg-[#EAECF0]"><Link href={`/admin/products/${item.productSlug}?tab=languages`}><span>人工审核</span><ArrowUpRight className="size-3.5" /></Link></Button></td>
                   </tr>
                 );

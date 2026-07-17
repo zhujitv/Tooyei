@@ -1,8 +1,10 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { AlertDialog } from "radix-ui";
 import { LoaderCircle, Pause, Play, RefreshCw } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 
 type Progress = {
@@ -11,69 +13,105 @@ type Progress = {
   completedItems: number;
   failedItems: number;
   skippedItems: number;
+  cancelledItems: number;
 };
 
 type RunResponse = {
   ok: boolean;
   error?: string;
-  result?: { processed: boolean; error?: string; job: Progress };
+  result?: { processed: boolean; executionId: string; error?: string; job: Progress };
 };
 
-const terminalStatuses = new Set(["COMPLETED", "PARTIAL", "FAILED", "CANCELLED"]);
+const terminalStatuses = new Set(["COMPLETED", "PARTIAL_FAILED", "FAILED", "CANCELLED", "CLOSED"]);
+const resumableStatuses = new Set(["PENDING", "PAUSED", "CANCELLED"]);
 
 export function TranslationJobRunner({
   jobId,
   configured,
   initial,
+  autoStart = false,
 }: {
   jobId: string;
   configured: boolean;
   initial: Progress;
+  autoStart?: boolean;
 }) {
   const router = useRouter();
   const continueRef = useRef(false);
+  const autoStartedRef = useRef(false);
   const [running, setRunning] = useState(false);
+  const [stopping, setStopping] = useState(false);
+  const [stopOpen, setStopOpen] = useState(false);
   const [progress, setProgress] = useState(initial);
   const [message, setMessage] = useState<string | null>(null);
 
-  const finished = progress.completedItems + progress.failedItems + progress.skippedItems;
+  const finished = progress.completedItems + progress.failedItems + progress.skippedItems + progress.cancelledItems;
   const percent = progress.totalItems ? Math.round((finished / progress.totalItems) * 100) : 0;
+  const hasPending = finished < progress.totalItems;
+  const canRun = configured && hasPending && resumableStatuses.has(progress.status) && !running && !stopping;
+  const canStop = progress.status === "RUNNING" || running;
 
-  const stop = () => {
-    continueRef.current = false;
-    setRunning(false);
-    setMessage("已暂停；当前请求完成后不会继续处理下一项。 ");
-    router.refresh();
-  };
-
-  const run = async () => {
-    if (running || !configured) return;
+  const run = useCallback(async () => {
+    if (running || stopping || !configured || !hasPending) return;
     continueRef.current = true;
     setRunning(true);
     setMessage(null);
 
     let current = progress;
+    let executionId: string | undefined;
     try {
       while (continueRef.current && !terminalStatuses.has(current.status)) {
         const response = await fetch(`/admin/api/translation-jobs/${jobId}/run`, {
           method: "POST",
-          headers: { Accept: "application/json" },
+          headers: { Accept: "application/json", "Content-Type": "application/json" },
+          body: JSON.stringify(executionId ? { executionId } : {}),
         });
         const body = (await response.json().catch(() => null)) as RunResponse | null;
         if (!response.ok || !body?.ok || !body.result) {
           throw new Error(body?.error || `执行请求失败（HTTP ${response.status}）。`);
         }
+        executionId = body.result.executionId;
         current = body.result.job;
         setProgress(current);
-        if (body.result.error) setMessage(`一项任务失败：${body.result.error}；其余任务将继续。`);
+        if (body.result.error) setMessage(`一项任务失败：${body.result.error}；其余待处理项目将继续。`);
         if (!body.result.processed || terminalStatuses.has(current.status)) break;
       }
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "翻译任务执行失败。 ");
+      setMessage(error instanceof Error ? error.message : "翻译任务执行失败。");
     } finally {
       continueRef.current = false;
       setRunning(false);
       router.refresh();
+    }
+  }, [configured, hasPending, jobId, progress, router, running, stopping]);
+
+  useEffect(() => {
+    if (!autoStart || autoStartedRef.current || !canRun) return;
+    autoStartedRef.current = true;
+    void run();
+  }, [autoStart, canRun, run]);
+
+  const stop = async () => {
+    if (stopping) return;
+    continueRef.current = false;
+    setStopping(true);
+    setMessage(null);
+    try {
+      const response = await fetch(`/admin/api/translation-jobs/${jobId}`, {
+        method: "PATCH",
+        headers: { Accept: "application/json", "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "STOP" }),
+      });
+      const body = await response.json().catch(() => null) as { ok?: boolean; error?: string } | null;
+      if (!response.ok || !body?.ok) throw new Error(body?.error || "停止任务失败。");
+      setProgress((current) => ({ ...current, status: "CANCELLED" }));
+      setStopOpen(false);
+      setMessage("任务已停止，当前正在处理的单项可能仍会完成。");
+      router.refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "停止任务失败。");
+    } finally {
+      setStopping(false);
     }
   };
 
@@ -88,13 +126,32 @@ export function TranslationJobRunner({
           <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#EAECF0]">
             <div className="h-full rounded-full bg-[#25344F] transition-[width] duration-300" style={{ width: `${percent}%` }} />
           </div>
-          <p className="mt-2 text-xs text-[#667085]">完成 {progress.completedItems} · 跳过 {progress.skippedItems} · 失败 {progress.failedItems}</p>
+          <p className="mt-2 text-xs text-[#667085]">
+            完成 {progress.completedItems} · 跳过 {progress.skippedItems} · 失败 {progress.failedItems} · 已取消 {progress.cancelledItems}
+          </p>
         </div>
-        <div className="flex shrink-0 gap-2">
-          {running ? (
-            <Button type="button" variant="outline" onClick={stop}><Pause className="size-4" />暂停</Button>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {canStop ? (
+            <AlertDialog.Root open={stopOpen} onOpenChange={setStopOpen}>
+              <AlertDialog.Trigger asChild>
+                <Button type="button" variant="outline" disabled={stopping}><Pause className="size-4" />停止执行</Button>
+              </AlertDialog.Trigger>
+              <AlertDialog.Portal>
+                <AlertDialog.Overlay className="fixed inset-0 z-[100] bg-[#101828]/40 backdrop-blur-[2px]" />
+                <AlertDialog.Content className="fixed left-1/2 top-1/2 z-[101] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-xl border border-[#E4E7EC] bg-white p-6 shadow-2xl">
+                  <AlertDialog.Title className="text-lg font-semibold text-[#172033]">确认停止该翻译任务？</AlertDialog.Title>
+                  <AlertDialog.Description className="mt-2 text-sm leading-6 text-[#667085]">任务停止后不会再领取新项目，当前正在处理的单项可能仍会完成。</AlertDialog.Description>
+                  <div className="mt-6 flex justify-end gap-2">
+                    <AlertDialog.Cancel asChild><Button type="button" variant="outline">取消</Button></AlertDialog.Cancel>
+                    <Button type="button" onClick={stop} disabled={stopping} className="bg-[#B42318] text-white hover:bg-[#912018]">
+                      {stopping ? <LoaderCircle className="size-4 animate-spin" /> : <Pause className="size-4" />}停止任务
+                    </Button>
+                  </div>
+                </AlertDialog.Content>
+              </AlertDialog.Portal>
+            </AlertDialog.Root>
           ) : (
-            <Button type="button" onClick={run} disabled={!configured || terminalStatuses.has(progress.status)} className="bg-[#25344F] text-white hover:bg-[#172033]">
+            <Button id="translation-run-button" type="button" onClick={run} disabled={!canRun} className="bg-[#25344F] text-white hover:bg-[#172033]">
               {finished ? <RefreshCw className="size-4" /> : <Play className="size-4" />}
               {finished ? "继续执行" : "开始执行"}
             </Button>
@@ -103,6 +160,7 @@ export function TranslationJobRunner({
         </div>
       </div>
       {!configured ? <p className="mt-3 text-xs text-amber-700">配置翻译 Provider 和 API 密钥后才能运行；当前任务已安全保存在数据库。</p> : null}
+      {progress.status === "CLOSED" ? <p className="mt-3 text-xs text-slate-600">任务已关闭归档；恢复后才能继续执行。</p> : null}
       {message ? <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">{message}</p> : null}
     </div>
   );

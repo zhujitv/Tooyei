@@ -7,7 +7,6 @@ import { requireTranslationManagerSession } from "@/lib/admin-auth";
 import { safeWriteAuditLog } from "@/lib/repositories/audit-logs";
 import {
   createProductTranslationJob,
-  retryFailedProductTranslationJobItems,
   translationLocales,
 } from "@/lib/repositories/product-translation-jobs";
 import { translationProviderIds } from "@/lib/translation-providers/types";
@@ -73,27 +72,4 @@ export async function createTranslationJobAction(formData: FormData) {
     redirect(errorPath(error));
   }
   redirect(`/admin/translations/${job.id}`);
-}
-
-const retrySchema = z.object({ jobId: z.string().min(1) });
-
-export async function retryTranslationJobAction(formData: FormData) {
-  const session = await requireTranslationManagerSession();
-  const parsed = retrySchema.safeParse({ jobId: formData.get("jobId") });
-  if (!parsed.success) redirect("/admin/translations?error=无效的翻译任务。 ");
-
-  try {
-    const result = await retryFailedProductTranslationJobItems(parsed.data.jobId);
-    await safeWriteAuditLog({
-      actorEmail: session.email,
-      action: "product_translation_job.retried",
-      entityType: "ProductTranslationJob",
-      entityId: parsed.data.jobId,
-      metadata: { queued: result.count },
-    });
-  } catch (error) {
-    console.error("Retry translation job failed", error instanceof Error ? error.message : error);
-    redirect(`/admin/translations/${parsed.data.jobId}?error=${encodeURIComponent("失败任务重新排队失败。")}`);
-  }
-  redirect(`/admin/translations/${parsed.data.jobId}?saved=retry`);
 }
