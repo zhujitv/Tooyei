@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowUpRight, Globe2, Mail, MapPin, Phone } from "lucide-react";
 import { copy } from "@/lib/content";
@@ -139,13 +140,13 @@ export function SiteFooter({ locale }: { locale: Locale }) {
         <div className="grid gap-12 py-14 md:grid-cols-2 lg:grid-cols-[1.4fr_0.7fr_0.8fr_1fr] lg:gap-16 lg:py-20">
           <div>
             <Link href={localizedPath(locale)} className="inline-flex items-center gap-4" aria-label="Tooyei">
-              <span className="site-brand-mark site-brand-mark-dark size-14 text-xs">TY</span>
-              <span>
-                <span className="block text-xl font-black tracking-[0.2em]">TOOYEI</span>
-                <span className="mt-1.5 block text-[0.58rem] font-bold uppercase tracking-[0.24em] text-white/35">
-                  Flooring Systems
-                </span>
-              </span>
+              <Image
+                src="/brand/tooyei-logo-white.png"
+                alt="Tooyei"
+                width={760}
+                height={190}
+                className="h-12 w-auto object-contain"
+              />
             </Link>
             <p className="mt-7 max-w-sm text-sm leading-7 text-white/45">{labels.globalBusiness}</p>
             <div className="mt-7 flex flex-wrap gap-2">

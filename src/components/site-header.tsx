@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -95,18 +96,17 @@ const headerCopy: Record<
 const Brand = ({ locale }: { locale: Locale }) => (
   <Link
     href={localizedPath(locale)}
-    className="group flex items-center gap-3.5"
+    className="group flex items-center"
     aria-label={locale === "zh" ? "Tooyei 首页" : "Tooyei home"}
   >
-    <span className="site-brand-mark size-11 text-[0.7rem] sm:size-12">TY</span>
-    <span>
-      <span className="block text-[1.05rem] font-black leading-none tracking-[0.2em] text-[#07111f] sm:text-lg">
-        TOOYEI
-      </span>
-      <span className="mt-1.5 block text-[0.56rem] font-bold uppercase tracking-[0.24em] text-slate-400 sm:text-[0.6rem]">
-        Flooring Systems
-      </span>
-    </span>
+    <Image
+      src="/brand/tooyei-logo.png"
+      alt="Tooyei"
+      width={760}
+      height={190}
+      priority
+      className="h-10 w-auto object-contain sm:h-11"
+    />
   </Link>
 );
 
@@ -243,7 +243,14 @@ export function SiteHeader({ locale }: { locale: Locale }) {
               <SheetHeader className="border-b border-white/10 p-6 text-left">
                 <div className="flex items-start justify-between gap-6">
                   <div>
-                    <SheetTitle className="text-lg font-black tracking-[0.18em] text-white">TOOYEI</SheetTitle>
+                    <SheetTitle className="sr-only">TOOYEI</SheetTitle>
+                    <Image
+                      src="/brand/tooyei-logo-white.png"
+                      alt="Tooyei"
+                      width={760}
+                      height={190}
+                      className="h-10 w-auto object-contain"
+                    />
                     <SheetDescription className="mt-2 text-xs uppercase tracking-[0.16em] text-white/40">
                       Flooring systems for global markets
                     </SheetDescription>

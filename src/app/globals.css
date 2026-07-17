@@ -137,19 +137,6 @@
     @apply grid place-items-center rounded-sm bg-[#b68a4c] font-black tracking-tighter text-[#0b1220];
   }
 
-  .site-brand-mark {
-    @apply relative grid shrink-0 place-items-center overflow-hidden rounded-sm bg-[#b68a4c] font-black tracking-[-0.08em] text-[#07111f] shadow-[0_10px_28px_rgba(182,138,76,0.2)];
-  }
-
-  .site-brand-mark::before {
-    content: "";
-    @apply pointer-events-none absolute inset-[5px] border border-[#07111f]/30;
-  }
-
-  .site-brand-mark-dark {
-    @apply shadow-[0_14px_36px_rgba(0,0,0,0.28)];
-  }
-
   .brand-eyebrow {
     @apply text-xs font-bold uppercase tracking-[0.22em] text-[#b68a4c];
   }
