@@ -4,23 +4,13 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import { Locale } from "@/generated/prisma/client";
 import { getPrisma } from "@/lib/db";
+import { getTranslationProviderState } from "@/lib/translation-providers/config";
+import { getTranslationProvider } from "@/lib/translation-providers/registry";
 
 const localeNames: Record<Locale, string> = {
-  ZH: "Simplified Chinese",
-  EN: "English",
-  DE: "German",
-  FR: "French",
-  ES: "Spanish",
-  RU: "Russian",
-  JA: "Japanese",
-  IT: "Italian",
-  AR: "Arabic",
-  PT: "Portuguese",
-  NL: "Dutch",
-  PL: "Polish",
-  TR: "Turkish",
-  RO: "Romanian",
-  CS: "Czech",
+  ZH: "Simplified Chinese", EN: "English", DE: "German", FR: "French", ES: "Spanish",
+  RU: "Russian", JA: "Japanese", IT: "Italian", AR: "Arabic", PT: "Portuguese",
+  NL: "Dutch", PL: "Polish", TR: "Turkish", RO: "Romanian", CS: "Czech",
 };
 
 const textItemSchema = z.object({
@@ -66,14 +56,8 @@ const productTranslationJsonSchema = {
     summary: stringProperty,
     seoTitle: stringProperty,
     seoDescription: stringProperty,
-    media: arrayOf(
-      { id: stringProperty, alt: stringProperty, caption: stringProperty },
-      ["id", "alt", "caption"],
-    ),
-    features: arrayOf(
-      { id: stringProperty, title: stringProperty, description: stringProperty },
-      ["id", "title", "description"],
-    ),
+    media: arrayOf({ id: stringProperty, alt: stringProperty, caption: stringProperty }, ["id", "alt", "caption"]),
+    features: arrayOf({ id: stringProperty, title: stringProperty, description: stringProperty }, ["id", "title", "description"]),
     specifications: arrayOf(
       { id: stringProperty, group: stringProperty, label: stringProperty, displayValue: stringProperty },
       ["id", "group", "label", "displayValue"],
@@ -82,52 +66,14 @@ const productTranslationJsonSchema = {
       { id: stringProperty, title: stringProperty, description: stringProperty, imageAlt: stringProperty },
       ["id", "title", "description", "imageAlt"],
     ),
-    downloads: arrayOf(
-      { id: stringProperty, title: stringProperty, description: stringProperty },
-      ["id", "title", "description"],
-    ),
+    downloads: arrayOf({ id: stringProperty, title: stringProperty, description: stringProperty }, ["id", "title", "description"]),
   },
   required: [
-    "title",
-    "summary",
-    "seoTitle",
-    "seoDescription",
-    "media",
-    "features",
-    "specifications",
-    "applications",
-    "downloads",
+    "title", "summary", "seoTitle", "seoDescription", "media", "features",
+    "specifications", "applications", "downloads",
   ],
   additionalProperties: false,
 } as const;
-
-type OpenAIResponse = {
-  id?: string;
-  status?: string;
-  output_text?: string;
-  output?: Array<{
-    type?: string;
-    content?: Array<{ type?: string; text?: string; refusal?: string }>;
-  }>;
-  usage?: { input_tokens?: number; output_tokens?: number };
-  error?: { message?: string } | null;
-  incomplete_details?: { reason?: string } | null;
-};
-
-const getOutputText = (response: OpenAIResponse) => {
-  if (response.output_text?.trim()) return response.output_text;
-  for (const item of response.output ?? []) {
-    for (const content of item.content ?? []) {
-      if (content.type === "refusal" && content.refusal) {
-        throw new Error(`模型拒绝了此翻译任务：${content.refusal}`);
-      }
-      if (content.type === "output_text" && content.text?.trim()) return content.text;
-    }
-  }
-  throw new Error(response.incomplete_details?.reason
-    ? `模型响应不完整：${response.incomplete_details.reason}`
-    : "模型没有返回可用的结构化翻译内容。");
-};
 
 const preferredTranslation = <T extends { locale: Locale }>(rows: T[], locale: Locale) => {
   const priorities = Array.from(new Set([locale, Locale.EN, Locale.ZH]));
@@ -141,6 +87,12 @@ const equalIds = (source: Array<{ id: string }>, output: Array<{ id: string }>) 
   return left.length === right.length && left.every((id, index) => id === right[index]);
 };
 
+const parseProviderJson = (value: string) => {
+  const trimmed = value.trim();
+  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  return JSON.parse(fenced?.[1] ?? trimmed) as unknown;
+};
+
 export type GeneratedProductTranslation = {
   output: ProductTranslationOutput;
   inputHash: string;
@@ -150,17 +102,18 @@ export type GeneratedProductTranslation = {
   warnings: string[];
 };
 
-export const isOpenAITranslationConfigured = () => Boolean(process.env.OPENAI_API_KEY?.trim());
-export const getOpenAITranslationModel = () => process.env.OPENAI_TRANSLATION_MODEL?.trim() || "gpt-5.6-sol";
-
 export async function generateProductTranslation(
   productId: string,
   sourceLocale: Locale,
   targetLocale: Locale,
+  expected?: { provider: string; model: string },
 ): Promise<GeneratedProductTranslation> {
-  const apiKey = process.env.OPENAI_API_KEY?.trim();
-  if (!apiKey) throw new Error("尚未配置 OPENAI_API_KEY，无法执行机器翻译。");
   if (sourceLocale === targetLocale) throw new Error("源语言和目标语言不能相同。");
+  const state = getTranslationProviderState();
+  if (!state.configured || !state.provider) throw new Error(state.error || "翻译 Provider 尚未配置完整。");
+  if (expected && (expected.provider !== state.provider || expected.model !== state.model)) {
+    throw new Error(`任务使用 ${expected.provider} / ${expected.model}，当前配置为 ${state.provider} / ${state.model}；请切换配置或新建任务。`);
+  }
 
   const prisma = getPrisma();
   const product = await prisma.product.findUnique({
@@ -237,53 +190,28 @@ export async function generateProductTranslation(
     }),
   };
 
-  const serializedSource = JSON.stringify(source);
-  const inputHash = createHash("sha256").update(`${sourceLocale}:${targetLocale}:${serializedSource}`).digest("hex");
-  const model = getOpenAITranslationModel();
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      input: [
-        {
-          role: "system",
-          content: [
-            `You are a senior localization editor for an international flooring manufacturer. Translate the supplied product content from ${localeNames[sourceLocale]} to ${localeNames[targetLocale]}.`,
-            "Return professional native-language B2B copy suitable for architects, distributors, importers, and project buyers.",
-            "Preserve the brand TOOYEI, SKU, model identifiers, technical meanings, all numbers, dimensions, standards, percentages, units, URLs, and item IDs exactly.",
-            "Do not invent certifications, performance claims, warranties, applications, materials, or technical facts that are absent from the source.",
-            "Translate every supplied visitor-facing field. Empty source fields must remain empty. Return every array item exactly once with the same id.",
-            "Write a concise SEO title no longer than 70 characters and an accurate SEO description no longer than 180 characters in the target language.",
-            "For Arabic, use natural Modern Standard Arabic. For Chinese, use Simplified Chinese. For Japanese, use natural Japanese industry terminology.",
-          ].join(" "),
-        },
-        { role: "user", content: serializedSource },
-      ],
-      text: {
-        format: {
-          type: "json_schema",
-          name: "tooyei_product_translation",
-          schema: productTranslationJsonSchema,
-          strict: true,
-        },
-      },
-      max_output_tokens: 12000,
-    }),
-    signal: AbortSignal.timeout(110_000),
+  const sourceJson = JSON.stringify(source);
+  const inputHash = createHash("sha256")
+    .update(`${state.provider}:${state.model}:${sourceLocale}:${targetLocale}:${sourceJson}`)
+    .digest("hex");
+  const systemPrompt = [
+    `You are a senior localization editor for an international flooring manufacturer. Translate the supplied product content from ${localeNames[sourceLocale]} to ${localeNames[targetLocale]}.`,
+    "Return professional native-language B2B copy suitable for architects, distributors, importers, and project buyers.",
+    "Preserve the brand TOOYEI, SKU, model identifiers, technical meanings, all numbers, dimensions, standards, percentages, units, URLs, and item IDs exactly.",
+    "Do not invent certifications, performance claims, warranties, applications, materials, or technical facts that are absent from the source.",
+    "Translate every supplied visitor-facing field. Empty source fields must remain empty. Return every array item exactly once with the same id.",
+    "Write a concise SEO title no longer than 70 characters and an accurate SEO description no longer than 180 characters in the target language.",
+    "For Arabic, use natural Modern Standard Arabic. For Chinese, use Simplified Chinese. For Japanese, use natural Japanese industry terminology.",
+  ].join(" ");
+  const generated = await getTranslationProvider().generateStructured({
+    systemPrompt,
+    sourceJson,
+    schemaName: "tooyei_product_translation",
+    schema: productTranslationJsonSchema,
+    maxOutputTokens: 12000,
   });
+  const output = productTranslationOutputSchema.parse(parseProviderJson(generated.outputText));
 
-  const payload = (await response.json().catch(() => null)) as OpenAIResponse | null;
-  if (!response.ok || !payload) {
-    throw new Error(payload?.error?.message || `OpenAI 请求失败（HTTP ${response.status}）。`);
-  }
-  if (payload.error?.message) throw new Error(payload.error.message);
-
-  const parsedJson = JSON.parse(getOutputText(payload)) as unknown;
-  const output = productTranslationOutputSchema.parse(parsedJson);
   const structuredPairs = [
     ["媒体", source.media, output.media],
     ["卖点", source.features, output.features],
@@ -306,9 +234,9 @@ export async function generateProductTranslation(
   return {
     output,
     inputHash,
-    responseId: payload.id ?? null,
-    inputTokens: payload.usage?.input_tokens ?? 0,
-    outputTokens: payload.usage?.output_tokens ?? 0,
+    responseId: generated.responseId,
+    inputTokens: generated.inputTokens,
+    outputTokens: generated.outputTokens,
     warnings,
   };
 }

@@ -106,7 +106,7 @@ export default async function TranslationCenterPage({
             <Database className="size-3.5" />{databaseReady ? "数据库已连接" : "数据库未连接"}
           </span>
           <span className="inline-flex items-center gap-2 rounded-md border border-[#E4E7EC] bg-white px-3 py-2 text-xs text-[#475467]">
-            <Bot className="size-3.5" />{service.configured ? `${service.model} 已就绪` : "OpenAI 尚未配置"}
+            <Bot className="size-3.5" />{service.configured ? `${service.providerLabel} · ${service.model}` : "翻译服务尚未配置"}
           </span>
         </div>
       </header>
@@ -121,8 +121,8 @@ export default async function TranslationCenterPage({
       {!service.configured ? (
         <Alert className="mt-5 border-amber-200 bg-amber-50 text-amber-900">
           <TriangleAlert className="size-4" />
-          <AlertTitle>需要配置 OpenAI API</AlertTitle>
-          <AlertDescription>请在 Vercel 环境变量中增加 OPENAI_API_KEY；可选增加 OPENAI_TRANSLATION_MODEL。任务数据和现有产品不受影响。</AlertDescription>
+          <AlertTitle>需要配置翻译 Provider</AlertTitle>
+          <AlertDescription>{service.error || "请配置 TRANSLATION_PROVIDER、TRANSLATION_API_KEY、TRANSLATION_API_BASE_URL 和 TRANSLATION_MODEL。"}任务数据和现有产品不受影响。</AlertDescription>
         </Alert>
       ) : null}
 
@@ -246,7 +246,7 @@ export default async function TranslationCenterPage({
                         <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusTone[job.status]}`}>{jobLabel[job.status]}</span>
                         <span className="text-xs text-[#667085]">{localeMeta[job.sourceLocale as keyof typeof localeMeta]?.[1] ?? job.sourceLocale} → {job.targetLocales.length} 种语言</span>
                       </div>
-                      <p className="mt-2 truncate text-sm font-medium text-[#344054]">{job.model}</p>
+                      <p className="mt-2 truncate text-sm font-medium text-[#344054]">{job.provider} · {job.model}</p>
                       <p className="mt-1 text-xs text-[#98A2B3]">{dateTime.format(job.createdAt)} · {job.requestedBy?.name ?? job.requestedBy?.email ?? "管理员"}</p>
                     </div>
                     <ArrowRight className="mt-1 size-4 shrink-0 text-[#98A2B3] group-hover:text-[#344054]" />

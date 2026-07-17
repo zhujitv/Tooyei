@@ -102,7 +102,7 @@ export function TranslationJobRunner({
           {running ? <span className="inline-flex items-center gap-2 px-2 text-xs text-violet-700"><LoaderCircle className="size-4 animate-spin" />正在处理</span> : null}
         </div>
       </div>
-      {!configured ? <p className="mt-3 text-xs text-amber-700">配置 OPENAI_API_KEY 后才能运行；当前任务已安全保存在数据库。</p> : null}
+      {!configured ? <p className="mt-3 text-xs text-amber-700">配置翻译 Provider 和 API 密钥后才能运行；当前任务已安全保存在数据库。</p> : null}
       {message ? <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">{message}</p> : null}
     </div>
   );

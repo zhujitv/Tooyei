@@ -11,10 +11,9 @@ import {
 import { getPrisma, isDatabaseConfigured } from "@/lib/db";
 import {
   generateProductTranslation,
-  getOpenAITranslationModel,
-  isOpenAITranslationConfigured,
   type ProductTranslationOutput,
-} from "@/lib/openai-product-translation";
+} from "@/lib/product-translation-service";
+import { getTranslationProviderState } from "@/lib/translation-providers/config";
 
 export const translationLocales = [
   Locale.EN,
@@ -45,10 +44,7 @@ const assertDatabase = () => {
   if (!isDatabaseConfigured()) throw new Error("DATABASE_URL 尚未配置，无法管理翻译任务。");
 };
 
-export const getTranslationServiceState = () => ({
-  configured: isOpenAITranslationConfigured(),
-  model: getOpenAITranslationModel(),
-});
+export const getTranslationServiceState = () => getTranslationProviderState();
 
 export async function getTranslationDashboard() {
   if (!isDatabaseConfigured()) {
@@ -75,6 +71,7 @@ export async function getTranslationDashboard() {
         status: true,
         sourceLocale: true,
         targetLocales: true,
+        provider: true,
         model: true,
         totalItems: true,
         completedItems: true,
@@ -127,6 +124,8 @@ export async function getTranslationProductOptions(query = "") {
 
 export async function createProductTranslationJob(input: CreateTranslationJobInput) {
   assertDatabase();
+  const service = getTranslationProviderState();
+  if (!service.provider || !service.model) throw new Error(service.error || "翻译 Provider 配置无效。");
   const targetLocales = Array.from(new Set(input.targetLocales)).filter((locale) => locale !== input.sourceLocale);
   if (!targetLocales.length) throw new Error("请至少选择一种不同于源语言的目标语言。");
 
@@ -180,7 +179,8 @@ export async function createProductTranslationJob(input: CreateTranslationJobInp
     data: {
       sourceLocale: input.sourceLocale,
       targetLocales,
-      model: getOpenAITranslationModel(),
+      provider: service.provider,
+      model: service.model,
       totalItems: items.length,
       requestedById: actor.id,
       items: { create: items },
@@ -198,6 +198,7 @@ export async function getProductTranslationJob(id: string) {
       status: true,
       sourceLocale: true,
       targetLocales: true,
+      provider: true,
       model: true,
       totalItems: true,
       completedItems: true,
@@ -354,7 +355,8 @@ async function refreshJobSummary(jobId: string) {
 
 export async function processNextProductTranslationJobItem(jobId: string) {
   assertDatabase();
-  if (!isOpenAITranslationConfigured()) throw new Error("尚未配置 OPENAI_API_KEY，任务已保留但不能执行。");
+  const service = getTranslationProviderState();
+  if (!service.configured) throw new Error(service.error || "翻译 Provider 尚未配置完整，任务已保留但不能执行。");
   const prisma = getPrisma();
 
   await prisma.productTranslationJobItem.updateMany({
@@ -369,7 +371,7 @@ export async function processNextProductTranslationJobItem(jobId: string) {
   const item = await prisma.$transaction(async (tx) => {
     const job = await tx.productTranslationJob.findUnique({
       where: { id: jobId },
-      select: { id: true, status: true, sourceLocale: true },
+      select: { id: true, status: true, sourceLocale: true, provider: true, model: true },
     });
     if (!job) throw new Error("翻译任务不存在。");
     if (job.status === TranslationJobStatus.CANCELLED) throw new Error("翻译任务已取消。");
@@ -394,13 +396,18 @@ export async function processNextProductTranslationJobItem(jobId: string) {
         lastError: null,
       },
     });
-    return { ...candidate, sourceLocale: job.sourceLocale };
+    return { ...candidate, sourceLocale: job.sourceLocale, provider: job.provider, model: job.model };
   });
 
   if (!item) return { processed: false, job: await refreshJobSummary(jobId) };
 
   try {
-    const generated = await generateProductTranslation(item.productId, item.sourceLocale, item.targetLocale);
+    const generated = await generateProductTranslation(
+      item.productId,
+      item.sourceLocale,
+      item.targetLocale,
+      { provider: item.provider, model: item.model },
+    );
     const saved = await saveGeneratedTranslation(item.productId, item.targetLocale, generated.output);
     await prisma.productTranslationJobItem.update({
       where: { id: item.id },

@@ -230,6 +230,7 @@ model ProductTranslationJob {
   status         TranslationJobStatus     @default(QUEUED)
   sourceLocale   Locale
   targetLocales  Locale[]
+  provider       String                   @default("openai-responses")
   model          String
   totalItems     Int                      @default(0)
   completedItems Int                      @default(0)

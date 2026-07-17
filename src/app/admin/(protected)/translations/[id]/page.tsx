@@ -16,7 +16,6 @@ import { TranslationJobItemStatus, TranslationJobStatus } from "@/generated/pris
 import { TranslationJobRunner } from "@/components/translation-job-runner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { getOpenAITranslationModel } from "@/lib/openai-product-translation";
 import { getProductTranslationJob, getTranslationServiceState } from "@/lib/repositories/product-translation-jobs";
 import { retryTranslationJobAction } from "../actions";
 
@@ -79,7 +78,7 @@ export default async function TranslationJobPage({
           <p className="mt-2 font-mono text-xs text-[#98A2B3]">{job.id}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs text-[#667085]">
-          <span className="inline-flex items-center gap-2 rounded-md border border-[#E4E7EC] bg-white px-3 py-2"><Bot className="size-3.5" />{job.model || getOpenAITranslationModel()}</span>
+          <span className="inline-flex items-center gap-2 rounded-md border border-[#E4E7EC] bg-white px-3 py-2"><Bot className="size-3.5" />{job.provider} · {job.model}</span>
           <span className="inline-flex items-center gap-2 rounded-md border border-[#E4E7EC] bg-white px-3 py-2"><Clock3 className="size-3.5" />{formatter.format(job.createdAt)}</span>
         </div>
       </header>

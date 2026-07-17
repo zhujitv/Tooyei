@@ -52,8 +52,13 @@ Link a public Blob store and provide `BLOB_READ_WRITE_TOKEN` before using upload
 
 The product translation center at `/admin/translations` can create resumable
 jobs across English, German, French, Spanish, Russian, Japanese, Italian,
-Arabic and Chinese. Configure `OPENAI_API_KEY` to run those jobs and optionally
-override `OPENAI_TRANSLATION_MODEL`. Each product-language item persists its
+Arabic and Chinese. The translation layer uses a provider interface rather
+than calling a vendor from queue code. Configure `TRANSLATION_PROVIDER`,
+`TRANSLATION_API_KEY`, `TRANSLATION_API_BASE_URL` and `TRANSLATION_MODEL`.
+`openai-responses` and `openai-compatible` adapters are included; a provider
+that only supports JSON mode can use `TRANSLATION_RESPONSE_FORMAT=json_object`.
+Legacy `OPENAI_API_KEY` and `OPENAI_TRANSLATION_MODEL` names remain supported by
+the OpenAI adapter. Each product-language item persists its
 status, response ID, input hash, token usage, errors and QA warnings. Generated
 main content, SEO metadata and structured product fields are saved as
 `MACHINE_DRAFT`; existing `PUBLISHED` translations are never overwritten.
