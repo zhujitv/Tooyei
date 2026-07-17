@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Noto_Sans_SC } from "next/font/google";
+import { Geist_Mono, Inter, Noto_Sans_SC } from "next/font/google";
 import { headers } from "next/headers";
 import "./globals.css";
 import { isLocale, localeDirection } from "@/lib/site";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin", "cyrillic"],
   display: "swap",
 });
@@ -47,7 +47,7 @@ export default async function RootLayout({
       lang={locale === "zh" ? "zh-CN" : locale}
       dir={localeDirection(locale)}
       data-scroll-behavior="smooth"
-      className={`${geistSans.variable} ${geistMono.variable} ${notoSansSC.variable} h-full antialiased`}
+      className={`${inter.variable} ${geistMono.variable} ${notoSansSC.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col antialiased">{children}</body>
     </html>

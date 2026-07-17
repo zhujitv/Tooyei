@@ -72,13 +72,13 @@ const jobLabel: Record<TranslationExecutionStatus, string> = {
 };
 
 const statusTone: Record<TranslationExecutionStatus, string> = {
-  PENDING: "bg-slate-100 text-slate-600",
-  QUEUED: "bg-blue-50 text-blue-700",
-  PROCESSING: "bg-violet-50 text-violet-700",
-  SUCCESS: "bg-emerald-50 text-emerald-700",
-  FAILED: "bg-rose-50 text-rose-700",
-  RETRYING: "bg-amber-50 text-amber-700",
-  CANCELLED: "bg-slate-100 text-slate-500",
+  PENDING: "admin-badge-neutral",
+  QUEUED: "admin-badge-neutral border-blue-200 bg-blue-50 text-blue-700",
+  PROCESSING: "admin-badge-ai",
+  SUCCESS: "admin-badge-success",
+  FAILED: "admin-badge-missing",
+  RETRYING: "admin-badge-review",
+  CANCELLED: "admin-badge-neutral",
 };
 
 const statusFilters: Array<[TranslationExecutionStatus | "", string]> = [
@@ -177,8 +177,8 @@ export default async function TranslationCenterPage({
               </div>
               <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
                 <p><span className="block font-semibold text-emerald-700">{current.ready}</span><span className="text-[#98A2B3]">已发布</span></p>
-                <p><span className="block font-semibold text-violet-700">{current.review}</span><span className="text-[#98A2B3]">待审核</span></p>
-                <p><span className="block font-semibold text-amber-700">{current.missing}</span><span className="text-[#98A2B3]">缺失</span></p>
+                <p><span className="block font-semibold text-amber-700">{current.review}</span><span className="text-[#94A3B8]">待审核</span></p>
+                <p><span className="block font-semibold text-rose-700">{current.missing}</span><span className="text-[#94A3B8]">缺失</span></p>
               </div>
             </article>
           );
@@ -272,7 +272,7 @@ export default async function TranslationCenterPage({
               </div>
             </details>
 
-            <Button type="submit" disabled={!databaseReady || !translationService.configured} className="bg-[#25344F] text-white hover:bg-[#172033]">
+            <Button type="submit" disabled={!databaseReady || !translationService.configured} className="admin-button-primary">
               <Sparkles className="size-4" />创建可恢复翻译任务
             </Button>
           </form>
@@ -288,7 +288,7 @@ export default async function TranslationCenterPage({
               <Button type="submit" size="sm" variant="outline"><ListFilter className="size-3.5" />筛选</Button>
             </form>
           </div>
-          <div className="divide-y divide-[#EAECF0]">
+          <div className="grid gap-3 bg-[#F8FAFC] p-4">
             {dashboard.jobs.map((job) => {
               const finished = job.completedItems + job.failedItems + job.skippedItems + job.cancelledItems;
               const progress = job.totalItems ? Math.round((finished / job.totalItems) * 100) : 0;
@@ -303,24 +303,24 @@ export default async function TranslationCenterPage({
                 ? translationProcessingStepLabels[activeItem.processingStep]
                 : executionStatus === "SUCCESS" ? "处理完成" : "等待队列";
               return (
-                <div key={job.id} className="group px-5 py-4 transition-colors hover:bg-[#F9FAFB]">
+                <article key={job.id} className="group rounded-xl border border-[#E5E7EB] bg-white p-4 shadow-sm transition hover:border-blue-200 hover:shadow-md">
                   <div className="flex items-start justify-between gap-3">
                     <Link href={`/admin/translations/${job.id}`} className="min-w-0 flex-1 rounded outline-none focus-visible:ring-2 focus-visible:ring-[#98A2B3]">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusTone[executionStatus]}`}>{jobLabel[executionStatus]}</span>
+                        <span className={statusTone[executionStatus]}>{jobLabel[executionStatus]}</span>
                         <span className="text-xs text-[#667085]">{localeMeta[job.sourceLocale as keyof typeof localeMeta]?.[1] ?? job.sourceLocale} → {job.targetLocales.length} 种语言</span>
                       </div>
                       <p className="mt-2 truncate text-sm font-medium text-[#344054]">当前步骤：{step}</p>
-                      <p className="mt-1 truncate font-mono text-[11px] text-[#98A2B3]">{job.provider} · {job.model}</p>
+                      <p className="mt-2 inline-flex max-w-full items-center gap-1.5 rounded-md border border-violet-100 bg-violet-50 px-2 py-1 font-mono text-[11px] text-violet-700"><Bot className="size-3 shrink-0" /><span className="truncate">{job.provider} · {job.model}</span></p>
                       <p className="mt-1 text-xs text-[#98A2B3]">{dateTime.format(job.createdAt)} · {job.requestedBy?.name ?? job.requestedBy?.email ?? "管理员"}</p>
                     </Link>
                     <TranslationJobActions jobId={job.id} status={job.status} failedItems={job.failedItems} canDelete={Boolean(productManager)} mode="menu" />
                   </div>
                   <div className="mt-3 flex items-center gap-3">
-                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#EAECF0]"><div className="h-full rounded-full bg-[#667085]" style={{ width: `${progress}%` }} /></div>
+                    <div className="admin-progress-track flex-1"><div className="admin-progress-value" style={{ width: `${progress}%` }} /></div>
                     <span className="w-12 text-right text-xs font-medium text-[#667085]">{finished}/{job.totalItems}</span>
                   </div>
-                </div>
+                </article>
               );
             })}
             {!dashboard.jobs.length ? (

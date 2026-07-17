@@ -35,7 +35,7 @@ const buildHtml = (inquiry: AdminInquiryDetail) => {
 
   return `<!doctype html>
 <html>
-  <body style="margin:0;background:#f6f5f1;font-family:Arial,Helvetica,sans-serif;color:#111827;">
+  <body style="margin:0;background:#f6f5f1;font-family:Inter,'Noto Sans SC','PingFang SC','Microsoft YaHei',Arial,Helvetica,sans-serif;color:#111827;">
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:32px 16px;">
       <tr>
         <td align="center">

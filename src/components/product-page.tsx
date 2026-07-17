@@ -196,7 +196,7 @@ export async function ProductPage({ product, locale }: { product: Product; local
                 <span className="brand-eyebrow">{product.sku}</span>
               </div>
               <h1 className="mt-6 text-4xl font-semibold tracking-[-0.04em] sm:text-5xl">{productTitle}</h1>
-              <p className="mt-6 text-lg leading-8 text-muted-foreground">{productSummary}</p>
+              <p className="mt-6 text-base leading-7 text-muted-foreground">{productSummary}</p>
 
               {product.features.length ? (
                 <section className="mt-8">
@@ -218,7 +218,7 @@ export async function ProductPage({ product, locale }: { product: Product; local
                           {readLocalizedText(feature, locale)}
                         </div>
                         {feature.description && readLocalizedText(feature.description, locale) ? (
-                          <p className="mt-2 pl-8 text-sm leading-6 text-muted-foreground">{readLocalizedText(feature.description, locale)}</p>
+                          <p className="mt-2 pl-8 text-base leading-7 text-muted-foreground">{readLocalizedText(feature.description, locale)}</p>
                         ) : null}
                       </div>
                     ))}
@@ -284,7 +284,7 @@ export async function ProductPage({ product, locale }: { product: Product; local
                     ) : null}
                     <CardContent className="p-5">
                       <h3 className="text-lg font-semibold">{readLocalizedText(application.title, locale)}</h3>
-                      <p className="mt-3 text-sm leading-6 text-muted-foreground">{readLocalizedText(application.description, locale)}</p>
+                      <p className="mt-3 text-base leading-7 text-muted-foreground">{readLocalizedText(application.description, locale)}</p>
                     </CardContent>
                   </Card>
                 ))}
@@ -313,7 +313,7 @@ export async function ProductPage({ product, locale }: { product: Product; local
                       <div>
                         <h3 className="font-semibold">{readLocalizedText(download.title, locale)}</h3>
                         {download.description && readLocalizedText(download.description, locale) ? (
-                          <p className="mt-2 text-sm leading-6 text-white/55">{readLocalizedText(download.description, locale)}</p>
+                          <p className="mt-2 text-base leading-7 text-white/55">{readLocalizedText(download.description, locale)}</p>
                         ) : null}
                       </div>
                       <ArrowDownToLine className="size-5 shrink-0 text-white/45" />

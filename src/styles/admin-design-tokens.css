@@ -1,0 +1,223 @@
+/* Tooyei Admin design tokens
+   Shared visual contract for the SaaS/PIM workspace. Keep domain components
+   on semantic admin classes so color and density can evolve in one place. */
+:root {
+  --admin-bg: #f8fafc;
+  --admin-surface: #ffffff;
+  --admin-surface-subtle: #f8fafc;
+  --admin-surface-hover: #f1f5f9;
+  --admin-border: #e5e7eb;
+  --admin-border-strong: #cbd5e1;
+  --admin-title: #111827;
+  --admin-body: #475569;
+  --admin-muted: #94a3b8;
+  --admin-disabled: #cbd5e1;
+  --admin-primary: #2563eb;
+  --admin-primary-hover: #1d4ed8;
+  --admin-primary-soft: #eff6ff;
+  --admin-primary-border: #bfdbfe;
+  --admin-success: #15803d;
+  --admin-success-soft: #f0fdf4;
+  --admin-success-border: #bbf7d0;
+  --admin-review: #a16207;
+  --admin-review-soft: #fffbeb;
+  --admin-review-border: #fde68a;
+  --admin-missing: #b91c1c;
+  --admin-missing-soft: #fef2f2;
+  --admin-missing-border: #fecaca;
+  --admin-ai: #7c3aed;
+  --admin-ai-soft: #f5f3ff;
+  --admin-ai-border: #ddd6fe;
+  --admin-radius-sm: 6px;
+  --admin-radius: 8px;
+  --admin-radius-lg: 12px;
+  --admin-space-1: 4px;
+  --admin-space-2: 8px;
+  --admin-space-3: 12px;
+  --admin-space-4: 16px;
+  --admin-space-5: 20px;
+  --admin-space-6: 24px;
+  --admin-shadow-card: 0 1px 2px rgb(15 23 42 / 0.04), 0 1px 3px rgb(15 23 42 / 0.03);
+  --admin-shadow-float: 0 12px 30px rgb(15 23 42 / 0.1);
+  --admin-font-sans: var(--font-inter), var(--font-noto-sans-sc), "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", ui-sans-serif, system-ui, sans-serif;
+  --admin-font-mono: var(--font-geist-mono), var(--font-noto-sans-sc), "PingFang SC", "Microsoft YaHei", ui-monospace, monospace;
+}
+
+.admin-root {
+  color-scheme: light;
+  min-height: 100vh;
+  background: var(--admin-bg);
+  color: var(--admin-body);
+  font-family: var(--admin-font-sans);
+}
+
+.admin-content {
+  min-height: calc(100vh - 64px);
+  background: var(--admin-bg);
+}
+
+.admin-page {
+  color: var(--admin-body);
+}
+
+.admin-page h1,
+.admin-page h2,
+.admin-page h3,
+.admin-page h4,
+.admin-title {
+  color: var(--admin-title);
+  font-weight: 600;
+}
+
+.admin-card,
+.admin-root [data-slot="card"] {
+  border: 1px solid var(--admin-border);
+  background: var(--admin-surface);
+  color: var(--admin-body);
+  box-shadow: var(--admin-shadow-card);
+}
+
+.admin-section-card {
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-lg);
+  background: var(--admin-surface);
+  box-shadow: var(--admin-shadow-card);
+}
+
+.admin-section-header {
+  border-bottom: 1px solid var(--admin-border);
+  padding: var(--admin-space-5) var(--admin-space-6);
+}
+
+.admin-section-body {
+  padding: var(--admin-space-6);
+}
+
+.admin-root [data-slot="input"],
+.admin-root [data-slot="textarea"],
+.admin-root .admin-field,
+.admin-root .admin-select {
+  border-color: var(--admin-border-strong);
+  border-radius: var(--admin-radius);
+  background: var(--admin-surface);
+  color: var(--admin-title);
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.03);
+  outline: none;
+}
+
+.admin-root [data-slot="input"],
+.admin-root .admin-field:not(textarea),
+.admin-root .admin-select {
+  height: 40px;
+}
+
+.admin-root [data-slot="input"]::placeholder,
+.admin-root [data-slot="textarea"]::placeholder,
+.admin-root .admin-field::placeholder {
+  color: var(--admin-muted);
+}
+
+.admin-root [data-slot="input"]:focus-visible,
+.admin-root [data-slot="textarea"]:focus-visible,
+.admin-root .admin-field:focus-visible,
+.admin-root .admin-select:focus {
+  border-color: var(--admin-primary);
+  box-shadow: 0 0 0 3px rgb(37 99 235 / 0.12);
+}
+
+.admin-root [data-slot="input"]:disabled,
+.admin-root [data-slot="textarea"]:disabled,
+.admin-root .admin-field:disabled,
+.admin-root .admin-select:disabled {
+  cursor: not-allowed;
+  border-color: var(--admin-border);
+  background: var(--admin-surface-subtle);
+  color: var(--admin-disabled);
+  opacity: 1;
+}
+
+.admin-label {
+  color: var(--admin-body);
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.5rem;
+}
+
+.admin-root button {
+  font-weight: 500;
+}
+
+.admin-button-primary {
+  background: var(--admin-primary) !important;
+  color: white !important;
+}
+
+.admin-button-primary:hover {
+  background: var(--admin-primary-hover) !important;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--admin-body);
+}
+
+.admin-table thead {
+  border-bottom: 1px solid var(--admin-border);
+  background: var(--admin-surface-subtle);
+  color: var(--admin-muted);
+}
+
+.admin-table tbody tr {
+  border-bottom: 1px solid var(--admin-border);
+  background: var(--admin-surface);
+}
+
+.admin-table tbody tr:hover {
+  background: var(--admin-surface-subtle);
+}
+
+.admin-badge-success,
+.admin-badge-review,
+.admin-badge-missing,
+.admin-badge-ai,
+.admin-badge-neutral {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 24px;
+  border: 1px solid;
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1rem;
+}
+
+.admin-badge-success { border-color: var(--admin-success-border); background: var(--admin-success-soft); color: var(--admin-success); }
+.admin-badge-review { border-color: var(--admin-review-border); background: var(--admin-review-soft); color: var(--admin-review); }
+.admin-badge-missing { border-color: var(--admin-missing-border); background: var(--admin-missing-soft); color: var(--admin-missing); }
+.admin-badge-ai { border-color: var(--admin-ai-border); background: var(--admin-ai-soft); color: var(--admin-ai); }
+.admin-badge-neutral { border-color: var(--admin-border); background: var(--admin-surface-subtle); color: var(--admin-body); }
+
+.admin-progress-track {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e2e8f0;
+}
+
+.admin-progress-value {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--admin-primary);
+  transition: width 300ms ease;
+}
+
+.admin-code-panel {
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  background: var(--admin-surface-subtle);
+  color: var(--admin-body);
+  font-family: var(--admin-font-mono);
+}

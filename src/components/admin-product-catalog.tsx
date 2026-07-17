@@ -74,16 +74,16 @@ const statusLabel: Record<ContentStatus, string> = {
 };
 
 const statusClass: Record<ContentStatus, string> = {
-  DRAFT: "border-white/10 bg-white/[0.05] text-zinc-400",
-  PUBLISHED: "border-emerald-500/20 bg-emerald-500/10 text-emerald-300",
-  ARCHIVED: "border-rose-500/20 bg-rose-500/10 text-rose-300",
+  DRAFT: "admin-badge-neutral",
+  PUBLISHED: "admin-badge-success",
+  ARCHIVED: "admin-badge-missing",
 };
 
 const translationClass: Record<TranslationStatus, string> = {
-  PUBLISHED: "border-emerald-500/25 bg-emerald-500/10 text-emerald-300",
-  NEEDS_REVIEW: "border-amber-500/25 bg-amber-500/10 text-amber-300",
-  MACHINE_DRAFT: "border-violet-500/25 bg-violet-500/10 text-violet-300",
-  MISSING: "border-white/[0.07] bg-white/[0.03] text-zinc-700",
+  PUBLISHED: "admin-badge-success",
+  NEEDS_REVIEW: "admin-badge-review",
+  MACHINE_DRAFT: "admin-badge-ai",
+  MISSING: "admin-badge-missing",
 };
 
 const kindLabel: Record<ProductKind, string> = {

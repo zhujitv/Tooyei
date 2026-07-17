@@ -195,8 +195,9 @@ const serializeDownloads = (rows: DownloadRow[]) =>
     )
     .join("\n");
 
-const metricClass = "rounded-lg border border-white/[0.07] bg-white/[0.025] px-4 py-3";
-const rowClass = "rounded-lg border border-white/[0.07] bg-[#0a0a0b] p-3";
+const metricClass = "rounded-xl border border-[#E5E7EB] bg-white px-4 py-3 shadow-sm";
+const rowClass = "rounded-xl border border-[#E5E7EB] bg-white p-4 shadow-sm";
+const sectionClass = "space-y-4 rounded-xl border border-[#E5E7EB] bg-[#F8FAFC] p-5";
 
 const completionForLocale = <T extends { translations?: Partial<Record<ContentLocale, unknown>> }>(
   rows: T[],
@@ -227,8 +228,8 @@ function LanguageCompletion<T extends { translations?: Partial<Record<ContentLoc
           <span
             key={locale}
             className={completion === 100
-              ? "rounded border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-[10px] text-emerald-300"
-              : "rounded border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-[10px] text-amber-300"}
+              ? "admin-badge-success"
+              : "admin-badge-review"}
           >
             {languageNames[locale]} {completion}%
           </span>
@@ -260,17 +261,17 @@ function SectionHeader({
   count: number;
 }) {
   return (
-    <div className="flex flex-col justify-between gap-3 border-b border-white/[0.07] pb-4 sm:flex-row sm:items-start">
+    <div className="flex flex-col justify-between gap-3 border-b border-[#E5E7EB] pb-4 sm:flex-row sm:items-start">
       <div className="flex items-start gap-3">
-        <span className="grid size-10 shrink-0 place-items-center rounded-md border border-white/[0.08] bg-white/[0.035] text-zinc-400">
+        <span className="grid size-10 shrink-0 place-items-center rounded-lg border border-blue-100 bg-blue-50 text-blue-600">
           <Icon className="size-5" />
         </span>
         <div>
-          <h3 className="font-semibold text-zinc-100">{title}</h3>
-          <p className="mt-1 text-sm leading-6 text-zinc-600">{description}</p>
+          <h3 className="font-semibold text-[#111827]">{title}</h3>
+          <p className="mt-1 text-sm leading-6 text-[#475569]">{description}</p>
         </div>
       </div>
-      <Badge variant="outline" className="w-fit border-white/[0.1] text-zinc-500">
+      <Badge variant="outline" className="admin-badge-neutral">
         {count} 项
       </Badge>
     </div>
@@ -348,7 +349,7 @@ export function ProductStructuredContentEditor({
         <div className="rounded-lg border border-violet-500/20 bg-violet-500/[0.06] p-4">
           <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-center">
             <div>
-              <p className="flex items-center gap-2 text-sm font-semibold text-violet-200"><Sparkles className="size-4" />AI 结构化翻译</p>
+            <p className="flex items-center gap-2 text-sm font-semibold text-violet-700"><Sparkles className="size-4" />AI 结构化翻译</p>
               <p className="mt-1 text-xs text-zinc-500">自动应用建材行业术语库，任务会进入 Translation Worker 独立执行。</p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -387,7 +388,7 @@ export function ProductStructuredContentEditor({
         </div>
       </div>
 
-      <section className="space-y-4 rounded-lg border border-white/[0.07] bg-[#0d0d0f] p-4">
+      <section className={sectionClass}>
         <SectionHeader
           icon={ImageIcon}
           title="产品图片 / 图库"
@@ -498,7 +499,7 @@ export function ProductStructuredContentEditor({
         </Button>
       </section>
 
-      <section className="space-y-4 rounded-lg border border-white/[0.07] bg-[#0d0d0f] p-4">
+      <section className={sectionClass}>
         <SectionHeader icon={Layers3} title="卖点模块" description="用于产品详情页的核心优势卡片，建议 3-6 条。" count={features.length} />
         <LanguageCompletion rows={features.filter((row) => row.title.trim())} fields={[
           { key: "title", required: () => true },
@@ -589,7 +590,7 @@ export function ProductStructuredContentEditor({
         </Button>
       </section>
 
-      <section className="space-y-4 rounded-lg border border-white/[0.07] bg-[#0d0d0f] p-4">
+      <section className={sectionClass}>
         <SectionHeader icon={Grid2X2} title="产品参数表" description="结构化保存厚度、尺寸、耐磨层、包装等参数。" count={specifications.length} />
         <LanguageCompletion rows={specifications.filter((row) => row.label.trim() && row.value.trim())} fields={[
           { key: "label", required: () => true },
@@ -707,7 +708,7 @@ export function ProductStructuredContentEditor({
         </Button>
       </section>
 
-      <section className="space-y-4 rounded-lg border border-white/[0.07] bg-[#0d0d0f] p-4">
+      <section className={sectionClass}>
         <SectionHeader icon={ListPlus} title="应用场景" description="用于工程、住宅、商业等场景化内容展示。" count={applications.length} />
         <LanguageCompletion rows={applications.filter((row) => row.title.trim())} fields={[
           { key: "title", required: () => true },
@@ -821,7 +822,7 @@ export function ProductStructuredContentEditor({
         </Button>
       </section>
 
-      <section className="space-y-4 rounded-lg border border-white/[0.07] bg-[#0d0d0f] p-4">
+      <section className={sectionClass}>
         <SectionHeader icon={FileText} title="下载资料" description="上传或填写产品目录、规格表、安装指南、质保和证书。" count={downloads.length} />
         <LanguageCompletion rows={downloads.filter((row) => row.title.trim() && row.url.trim())} fields={[{ key: "title", required: () => true }]} />
         <div className="space-y-3">
@@ -920,9 +921,9 @@ export function ProductStructuredContentEditor({
         </Button>
       </section>
 
-      <div className="sticky bottom-4 z-10 flex flex-col gap-3 rounded-xl border border-white/[0.07] bg-[#151517]/95 p-4 shadow-[0_24px_80px_rgba(0,0,0,0.38)] backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between">
+      <div className="sticky bottom-4 z-10 flex flex-col gap-3 rounded-xl border border-[#E5E7EB] bg-white/95 p-4 shadow-[0_12px_30px_rgba(15,23,42,0.10)] backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-zinc-500">保存后会刷新产品列表、公开产品页和多语言产品页缓存。</p>
-        <Button type="submit" disabled={disabled} className="h-10 bg-zinc-100 px-5 text-zinc-950 hover:bg-white">
+        <Button type="submit" disabled={disabled} className="admin-button-primary h-10 px-5">
           <Save />
           保存结构化内容
         </Button>

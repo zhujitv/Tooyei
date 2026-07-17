@@ -33,7 +33,7 @@ export function ProductCard({ product, locale, compact = false }: ProductCardPro
       <div className={cn("flex flex-1 flex-col", compact ? "p-5" : "p-6 sm:p-7")}>
         <p className="text-[0.62rem] font-bold uppercase tracking-[0.2em] text-[var(--gold)]">{product.sku}</p>
         <h3 className={cn("font-medium leading-[1.35] tracking-[-0.025em] text-[var(--navy)]", compact ? "mt-3 min-h-12 text-lg" : "mt-4 min-h-[3.4rem] text-xl")}>{title}</h3>
-        <p className={cn("line-clamp-2 min-h-12 text-sm leading-6 text-[var(--muted)]", compact ? "mt-2" : "mt-3")}>{summary}</p>
+        <p className={cn("line-clamp-2 min-h-14 text-base leading-7 text-[var(--muted)]", compact ? "mt-2" : "mt-3")}>{summary}</p>
         {tags.length > 0 ? (
           <div className={cn("flex flex-wrap content-start gap-2", compact ? "mt-4 min-h-8" : "mt-5 min-h-14")}>
             {tags.map((tag) => (

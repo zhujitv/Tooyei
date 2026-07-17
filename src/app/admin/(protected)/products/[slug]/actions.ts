@@ -250,7 +250,8 @@ export async function updateProductTranslationAction(slug: string, formData: For
   });
 
   revalidateProductPaths(slug, parsed.data.locale);
-  redirect(`/admin/products/${slug}?saved=${parsed.data.locale}`);
+  const returnTab = formData.get("returnTab") === "seo" ? "seo" : "languages";
+  redirect(`/admin/products/${slug}?saved=${parsed.data.locale}&tab=${returnTab}`);
 }
 
 export async function updateProductStructuredContentAction(slug: string, formData: FormData) {

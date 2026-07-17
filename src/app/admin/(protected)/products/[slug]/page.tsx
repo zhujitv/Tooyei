@@ -12,7 +12,6 @@ import {
   ImageIcon,
   Save,
   SearchCheck,
-  TriangleAlert,
 } from "lucide-react";
 import { ContentStatus, ProductDownloadKind, ProductMediaRole } from "@/generated/prisma/client";
 import { AdminProductTabs, type ProductTabId } from "@/components/admin-product-tabs";
@@ -48,13 +47,6 @@ const statusLabel: Record<(typeof statuses)[number], string> = {
   MACHINE_DRAFT: "机器草稿",
   NEEDS_REVIEW: "待审核",
   PUBLISHED: "已发布",
-};
-
-const translationStatusClass: Record<(typeof statuses)[number], string> = {
-  MISSING: "border-white/[0.08] bg-white/[0.035] text-zinc-600",
-  MACHINE_DRAFT: "border-violet-500/20 bg-violet-500/10 text-violet-300",
-  NEEDS_REVIEW: "border-amber-500/20 bg-amber-500/10 text-amber-300",
-  PUBLISHED: "border-emerald-500/20 bg-emerald-500/10 text-emerald-300",
 };
 
 const productStatusLabel: Record<ContentStatus, string> = {
@@ -131,14 +123,16 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
     feedback.saved && !["core", "structured", "upload", "created"].includes(feedback.saved) && !structuredTranslationSaved
       ? feedback.saved.toUpperCase()
       : undefined;
-  const requestedTab = ["overview", "media", "content", "languages"].includes(feedback.tab ?? "")
+  const requestedTab = ["overview", "media", "content", "languages", "seo"].includes(feedback.tab ?? "")
     ? feedback.tab as ProductTabId
     : undefined;
   const initialTab: ProductTabId = requestedTab ?? (
     feedback.saved === "upload"
       ? "media"
-      : feedback.saved === "structured" || structuredTranslationSaved
+      : feedback.saved === "structured"
         ? "content"
+        : structuredTranslationSaved
+          ? "languages"
         : savedLocale
           ? "languages"
           : "overview"
@@ -156,7 +150,7 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
     { label: "基础资料", score: product.sku && (product.categoryId || !databaseReady) ? 15 : 0, weight: 15, tab: "overview" as ProductTabId },
     { label: "产品媒体", score: product.media.some((item) => item.visible) ? 20 : 0, weight: 20, tab: "media" as ProductTabId },
     { label: "多语言发布", score: Math.round((publishedLocales / product.translations.length) * 20), weight: 20, tab: "languages" as ProductTabId },
-    { label: "SEO 字段", score: Math.round((seoReadyLocales / product.translations.length) * 15), weight: 15, tab: "languages" as ProductTabId },
+    { label: "SEO 字段", score: Math.round((seoReadyLocales / product.translations.length) * 15), weight: 15, tab: "seo" as ProductTabId },
     { label: "卖点", score: product.features.length ? 10 : 0, weight: 10, tab: "content" as ProductTabId },
     { label: "规格参数", score: product.specifications.length ? 10 : 0, weight: 10, tab: "content" as ProductTabId },
     { label: "应用场景", score: product.applications.length ? 5 : 0, weight: 5, tab: "content" as ProductTabId },
@@ -339,45 +333,71 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
           />
         </CardContent>
       </Card>
-      <Card className="admin-card">
-        <CardHeader className="border-b border-white/[0.065] pb-4">
-          <CardTitle className="text-sm">九语言内容</CardTitle>
-          <p className="text-xs text-zinc-600">分别维护图片 ALT、卖点、参数、应用场景和下载资料文字。</p>
-        </CardHeader>
-        <CardContent className="pt-1">
-          <ProductStructuredTranslationEditor
-            key={[...product.media, ...product.features, ...product.specifications, ...product.applications, ...product.downloads].map((item) => item.id).join(":")}
-            action={saveStructuredTranslationAction}
-            disabled={!databaseReady}
-            initialLocale={initialStructuredLocale}
-            initial={{ media: product.media, features: product.features, specifications: product.specifications, applications: product.applications, downloads: product.downloads }}
-          />
-        </CardContent>
-      </Card>
     </div>
   );
 
   const languagesPanel = (
+    <div className="space-y-5">
+    <div className="grid gap-4 xl:grid-cols-2">
+      {product.translations.map((translation) => {
+        return (
+          <Card key={translation.locale} className="admin-card">
+            <CardHeader className="flex flex-row items-start justify-between border-b border-white/[0.065] pb-4">
+              <div><CardTitle className="flex items-center gap-2 text-sm"><span aria-hidden>{languageMarkers[translation.locale]}</span>{languageNames[translation.locale]}<span className="font-mono text-[9px] font-normal uppercase text-zinc-700">{translation.locale}</span></CardTitle><p className="mt-1 text-[11px] text-zinc-600">独立维护产品标题、摘要和发布状态。</p></div>
+              <Badge className={translation.status === "PUBLISHED" ? "admin-badge-success" : translation.status === "MISSING" ? "admin-badge-missing" : "admin-badge-review"}>{statusLabel[translation.status]}</Badge>
+            </CardHeader>
+            <CardContent className="pt-1">
+              <form action={saveTranslationAction} className="space-y-4">
+                <input type="hidden" name="locale" value={translation.locale} />
+                <input type="hidden" name="seoTitle" value={translation.seoTitle} />
+                <input type="hidden" name="seoDescription" value={translation.seoDescription} />
+                <div className="space-y-1.5"><Label htmlFor={`${translation.locale}-title`} className="admin-label">标题</Label><Input id={`${translation.locale}-title`} name="title" defaultValue={translation.title} minLength={3} maxLength={180} required disabled={!databaseReady} className="admin-field" /></div>
+                <div className="space-y-1.5"><Label htmlFor={`${translation.locale}-summary`} className="admin-label">摘要</Label><Textarea id={`${translation.locale}-summary`} name="summary" defaultValue={translation.summary} minLength={20} maxLength={800} required disabled={!databaseReady} className="admin-field min-h-24" /></div>
+                <div className="grid gap-4 border-t border-white/[0.065] pt-4 sm:grid-cols-[180px_1fr] sm:items-end"><div className="space-y-1.5"><Label htmlFor={`${translation.locale}-status`} className="admin-label">发布状态</Label><select id={`${translation.locale}-status`} name="status" defaultValue={translation.status} disabled={!databaseReady} className="admin-select w-full px-3 text-sm">{statuses.map((status) => <option key={status} value={status}>{statusLabel[status]}</option>)}</select></div><div className="flex justify-end"><Button type="submit" disabled={!databaseReady} className="admin-button-primary"><Save />保存 {translation.locale.toUpperCase()}</Button></div></div>
+              </form>
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
+    <Card className="admin-card">
+      <CardHeader className="border-b border-white/[0.065] pb-4">
+        <CardTitle className="text-sm">结构化内容翻译</CardTitle>
+        <p className="text-xs text-zinc-600">分别维护图片 ALT、卖点、参数、应用场景和下载资料文字。</p>
+      </CardHeader>
+      <CardContent className="pt-1">
+        <ProductStructuredTranslationEditor
+          key={[...product.media, ...product.features, ...product.specifications, ...product.applications, ...product.downloads].map((item) => item.id).join(":")}
+          action={saveStructuredTranslationAction}
+          disabled={!databaseReady}
+          initialLocale={initialStructuredLocale}
+          initial={{ media: product.media, features: product.features, specifications: product.specifications, applications: product.applications, downloads: product.downloads }}
+        />
+      </CardContent>
+    </Card>
+    </div>
+  );
+
+  const seoPanel = (
     <div className="grid gap-4 xl:grid-cols-2">
       {product.translations.map((translation) => {
         const seoReady = Boolean(translation.seoTitle.trim() && translation.seoDescription.trim());
         return (
           <Card key={translation.locale} className="admin-card">
             <CardHeader className="flex flex-row items-start justify-between border-b border-white/[0.065] pb-4">
-              <div><CardTitle className="flex items-center gap-2 text-sm"><span aria-hidden>{languageMarkers[translation.locale]}</span>{languageNames[translation.locale]}<span className="font-mono text-[9px] font-normal uppercase text-zinc-700">{translation.locale}</span></CardTitle><p className="mt-1 text-[11px] text-zinc-600">每种语言独立维护标题、摘要、SEO 和发布状态。</p></div>
-              <div className="flex items-center gap-1.5"><Badge className={`border ${translationStatusClass[translation.status]}`}>{statusLabel[translation.status]}</Badge><span title={seoReady ? "SEO 已完整" : "SEO 待完善"} className={seoReady ? "grid size-5 place-items-center rounded border border-emerald-500/20 bg-emerald-500/10 text-emerald-400" : "grid size-5 place-items-center rounded border border-amber-500/20 bg-amber-500/10 text-amber-400"}>{seoReady ? <Check className="size-3" /> : <SearchCheck className="size-3" />}</span></div>
+              <div><CardTitle className="flex items-center gap-2 text-sm"><span aria-hidden>{languageMarkers[translation.locale]}</span>{languageNames[translation.locale]} SEO</CardTitle><p className="mt-1 text-[11px] text-zinc-600">搜索结果标题与描述，不改变产品正文。</p></div>
+              <span className={seoReady ? "admin-badge-success" : "admin-badge-missing"}>{seoReady ? "SEO 完整" : "SEO 缺失"}</span>
             </CardHeader>
             <CardContent className="pt-1">
               <form action={saveTranslationAction} className="space-y-4">
                 <input type="hidden" name="locale" value={translation.locale} />
-                <div className="space-y-1.5"><Label htmlFor={`${translation.locale}-title`} className="admin-label">标题</Label><Input id={`${translation.locale}-title`} name="title" defaultValue={translation.title} minLength={3} maxLength={180} required disabled={!databaseReady} className="admin-field" /></div>
-                <div className="space-y-1.5"><Label htmlFor={`${translation.locale}-summary`} className="admin-label">摘要</Label><Textarea id={`${translation.locale}-summary`} name="summary" defaultValue={translation.summary} minLength={20} maxLength={800} required disabled={!databaseReady} className="admin-field min-h-24" /></div>
-                <div className="grid gap-4 sm:grid-cols-[1fr_150px]">
-                  <div className="space-y-1.5"><Label htmlFor={`${translation.locale}-seoTitle`} className="admin-label">SEO 标题</Label><Input id={`${translation.locale}-seoTitle`} name="seoTitle" defaultValue={translation.seoTitle} maxLength={70} required disabled={!databaseReady} placeholder="使用当前语言填写，最多 70 个字符" className="admin-field" /><p className="text-[10px] text-zinc-700">建议包含产品类型、核心卖点和品牌，避免与其他产品重复。</p></div>
-                  <div className="space-y-1.5"><Label htmlFor={`${translation.locale}-status`} className="admin-label">发布状态</Label><select id={`${translation.locale}-status`} name="status" defaultValue={translation.status} disabled={!databaseReady} className="admin-select h-8 w-full px-2.5 text-xs">{statuses.map((status) => <option key={status} value={status}>{statusLabel[status]}</option>)}</select></div>
-                </div>
-                <div className="space-y-1.5"><Label htmlFor={`${translation.locale}-seoDescription`} className="admin-label">SEO 描述</Label><Textarea id={`${translation.locale}-seoDescription`} name="seoDescription" defaultValue={translation.seoDescription} maxLength={180} required disabled={!databaseReady} placeholder="使用当前语言概括规格、应用和采购价值" className="admin-field min-h-16" /><p className="text-[10px] text-zinc-700">建议 80–180 个字符；后台批量补齐会使用本语言摘要生成基础版本。</p></div>
-                <div className="flex items-center justify-between border-t border-white/[0.065] pt-4"><span className={seoReady ? "flex items-center gap-1.5 text-[10px] text-emerald-400" : "flex items-center gap-1.5 text-[10px] text-amber-400"}>{seoReady ? <CheckCircle2 className="size-3" /> : <TriangleAlert className="size-3" />}{seoReady ? "SEO 字段已完整" : "SEO 标题或描述待补充"}</span><Button type="submit" size="sm" disabled={!databaseReady} className="bg-zinc-100 text-zinc-950 hover:bg-white"><Save />保存 {translation.locale.toUpperCase()}</Button></div>
+                <input type="hidden" name="returnTab" value="seo" />
+                <input type="hidden" name="title" value={translation.title} />
+                <input type="hidden" name="summary" value={translation.summary} />
+                <input type="hidden" name="status" value={translation.status} />
+                <div className="space-y-1.5"><Label htmlFor={`${translation.locale}-seo-only-title`} className="admin-label">SEO 标题</Label><Input id={`${translation.locale}-seo-only-title`} name="seoTitle" defaultValue={translation.seoTitle} maxLength={70} required disabled={!databaseReady} placeholder="最多 70 个字符" className="admin-field" /><p className="text-[10px] text-zinc-700">建议包含产品类型、核心卖点和 TOOYEI。</p></div>
+                <div className="space-y-1.5"><Label htmlFor={`${translation.locale}-seo-only-description`} className="admin-label">SEO 描述</Label><Textarea id={`${translation.locale}-seo-only-description`} name="seoDescription" defaultValue={translation.seoDescription} maxLength={180} required disabled={!databaseReady} placeholder="概括规格、应用场景与采购价值" className="admin-field min-h-24" /><p className="text-[10px] text-zinc-700">建议 80–180 个字符，内容应与当前语言产品页一致。</p></div>
+                <div className="flex items-center justify-between border-t border-white/[0.065] pt-4"><span className={seoReady ? "flex items-center gap-1.5 text-xs text-emerald-700" : "flex items-center gap-1.5 text-xs text-rose-700"}>{seoReady ? <Check className="size-3.5" /> : <SearchCheck className="size-3.5" />}{seoReady ? "搜索字段已完整" : "需要补齐搜索字段"}</span><Button type="submit" disabled={!databaseReady} className="admin-button-primary"><Save />保存 SEO</Button></div>
               </form>
             </CardContent>
           </Card>
@@ -388,39 +408,39 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
 
   return (
     <main className="admin-page">
-      <Button asChild size="sm" variant="ghost" className="-ml-2 text-zinc-600 hover:bg-white/[0.04] hover:text-zinc-300">
+      <Button asChild size="sm" variant="ghost" className="-ml-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900">
         <Link href="/admin/products"><ArrowLeft />返回产品</Link>
       </Button>
 
-      <header className="mt-4 grid gap-5 border-b border-white/[0.075] pb-6 lg:grid-cols-[1fr_auto] lg:items-end">
+      <header className="mt-4 grid gap-5 border-b border-[#E5E7EB] pb-6 lg:grid-cols-[1fr_auto] lg:items-end">
         <div className="flex min-w-0 items-start gap-4">
-          <div className="relative hidden size-20 shrink-0 overflow-hidden rounded-lg border border-white/[0.08] bg-[#151517] sm:block">
+          <div className="relative hidden size-20 shrink-0 overflow-hidden rounded-xl border border-[#E5E7EB] bg-[#F8FAFC] sm:block">
             {primaryMedia?.kind === "IMAGE" ? <div role="img" aria-label={primaryMedia.alt || zhTranslation?.title || product.sku} className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${JSON.stringify(primaryMedia.url)})` }} /> : <div className="absolute inset-0 grid place-items-center"><ImageIcon className="size-6 text-zinc-700" /></div>}
           </div>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="outline" className="border-white/[0.09] text-zinc-500">{productStatusLabel[product.status]}</Badge>
-              <span className="text-[10px] text-zinc-700">{kindLabel[product.kind]}</span>
-              {product.featured ? <Badge className="border border-violet-500/20 bg-violet-500/10 text-violet-300">精选</Badge> : null}
+              <Badge variant="outline" className="admin-badge-neutral">{productStatusLabel[product.status]}</Badge>
+              <span className="text-[10px] text-slate-400">{kindLabel[product.kind]}</span>
+              {product.featured ? <Badge className="admin-badge-ai">AI 精选</Badge> : null}
             </div>
-            <h1 className="mt-2 truncate text-2xl font-semibold tracking-[-0.035em] text-zinc-50">{zhTranslation?.title || "产品编辑器"}</h1>
-            <p className="mt-1.5 font-mono text-[10px] text-zinc-700">{product.sku} · {product.slug}</p>
+            <h1 className="mt-2 truncate text-2xl font-semibold tracking-[-0.035em] text-[#111827]">{zhTranslation?.title || "产品编辑器"}</h1>
+            <p className="mt-1.5 font-mono text-[10px] text-[#94A3B8]">{product.sku} · {product.slug}</p>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-3 rounded-lg border border-white/[0.08] bg-[#111113] px-3 py-2">
-            <div className="relative grid size-9 place-items-center rounded-full" style={{ background: `conic-gradient(${completeness >= 80 ? "#34d399" : "#fbbf24"} ${completeness * 3.6}deg, rgba(255,255,255,.06) 0deg)` }}><div className="absolute inset-[3px] rounded-full bg-[#111113]" /><span className="relative font-mono text-[9px] text-zinc-300">{completeness}</span></div>
-            <div><p className="text-[10px] text-zinc-600">资料完整度</p><p className="mt-0.5 text-xs font-medium text-zinc-300">{completeness >= 80 ? "接近发布标准" : completeness >= 55 ? "继续完善资料" : "资料缺失较多"}</p></div>
+          <div className="flex items-center gap-3 rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 shadow-sm">
+            <div className="relative grid size-9 place-items-center rounded-full" style={{ background: `conic-gradient(${completeness >= 80 ? "#22c55e" : "#f59e0b"} ${completeness * 3.6}deg, #e2e8f0 0deg)` }}><div className="absolute inset-[3px] rounded-full bg-white" /><span className="relative font-mono text-[9px] text-slate-700">{completeness}</span></div>
+            <div><p className="text-[10px] text-[#94A3B8]">资料完整度</p><p className="mt-0.5 text-xs font-medium text-[#475569]">{completeness >= 80 ? "接近发布标准" : completeness >= 55 ? "继续完善资料" : "资料缺失较多"}</p></div>
           </div>
-          <Button asChild size="sm" variant="outline" className="border-white/[0.1] bg-white/[0.035] text-zinc-300 hover:bg-white/[0.08] hover:text-white"><Link href={`/products/${product.slug}`} target="_blank"><ExternalLink />公开页面</Link></Button>
+          <Button asChild size="sm" variant="outline" className="border-[#E5E7EB] bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900"><Link href={`/products/${product.slug}`} target="_blank"><ExternalLink />公开页面</Link></Button>
         </div>
       </header>
 
       {feedback.saved ? (
-        <Alert className="mt-5 border-emerald-500/20 bg-emerald-500/[0.07] text-emerald-200"><Save className="size-4" /><AlertTitle>{feedback.saved === "core" ? "产品基础信息已保存" : feedback.saved === "created" ? "新产品已创建" : feedback.saved === "upload" ? "文件已上传并关联" : feedback.saved === "structured" ? "产品结构化内容已保存" : "翻译已保存"}</AlertTitle><AlertDescription className="text-emerald-200/60">{feedback.saved === "core" ? "产品列表、公开页面和缓存已刷新。" : feedback.saved === "created" ? "可以继续完善图片、规格、卖点、应用场景、下载资料和多语言 SEO。" : feedback.saved === "upload" ? "对象存储和产品媒体关系已更新。" : feedback.saved === "structured" ? "图库、规格、卖点、应用场景和下载资料已同步到公开产品页。" : `${savedLocale} 版本、SEO 字段和公开页面缓存已更新。`}</AlertDescription></Alert>
+        <Alert className="mt-5 border-emerald-200 bg-emerald-50 text-emerald-800"><Save className="size-4" /><AlertTitle>{feedback.saved === "core" ? "产品基础信息已保存" : feedback.saved === "created" ? "新产品已创建" : feedback.saved === "upload" ? "文件已上传并关联" : feedback.saved === "structured" ? "产品结构化内容已保存" : "翻译已保存"}</AlertTitle><AlertDescription>{feedback.saved === "core" ? "产品列表、公开页面和缓存已刷新。" : feedback.saved === "created" ? "可以继续完善图片、规格、卖点、应用场景、下载资料和多语言 SEO。" : feedback.saved === "upload" ? "对象存储和产品媒体关系已更新。" : feedback.saved === "structured" ? "图库、规格、卖点、应用场景和下载资料已同步到公开产品页。" : `${savedLocale} 版本、SEO 字段和公开页面缓存已更新。`}</AlertDescription></Alert>
       ) : null}
       {feedback.error ? (
-        <Alert className="mt-5 border-amber-500/20 bg-amber-500/[0.07] text-amber-200"><Database className="size-4" /><AlertTitle>修改未保存</AlertTitle><AlertDescription className="text-amber-200/60">{feedback.error === "database" ? "请先连接 PostgreSQL 并初始化产品目录。" : feedback.error === "core" ? "请检查 SKU、分类、状态和排序。" : feedback.error === "structured" ? "请检查结构化内容字段。" : feedback.error === "upload" ? "请检查文件类型、大小、Blob 配置和数据库连接。" : "请检查标题、摘要、SEO 字段和发布状态。"}</AlertDescription></Alert>
+        <Alert className="mt-5 border-amber-200 bg-amber-50 text-amber-900"><Database className="size-4" /><AlertTitle>修改未保存</AlertTitle><AlertDescription>{feedback.error === "database" ? "请先连接 PostgreSQL 并初始化产品目录。" : feedback.error === "core" ? "请检查 SKU、分类、状态和排序。" : feedback.error === "structured" ? "请检查结构化内容字段。" : feedback.error === "upload" ? "请检查文件类型、大小、Blob 配置和数据库连接。" : "请检查标题、摘要、SEO 字段和发布状态。"}</AlertDescription></Alert>
       ) : null}
 
       <AdminProductTabs
@@ -430,6 +450,7 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
         media={mediaPanel}
         content={contentPanel}
         languages={languagesPanel}
+        seo={seoPanel}
       />
     </main>
   );

@@ -30,15 +30,15 @@ export default async function AdminLoginPage({
   const message = params.error ? messages[params.error] : undefined;
 
   return (
-    <main className="admin-root grid min-h-screen place-items-center bg-[#F6F8FB] px-5 py-12 text-[#172033] [color-scheme:light]">
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_50%_-10%,rgba(37,52,79,0.07),transparent_30rem)]" />
-      <Card className="relative w-full max-w-sm rounded-xl border border-[#E4E7EC] bg-white text-[#172033] shadow-[0_24px_70px_rgba(16,24,40,0.10)] ring-0">
+    <main className="admin-root grid min-h-screen place-items-center bg-[#F8FAFC] px-5 py-12 text-[#111827] [color-scheme:light]">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_50%_-10%,rgba(37,99,235,0.08),transparent_30rem)]" />
+      <Card className="relative w-full max-w-sm rounded-xl border border-[#E5E7EB] bg-white text-[#111827] shadow-[0_24px_70px_rgba(15,23,42,0.10)] ring-0">
         <CardHeader>
           <span className="mb-5 grid size-9 place-items-center overflow-hidden rounded-md bg-[#df2029]">
             <Image src="/brand/tooyei-symbol.png" width={28} height={29} alt="" className="h-[29px] w-7 brightness-0 invert" priority />
           </span>
-          <CardTitle className="text-xl tracking-[-0.03em] text-[#172033]">登录 Tooyei</CardTitle>
-          <CardDescription className="text-[#667085]">进入内容与销售运营工作区。</CardDescription>
+          <CardTitle className="text-xl tracking-[-0.03em] text-[#111827]">登录 Tooyei</CardTitle>
+          <CardDescription className="text-[#475569]">进入内容与销售运营工作区。</CardDescription>
         </CardHeader>
         <CardContent>
           {message && (
@@ -58,7 +58,7 @@ export default async function AdminLoginPage({
               <Label htmlFor="password" className="admin-label">密码</Label>
               <Input id="password" name="password" type="password" minLength={12} autoComplete="current-password" required className="admin-field" />
             </div>
-            <Button type="submit" className="w-full bg-[#25344F] text-white hover:bg-[#1D293F]">登录</Button>
+            <Button type="submit" className="admin-button-primary h-10 w-full">登录</Button>
           </form>
         </CardContent>
       </Card>

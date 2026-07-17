@@ -44,12 +44,12 @@ const noteKindLabel: Record<(typeof noteKinds)[number], string> = {
 };
 
 const statusColor: Record<string, string> = {
-  NEW: "bg-sky-500/12 text-sky-300",
-  QUALIFIED: "bg-violet-500/12 text-violet-300",
-  IN_PROGRESS: "bg-amber-500/12 text-amber-300",
-  WON: "bg-emerald-500/12 text-emerald-300",
-  LOST: "bg-rose-500/12 text-rose-300",
-  SPAM: "bg-white/10 text-zinc-700",
+  NEW: "admin-badge-neutral border-blue-200 bg-blue-50 text-blue-700",
+  QUALIFIED: "admin-badge-ai",
+  IN_PROGRESS: "admin-badge-review",
+  WON: "admin-badge-success",
+  LOST: "admin-badge-missing",
+  SPAM: "admin-badge-neutral",
 };
 
 const formatDate = (date: Date) =>

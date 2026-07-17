@@ -37,9 +37,9 @@ type Props = {
   };
 };
 
-const sectionClass = "space-y-4 rounded-lg border border-white/[0.07] bg-[#0d0d0f] p-4";
-const rowClass = "grid gap-4 rounded-lg border border-white/[0.07] bg-[#0a0a0b] p-4 xl:grid-cols-[minmax(180px,.7fr)_minmax(0,1.3fr)]";
-const sourceClass = "rounded-md border border-white/[0.06] bg-white/[0.025] p-3 text-xs leading-5 text-zinc-500";
+const sectionClass = "space-y-4 rounded-xl border border-[#E5E7EB] bg-white p-5 shadow-sm";
+const rowClass = "grid gap-4 rounded-lg border border-[#E5E7EB] bg-[#F8FAFC] p-4 xl:grid-cols-[minmax(180px,.7fr)_minmax(0,1.3fr)]";
+const sourceClass = "rounded-lg border border-[#E5E7EB] bg-white p-3 text-xs leading-5 text-[#475569]";
 
 function buildDrafts(initial: Props["initial"]): Record<ContentLocale, TranslationPayload> {
   return Object.fromEntries(
@@ -81,7 +81,7 @@ function translationProgress(payload: TranslationPayload) {
 function SubmitButton({ disabled, locale }: { disabled: boolean; locale: ContentLocale }) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" disabled={disabled || pending} className="bg-zinc-100 text-zinc-950 hover:bg-white">
+    <Button type="submit" disabled={disabled || pending} className="admin-button-primary">
       <Save className={pending ? "animate-pulse" : ""} />
       {pending ? "正在保存…" : `保存${languageNames[locale]}内容`}
     </Button>
@@ -109,14 +109,14 @@ export function ProductStructuredTranslationEditor({ action, disabled = false, i
   return (
     <form action={action} className="space-y-5">
       <input type="hidden" name="locale" value={activeLocale} />
-      <textarea name="payload" value={JSON.stringify(active)} readOnly hidden />
+      <input type="hidden" name="payload" value={JSON.stringify(active)} />
 
-      <div className="flex flex-col gap-4 rounded-lg border border-white/[0.07] bg-[#0d0d0f] p-4">
+      <div className="flex flex-col gap-4 rounded-xl border border-[#E5E7EB] bg-white p-5 shadow-sm">
         <div className="flex items-start gap-3">
-          <span className="grid size-10 shrink-0 place-items-center rounded-md border border-white/[0.08] bg-white/[0.035] text-zinc-400"><Languages className="size-5" /></span>
+          <span className="grid size-10 shrink-0 place-items-center rounded-lg border border-blue-100 bg-blue-50 text-blue-600"><Languages className="size-5" /></span>
           <div>
-            <h3 className="font-semibold text-zinc-100">结构化内容翻译</h3>
-            <p className="mt-1 text-sm leading-6 text-zinc-600">结构、排序和文件全语言共用；这里只维护访客能看到的文字。缺失内容按当前语言 → 英文 → 中文回退。</p>
+            <h3 className="font-semibold text-[#111827]">结构化内容翻译</h3>
+            <p className="mt-1 text-sm leading-6 text-[#475569]">结构、排序和文件全语言共用；这里只维护访客能看到的文字。缺失内容按当前语言 → 英文 → 中文回退。</p>
           </div>
         </div>
         <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9">
@@ -129,7 +129,7 @@ export function ProductStructuredTranslationEditor({ action, disabled = false, i
                 type="button"
                 aria-pressed={activeTab}
                 onClick={() => setActiveLocale(locale)}
-                className={`rounded-lg border px-3 py-2 text-left transition ${activeTab ? "border-violet-400/35 bg-violet-400/10 text-zinc-100" : "border-white/[0.07] bg-white/[0.025] text-zinc-500 hover:bg-white/[0.05]"}`}
+                className={`rounded-lg border px-3 py-2 text-left transition ${activeTab ? "border-blue-200 bg-blue-50 text-blue-700" : "border-[#E5E7EB] bg-white text-[#475569] hover:bg-[#F8FAFC]"}`}
               >
                 <span className="flex items-center justify-between gap-2 text-xs"><span>{languageMarkers[locale]} {languageNames[locale]}</span><span className="font-mono text-[9px]">{item.percent}%</span></span>
                 <span className="mt-1 block text-[9px] text-zinc-700">{item.complete}/{item.total} 项</span>
@@ -140,11 +140,11 @@ export function ProductStructuredTranslationEditor({ action, disabled = false, i
       </div>
 
       {progress[activeLocale].percent < 100 ? (
-        <div className="flex items-center gap-2 rounded-md border border-amber-500/15 bg-amber-500/[0.06] px-3 py-2 text-xs text-amber-300">
+        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
           <TriangleAlert className="size-3.5" />{languageNames[activeLocale]}还有 {progress[activeLocale].total - progress[activeLocale].complete} 项主要字段未翻译。
         </div>
       ) : (
-        <div className="flex items-center gap-2 rounded-md border border-emerald-500/15 bg-emerald-500/[0.06] px-3 py-2 text-xs text-emerald-300">
+        <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
           <CheckCircle2 className="size-3.5" />{languageNames[activeLocale]}结构化内容主要字段已完整。
         </div>
       )}
