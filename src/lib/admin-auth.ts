@@ -108,3 +108,21 @@ export async function requireProductManagerSession(): Promise<ProductManagerSess
   if (!session) redirect("/admin/content?error=permission");
   return session;
 }
+
+export async function getTranslationManagerSession(): Promise<ProductManagerSession | null> {
+  const session = await getAdminSession();
+  if (!session) return null;
+
+  const user = await getCurrentAdminUser(session.email);
+  if (
+    !user?.active ||
+    (user.role !== AdminRole.OWNER && user.role !== AdminRole.EDITOR && user.role !== AdminRole.TRANSLATOR)
+  ) return null;
+  return { ...session, role: user.role };
+}
+
+export async function requireTranslationManagerSession(): Promise<ProductManagerSession> {
+  const session = await getTranslationManagerSession();
+  if (!session) redirect("/admin/content?error=permission");
+  return session;
+}

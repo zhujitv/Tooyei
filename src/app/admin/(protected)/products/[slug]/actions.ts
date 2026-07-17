@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { ContentStatus, MediaKind, ProductDownloadKind, ProductMediaRole, TranslationStatus } from "@/generated/prisma/client";
-import { getProductManagerSession, requireProductManagerSession } from "@/lib/admin-auth";
+import { getProductManagerSession, requireProductManagerSession, requireTranslationManagerSession } from "@/lib/admin-auth";
 import { isDatabaseConfigured } from "@/lib/db";
 import { productAssetFinalizeSchema, type ProductAssetFinalizeInput } from "@/lib/product-asset-policy";
 import { persistProductAssetUpload } from "@/lib/product-asset-service";
@@ -205,7 +205,7 @@ export async function updateProductCoreAction(slug: string, formData: FormData) 
 }
 
 export async function updateProductTranslationAction(slug: string, formData: FormData) {
-  const session = await requireProductManagerSession();
+  const session = await requireTranslationManagerSession();
   if (!isDatabaseConfigured()) redirect(`/admin/products/${slug}?error=database`);
 
   const parsed = translationSchema.safeParse({
@@ -281,7 +281,7 @@ export async function updateProductStructuredContentAction(slug: string, formDat
 }
 
 export async function updateProductStructuredTranslationAction(slug: string, formData: FormData) {
-  const session = await requireProductManagerSession();
+  const session = await requireTranslationManagerSession();
   if (!isDatabaseConfigured()) redirect(`/admin/products/${slug}?error=database`);
 
   const locale = z.enum(contentLocales).safeParse(formData.get("locale"));

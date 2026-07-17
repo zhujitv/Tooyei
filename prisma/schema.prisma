@@ -38,6 +38,23 @@ enum TranslationStatus {
   PUBLISHED
 }
 
+enum TranslationJobStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  PARTIAL
+  FAILED
+  CANCELLED
+}
+
+enum TranslationJobItemStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+  SKIPPED
+}
+
 enum ProductKind {
   SPC
   ESPC
@@ -168,6 +185,7 @@ model Product {
   applications   ProductApplication[]
   downloads      ProductDownload[]
   inquiries      InquiryProduct[]
+  translationJobItems ProductTranslationJobItem[]
   createdAt      DateTime               @default(now())
   updatedAt      DateTime               @updatedAt
 
@@ -205,6 +223,59 @@ model ProductTranslation {
 
   @@unique([productId, locale])
   @@index([locale, status])
+}
+
+model ProductTranslationJob {
+  id             String                   @id @default(cuid())
+  status         TranslationJobStatus     @default(QUEUED)
+  sourceLocale   Locale
+  targetLocales  Locale[]
+  model          String
+  totalItems     Int                      @default(0)
+  completedItems Int                      @default(0)
+  failedItems    Int                      @default(0)
+  skippedItems   Int                      @default(0)
+  inputTokens    Int                      @default(0)
+  outputTokens   Int                      @default(0)
+  lastError      String?
+  requestedById  String?
+  requestedBy    AdminUser?               @relation(fields: [requestedById], references: [id], onDelete: SetNull)
+  items          ProductTranslationJobItem[]
+  createdAt      DateTime                 @default(now())
+  startedAt      DateTime?
+  completedAt    DateTime?
+  updatedAt      DateTime                 @updatedAt
+
+  @@index([status, createdAt])
+  @@index([requestedById, createdAt])
+}
+
+model ProductTranslationJobItem {
+  id           String                   @id @default(cuid())
+  jobId        String
+  job          ProductTranslationJob    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  productId    String
+  product      Product                  @relation(fields: [productId], references: [id], onDelete: Restrict)
+  productSlug  String
+  productSku   String
+  targetLocale Locale
+  status       TranslationJobItemStatus @default(QUEUED)
+  inputHash    String?
+  responseId   String?
+  output       Json?
+  warnings     Json?
+  error        String?
+  inputTokens  Int                      @default(0)
+  outputTokens Int                      @default(0)
+  attempts     Int                      @default(0)
+  createdAt    DateTime                 @default(now())
+  startedAt    DateTime?
+  completedAt  DateTime?
+  updatedAt    DateTime                 @updatedAt
+
+  @@unique([jobId, productId, targetLocale])
+  @@index([jobId, status, createdAt])
+  @@index([productId, targetLocale, createdAt])
 }
 
 model ProductFeature {
@@ -513,6 +584,7 @@ model AdminUser {
   inquiryNotes InquiryNote[]
   sessions     AdminSession[]
   auditLogs    AuditLog[]
+  translationJobs ProductTranslationJob[]
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
 }

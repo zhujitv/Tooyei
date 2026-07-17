@@ -50,6 +50,14 @@ Product images, videos and downloadable files up to 3.8 MB can be uploaded from
 the product editor to Vercel Blob and attached to the product automatically.
 Link a public Blob store and provide `BLOB_READ_WRITE_TOKEN` before using uploads.
 
+The product translation center at `/admin/translations` can create resumable
+jobs across English, German, French, Spanish, Russian, Japanese, Italian,
+Arabic and Chinese. Configure `OPENAI_API_KEY` to run those jobs and optionally
+override `OPENAI_TRANSLATION_MODEL`. Each product-language item persists its
+status, response ID, input hash, token usage, errors and QA warnings. Generated
+main content, SEO metadata and structured product fields are saved as
+`MACHINE_DRAFT`; existing `PUBLISHED` translations are never overwritten.
+
 The legacy catalogue migration discovers all product URLs from the existing
 Tooyei sitemap and exports English, Spanish and German content, product images
 and specifications. Newly discovered records remain drafts with translations

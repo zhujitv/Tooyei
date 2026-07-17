@@ -103,7 +103,7 @@ const formatDate = (date: Date | null) =>
 
 type PageProps = {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ saved?: string; error?: string }>;
+  searchParams: Promise<{ saved?: string; error?: string; tab?: string }>;
 };
 
 export default async function AdminProductEditPage({ params, searchParams }: PageProps) {
@@ -129,14 +129,18 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
     feedback.saved && !["core", "structured", "upload", "created"].includes(feedback.saved) && !structuredTranslationSaved
       ? feedback.saved.toUpperCase()
       : undefined;
-  const initialTab: ProductTabId =
+  const requestedTab = ["overview", "media", "content", "languages"].includes(feedback.tab ?? "")
+    ? feedback.tab as ProductTabId
+    : undefined;
+  const initialTab: ProductTabId = requestedTab ?? (
     feedback.saved === "upload"
       ? "media"
       : feedback.saved === "structured" || structuredTranslationSaved
         ? "content"
         : savedLocale
           ? "languages"
-          : "overview";
+          : "overview"
+  );
 
   const mediaRoleOptions = Object.values(ProductMediaRole).map((role) => ({ value: role, label: mediaRoleLabel[role] }));
   const downloadKindOptions = Object.values(ProductDownloadKind).map((kind) => ({ value: kind, label: downloadKindLabel[kind] }));
