@@ -296,7 +296,7 @@ export async function HomePage({ locale }: { locale: Locale }) {
     <div className="site-shell">
       <SiteHeader locale={locale} initialCategories={categories} />
       <main>
-        <section className="brand-hero relative isolate min-h-[620px] overflow-hidden bg-[var(--navy)] text-white lg:min-h-[720px]">
+        <section className="brand-hero relative isolate min-h-[560px] overflow-hidden bg-[var(--navy)] text-white lg:min-h-[640px]">
           <Image
             src="/media/hero-flooring.jpg"
             alt={auxiliary.heroAlt}
@@ -316,14 +316,14 @@ export async function HomePage({ locale }: { locale: Locale }) {
             FLOORING SYSTEMS
           </div>
 
-          <div className="relative mx-auto flex min-h-[620px] max-w-[90rem] items-center px-5 py-20 lg:min-h-[720px] lg:px-10">
+          <div className="relative mx-auto flex min-h-[560px] max-w-[86rem] items-center px-5 py-16 lg:min-h-[640px] lg:px-10">
             <div className="brand-fade-up max-w-[43rem]">
               <p className="brand-eyebrow-light"><span />{t.hero.eyebrow}</p>
-              <h1 className="mt-7 max-w-[13em] whitespace-pre-line text-[clamp(2.6rem,6vw,4.5rem)] font-medium leading-[1.04] tracking-[-0.055em] text-white">
+              <h1 className="mt-5 max-w-[13em] whitespace-pre-line text-[clamp(2.45rem,5.6vw,4.25rem)] font-medium leading-[1.03] tracking-[-0.055em] text-white">
                 {t.hero.title}
               </h1>
-              <p className="mt-7 max-w-[39rem] text-base leading-8 text-white/72 sm:text-[1.08rem]">{t.hero.body}</p>
-              <div className="mt-9 flex flex-col gap-3 sm:flex-row">
+              <p className="mt-5 max-w-[39rem] text-base leading-7 text-white/72 sm:text-[1.04rem]">{t.hero.body}</p>
+              <div className="mt-7 flex flex-col gap-3 sm:flex-row">
                 <Button asChild size="lg" className="h-12 rounded-sm bg-[var(--gold)] px-6 text-[var(--navy)] shadow-none hover:bg-[var(--gold-hover)]">
                   <Link href={localizedPath(locale, "/products")}>{t.hero.primary}<ArrowRight className="size-4" /></Link>
                 </Button>
@@ -333,7 +333,7 @@ export async function HomePage({ locale }: { locale: Locale }) {
               </div>
             </div>
 
-            <div className="absolute bottom-8 right-10 hidden w-72 border-l border-white/20 pl-6 xl:block">
+            <div className="absolute bottom-7 right-10 hidden w-72 border-l border-white/20 pl-6 xl:block">
               <p className="text-[0.62rem] font-bold uppercase tracking-[0.2em] text-[var(--gold)]">TOOYEI / SINCE 2015</p>
               <p className="mt-3 text-sm leading-6 text-white/65">{auxiliary.sideNote}</p>
             </div>
@@ -341,11 +341,11 @@ export async function HomePage({ locale }: { locale: Locale }) {
         </section>
 
         <section aria-label={auxiliary.capabilitiesLabel} className="border-b border-[var(--border)] bg-white">
-          <div className="mx-auto grid max-w-[90rem] grid-cols-2 px-5 lg:grid-cols-4 lg:px-10">
+          <div className="mx-auto grid max-w-[86rem] grid-cols-2 px-5 lg:grid-cols-4 lg:px-10">
             {t.capabilities.map((label, index) => {
               const Icon = capabilityIcons[index] ?? CheckCircle2;
               return (
-                <div key={label} className="group flex min-h-24 items-center gap-3 border-b border-r border-[var(--border)] px-4 text-sm font-semibold text-[var(--text)] transition-colors last:border-r-0 hover:text-[var(--gold)] lg:border-b-0 lg:px-6">
+                <div key={label} className="group flex min-h-20 items-center gap-3 border-b border-r border-[var(--border)] px-3 text-sm font-semibold text-[var(--text)] transition-colors last:border-r-0 hover:text-[var(--gold)] lg:border-b-0 lg:px-5">
                   <Icon className="size-5 shrink-0 text-[var(--muted)] transition-colors group-hover:text-[var(--gold)]" strokeWidth={1.6} />
                   {label}
                 </div>
@@ -355,17 +355,17 @@ export async function HomePage({ locale }: { locale: Locale }) {
         </section>
 
         <section id="about" className="scroll-mt-28 bg-[var(--ivory)]">
-          <div className="mx-auto max-w-[90rem] px-5 py-20 lg:px-10 lg:py-28">
-            <div className="grid gap-7 lg:grid-cols-[0.9fr_1.1fr] lg:items-end">
+          <div className="mx-auto max-w-[86rem] px-5 py-16 lg:px-10 lg:py-20">
+            <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr] lg:items-end">
               <div>
                 <p className="brand-eyebrow">TOOYEI / 2015</p>
-                <h2 className="brand-h2 mt-5">{t.trust.title}</h2>
+                <h2 className="brand-h2 mt-4">{t.trust.title}</h2>
               </div>
-              <p className="max-w-2xl text-base leading-8 text-[var(--muted)] lg:justify-self-end">{t.trust.body}</p>
+              <p className="max-w-2xl text-base leading-7 text-[var(--muted)] lg:justify-self-end">{t.trust.body}</p>
             </div>
-            <div className="mt-14 grid border-y border-[var(--border)] sm:grid-cols-2 lg:grid-cols-4">
+            <div className="mt-10 grid border-y border-[var(--border)] sm:grid-cols-2 lg:grid-cols-4">
               {t.trust.metrics.map(([value, label], index) => (
-                <div key={value} className="border-b border-[var(--border)] py-8 sm:px-7 lg:border-b-0 lg:border-r lg:py-10 lg:last:border-r-0">
+                <div key={value} className="border-b border-[var(--border)] py-6 sm:px-6 lg:border-b-0 lg:border-r lg:py-7 lg:last:border-r-0">
                   <p className="text-2xl font-medium tracking-[-0.035em] text-[var(--navy)] sm:text-3xl">{value}</p>
                   <p className="mt-2 text-sm leading-6 text-[var(--muted)]"><span className="mr-2 font-mono text-[0.62rem] text-[var(--gold)]">0{index + 1}</span>{label}</p>
                 </div>
@@ -375,30 +375,30 @@ export async function HomePage({ locale }: { locale: Locale }) {
         </section>
 
         <section className="bg-[var(--paper)]">
-          <div className="mx-auto max-w-[90rem] px-5 py-24 lg:px-10 lg:py-32">
-            <div className="grid gap-8 lg:grid-cols-[0.95fr_1.05fr] lg:items-end">
+          <div className="mx-auto max-w-[86rem] px-5 py-18 lg:px-10 lg:py-24">
+            <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr] lg:items-end">
               <div>
                 <p className="brand-eyebrow">01 · {t.systems.eyebrow}</p>
-                <h2 className="brand-h2 mt-5 max-w-3xl">{t.systems.title}</h2>
+                <h2 className="brand-h2 mt-4 max-w-3xl">{t.systems.title}</h2>
               </div>
               <div className="lg:justify-self-end">
-                <p className="max-w-xl text-base leading-8 text-[var(--muted)]">{t.systems.body}</p>
-                <Link href={localizedPath(locale, "/products")} className="brand-text-link mt-5">{t.systems.action}<ArrowRight /></Link>
+                <p className="max-w-xl text-base leading-7 text-[var(--muted)]">{t.systems.body}</p>
+                <Link href={localizedPath(locale, "/products")} className="brand-text-link mt-4">{t.systems.action}<ArrowRight /></Link>
               </div>
             </div>
 
-            <div className="brand-horizontal-scroll mt-14 flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4 lg:grid lg:grid-cols-4 lg:overflow-visible lg:pb-0">
+            <div className="brand-horizontal-scroll mt-10 flex snap-x snap-mandatory gap-3 overflow-x-auto pb-4 lg:grid lg:grid-cols-4 lg:overflow-visible lg:pb-0">
               {systems.map((system, index) => (
                 <Link key={system.name} href={localizedPath(locale, "/products")} className="group min-w-[82%] snap-start border border-[var(--border)] bg-white sm:min-w-[46%] lg:min-w-0">
-                  <div className="relative aspect-[4/5] overflow-hidden bg-[#e6e3dd]">
+                  <div className="relative aspect-[5/4] overflow-hidden bg-[#e6e3dd]">
                     <Image src={system.image} alt={system.name} fill sizes="(max-width: 640px) 82vw, (max-width: 1024px) 46vw, 25vw" className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]" />
                   </div>
-                  <div className="p-5 sm:p-6">
+                  <div className="p-4 sm:p-5">
                     <div className="flex items-center justify-between gap-4">
                       <p className="text-[0.62rem] font-bold uppercase tracking-[0.18em] text-[var(--gold)]">0{index + 1} / System</p>
                       <ArrowRight className="size-4 text-[var(--muted)] transition-transform duration-300 group-hover:translate-x-1 group-hover:text-[var(--gold)]" />
                     </div>
-                    <h3 className="mt-4 text-2xl font-medium tracking-[-0.035em] text-[var(--navy)] transition-colors group-hover:text-[var(--gold)]">{system.name}</h3>
+                    <h3 className="mt-3 text-xl font-medium tracking-[-0.035em] text-[var(--navy)] transition-colors group-hover:text-[var(--gold)]">{system.name}</h3>
                     <p className="mt-2 text-xs tracking-[0.07em] text-[var(--muted)]">{system.detail[contentLocale]}</p>
                   </div>
                 </Link>
@@ -409,50 +409,50 @@ export async function HomePage({ locale }: { locale: Locale }) {
         </section>
 
         <section className="border-y border-[var(--border)] bg-white">
-          <div className="mx-auto max-w-[90rem] px-5 py-24 lg:px-10 lg:py-28">
-            <div className="flex flex-col justify-between gap-7 md:flex-row md:items-end">
+          <div className="mx-auto max-w-[86rem] px-5 py-18 lg:px-10 lg:py-24">
+            <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
               <div>
                 <p className="brand-eyebrow">02 · {t.featured.eyebrow}</p>
-                <h2 className="brand-h2 mt-5">{t.featured.title}</h2>
+                <h2 className="brand-h2 mt-4">{t.featured.title}</h2>
               </div>
               <div>
-                <p className="max-w-xl text-base leading-8 text-[var(--muted)]">{t.featured.body}</p>
+                <p className="max-w-xl text-base leading-7 text-[var(--muted)]">{t.featured.body}</p>
                 <Link href={localizedPath(locale, "/products")} className="brand-text-link mt-4">{t.featured.action}<ArrowRight /></Link>
               </div>
             </div>
-            <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {products.slice(0, 3).map((product) => <ProductCard key={product.slug} product={product} locale={locale} />)}
+            <div className="mt-10 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+              {products.slice(0, 3).map((product) => <ProductCard key={product.slug} product={product} locale={locale} compact />)}
             </div>
           </div>
         </section>
 
         <section id="applications" className="scroll-mt-28 bg-[var(--navy)] text-white">
-          <div className="mx-auto max-w-[90rem] px-5 py-24 lg:px-10 lg:py-32">
-            <div className="grid gap-8 lg:grid-cols-[0.95fr_1.05fr] lg:items-end">
+          <div className="mx-auto max-w-[86rem] px-5 py-18 lg:px-10 lg:py-24">
+            <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr] lg:items-end">
               <div>
                 <p className="brand-eyebrow-light"><span />03 · {t.applications.eyebrow}</p>
-                <h2 className="brand-h2 mt-5 max-w-3xl text-white">{t.applications.title}</h2>
+                <h2 className="brand-h2 mt-4 max-w-3xl text-white">{t.applications.title}</h2>
               </div>
-              <p className="max-w-xl text-base leading-8 text-white/60 lg:justify-self-end">{t.applications.body}</p>
+              <p className="max-w-xl text-base leading-7 text-white/60 lg:justify-self-end">{t.applications.body}</p>
             </div>
 
-            <div className="mt-14 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="mt-10 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               {t.applications.cards.map(([title, body], index) => (
-                <article key={title} className="group relative aspect-[3/4] overflow-hidden border border-white/10 bg-[var(--navy-soft)]">
+                <article key={title} className="group relative min-h-[250px] overflow-hidden border border-white/10 bg-[var(--navy-soft)]">
                   <Image src={applicationImages[index] ?? applicationImages[0]} alt={title} fill sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 25vw" className="object-cover saturate-[0.72] transition-transform duration-700 group-hover:scale-[1.03]" />
                   <div className="absolute inset-0 bg-gradient-to-t from-[var(--navy)] via-[var(--navy)]/20 to-transparent" />
-                  <div className="absolute inset-x-0 bottom-0 p-6">
+                  <div className="absolute inset-x-0 bottom-0 p-5">
                     <p className="font-mono text-[0.62rem] tracking-[0.16em] text-[var(--gold)]">0{index + 1}</p>
-                    <h3 className="mt-3 text-2xl font-medium tracking-[-0.03em]">{title}</h3>
-                    <p className="mt-3 text-sm leading-6 text-white/62">{body}</p>
+                    <h3 className="mt-2 text-xl font-medium tracking-[-0.03em]">{title}</h3>
+                    <p className="mt-2 text-sm leading-6 text-white/62">{body}</p>
                   </div>
                 </article>
               ))}
             </div>
 
-            <div className="mt-12 grid border-y border-white/10 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="mt-8 grid border-y border-white/10 sm:grid-cols-2 lg:grid-cols-4">
               {t.applications.pillars.map(([title, detail]) => (
-                <div key={title} className="border-b border-white/10 py-6 sm:px-6 lg:border-b-0 lg:border-r lg:last:border-r-0">
+                <div key={title} className="border-b border-white/10 py-5 sm:px-5 lg:border-b-0 lg:border-r lg:last:border-r-0">
                   <p className="text-sm font-semibold text-white">{title}</p>
                   <p className="mt-1 text-xs leading-5 text-white/45">{detail}</p>
                 </div>
@@ -462,27 +462,27 @@ export async function HomePage({ locale }: { locale: Locale }) {
         </section>
 
         <section id="oem" className="scroll-mt-28 bg-[var(--paper)]">
-          <div className="mx-auto max-w-[90rem] px-5 py-24 lg:px-10 lg:py-32">
-            <div className="grid gap-8 lg:grid-cols-[0.95fr_1.05fr] lg:items-end">
+          <div className="mx-auto max-w-[86rem] px-5 py-18 lg:px-10 lg:py-24">
+            <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr] lg:items-end">
               <div>
                 <p className="brand-eyebrow">04 · {t.oem.eyebrow}</p>
-                <h2 className="brand-h2 mt-5 max-w-3xl">{t.oem.title}</h2>
+                <h2 className="brand-h2 mt-4 max-w-3xl">{t.oem.title}</h2>
               </div>
-              <p className="max-w-xl text-base leading-8 text-[var(--muted)] lg:justify-self-end">{t.oem.body}</p>
+              <p className="max-w-xl text-base leading-7 text-[var(--muted)] lg:justify-self-end">{t.oem.body}</p>
             </div>
 
-            <div className="mt-16 grid gap-0 md:grid-cols-4">
+            <div className="mt-10 grid gap-0 md:grid-cols-4">
               {t.oem.steps.map(([title, body], index) => (
-                <article key={title} className="group relative border-l border-[var(--border)] py-2 pl-8 pb-10 md:border-l-0 md:border-t md:px-6 md:pb-0 md:pt-9">
+                <article key={title} className="group relative border-l border-[var(--border)] py-2 pl-7 pb-8 md:border-l-0 md:border-t md:px-5 md:pb-0 md:pt-7">
                   <span className="absolute -left-[5px] top-2 size-[9px] rounded-full border-2 border-[var(--paper)] bg-[var(--muted)] transition-colors group-hover:bg-[var(--gold)] md:-top-[5px] md:left-6" />
                   <p className="font-mono text-[0.65rem] tracking-[0.16em] text-[var(--gold)]">0{index + 1}</p>
-                  <h3 className="mt-4 text-xl font-medium tracking-[-0.025em] text-[var(--navy)]">{title}</h3>
-                  <p className="mt-3 text-sm leading-6 text-[var(--muted)]">{body}</p>
+                  <h3 className="mt-3 text-lg font-medium tracking-[-0.025em] text-[var(--navy)]">{title}</h3>
+                  <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{body}</p>
                 </article>
               ))}
             </div>
 
-            <div className="mt-12 flex flex-col gap-6 border-t border-[var(--border)] pt-8 md:flex-row md:items-center md:justify-between">
+            <div className="mt-10 flex flex-col gap-5 border-t border-[var(--border)] pt-7 md:flex-row md:items-center md:justify-between">
               <div className="flex flex-wrap gap-2">
                 {["Private Label", "Custom Packaging", "Export Documentation"].map((label) => (
                   <span key={label} className="border border-[var(--border)] bg-white px-4 py-2 text-xs font-semibold tracking-[0.04em] text-[var(--navy)]">{label}</span>
@@ -496,20 +496,20 @@ export async function HomePage({ locale }: { locale: Locale }) {
         </section>
 
         <section className="border-y border-[var(--border)] bg-white">
-          <div className="mx-auto max-w-[90rem] px-5 py-24 lg:px-10 lg:py-28">
+          <div className="mx-auto max-w-[86rem] px-5 py-18 lg:px-10 lg:py-24">
             <div className="max-w-3xl">
               <p className="brand-eyebrow">05 · {t.why.eyebrow}</p>
-              <h2 className="brand-h2 mt-5">{t.why.title}</h2>
-              <p className="mt-6 max-w-2xl text-base leading-8 text-[var(--muted)]">{t.why.body}</p>
+              <h2 className="brand-h2 mt-4">{t.why.title}</h2>
+              <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--muted)]">{t.why.body}</p>
             </div>
-            <div className="mt-14 grid border-y border-[var(--border)] md:grid-cols-2 lg:grid-cols-4">
+            <div className="mt-10 grid border-y border-[var(--border)] md:grid-cols-2 lg:grid-cols-4">
               {t.why.values.map(([title, body], index) => {
                 const Icon = whyIcons[index] ?? Sparkles;
                 return (
-                  <div key={title} className="border-b border-[var(--border)] py-9 md:px-7 lg:border-b-0 lg:border-r lg:last:border-r-0">
+                  <div key={title} className="border-b border-[var(--border)] py-7 md:px-6 lg:border-b-0 lg:border-r lg:last:border-r-0">
                     <Icon className="size-6 text-[var(--gold)]" strokeWidth={1.5} />
-                    <h3 className="mt-10 text-xl font-medium tracking-[-0.025em] text-[var(--navy)]">{title}</h3>
-                    <p className="mt-3 text-sm leading-7 text-[var(--muted)]">{body}</p>
+                    <h3 className="mt-6 text-lg font-medium tracking-[-0.025em] text-[var(--navy)]">{title}</h3>
+                    <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{body}</p>
                   </div>
                 );
               })}
@@ -518,20 +518,20 @@ export async function HomePage({ locale }: { locale: Locale }) {
         </section>
 
         <section id="support" className="scroll-mt-28 bg-[var(--ivory)]">
-          <div className="mx-auto max-w-[90rem] px-5 py-24 lg:px-10 lg:py-28">
-            <div className="grid gap-8 lg:grid-cols-[0.95fr_1.05fr] lg:items-end">
+          <div className="mx-auto max-w-[86rem] px-5 py-18 lg:px-10 lg:py-24">
+            <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr] lg:items-end">
               <div>
                 <p className="brand-eyebrow">06 · {t.support.eyebrow}</p>
-                <h2 className="brand-h2 mt-5 max-w-3xl">{t.support.title}</h2>
+                <h2 className="brand-h2 mt-4 max-w-3xl">{t.support.title}</h2>
               </div>
-              <p className="max-w-xl text-base leading-8 text-[var(--muted)] lg:justify-self-end">{t.support.body}</p>
+              <p className="max-w-xl text-base leading-7 text-[var(--muted)] lg:justify-self-end">{t.support.body}</p>
             </div>
-            <div className="mt-12 grid border border-[var(--border)] bg-[var(--border)] gap-px md:grid-cols-2 lg:grid-cols-4">
+            <div className="mt-10 grid border border-[var(--border)] bg-[var(--border)] gap-px md:grid-cols-2 lg:grid-cols-4">
               {t.support.cards.map(([title, body], index) => {
                 const Icon = supportIcons[index] ?? FileText;
                 const href = index === 0 ? localizedPath(locale, "/products") : localizedPath(locale, "/contact");
                 return (
-                  <Link key={title} href={href} className="group flex min-h-72 flex-col bg-[var(--ivory)] p-7 transition-colors hover:bg-white">
+                  <Link key={title} href={href} className="group flex min-h-56 flex-col bg-[var(--ivory)] p-6 transition-colors hover:bg-white">
                     <div className="flex items-start justify-between">
                       <Icon className="size-6 text-[var(--gold)]" strokeWidth={1.5} />
                       <ArrowUpRight className="size-4 text-[var(--muted)] transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-[var(--gold)]" />
@@ -549,12 +549,12 @@ export async function HomePage({ locale }: { locale: Locale }) {
         </section>
 
         <section className="bg-[var(--navy-soft)] text-white">
-          <div className="mx-auto grid max-w-[90rem] gap-16 px-5 py-24 lg:grid-cols-[1.25fr_0.75fr] lg:px-10 lg:py-28">
+          <div className="mx-auto grid max-w-[86rem] gap-10 px-5 py-18 lg:grid-cols-[1.25fr_0.75fr] lg:px-10 lg:py-22">
             <div>
               <p className="brand-eyebrow-light"><span />{t.global.eyebrow}</p>
-              <h2 className="brand-h2 mt-5 text-white">{t.global.title}</h2>
-              <p className="mt-6 max-w-2xl text-base leading-8 text-white/60">{t.global.body}</p>
-              <div className="mt-10 border-y border-white/10 py-6">
+              <h2 className="brand-h2 mt-4 text-white">{t.global.title}</h2>
+              <p className="mt-4 max-w-2xl text-base leading-7 text-white/60">{t.global.body}</p>
+              <div className="mt-7 border-y border-white/10 py-5">
                 <p className="text-[0.62rem] font-bold uppercase tracking-[0.18em] text-[var(--gold)]">Markets</p>
                 <p className="mt-3 text-sm leading-7 text-white/72 sm:text-base">{t.global.markets}</p>
               </div>
@@ -567,11 +567,11 @@ export async function HomePage({ locale }: { locale: Locale }) {
         </section>
 
         <section id="newsletter" className="scroll-mt-28 bg-[var(--paper)]">
-          <div className="mx-auto grid max-w-[90rem] gap-10 px-5 py-20 lg:grid-cols-[0.85fr_1.15fr] lg:items-end lg:px-10 lg:py-24">
+          <div className="mx-auto grid max-w-[86rem] gap-8 px-5 py-14 lg:grid-cols-[0.85fr_1.15fr] lg:items-end lg:px-10 lg:py-16">
             <div>
               <p className="brand-eyebrow">{t.newsletter.eyebrow}</p>
-              <h2 className="mt-5 text-3xl font-medium tracking-[-0.04em] text-[var(--navy)] sm:text-4xl">{t.newsletter.title}</h2>
-              <p className="mt-4 text-base leading-7 text-[var(--muted)]">{t.newsletter.body}</p>
+              <h2 className="mt-4 text-3xl font-medium tracking-[-0.04em] text-[var(--navy)] sm:text-4xl">{t.newsletter.title}</h2>
+              <p className="mt-3 text-base leading-7 text-[var(--muted)]">{t.newsletter.body}</p>
             </div>
             <div className="lg:justify-self-end lg:w-full lg:max-w-xl">
               <NewsletterForm locale={locale} />
@@ -582,17 +582,17 @@ export async function HomePage({ locale }: { locale: Locale }) {
         <section className="relative isolate overflow-hidden bg-[var(--navy)] text-white">
           <div aria-hidden="true" className="absolute -right-32 -top-56 size-[42rem] rounded-full border border-white/[0.045]" />
           <div aria-hidden="true" className="absolute -right-10 -top-32 size-[30rem] rounded-full border border-white/[0.045]" />
-          <div className="relative mx-auto grid max-w-[90rem] gap-12 px-5 py-24 lg:grid-cols-[1.15fr_0.85fr] lg:items-end lg:px-10 lg:py-28">
+          <div className="relative mx-auto grid max-w-[86rem] gap-8 px-5 py-18 lg:grid-cols-[1.15fr_0.85fr] lg:items-end lg:px-10 lg:py-22">
             <div>
               <p className="brand-eyebrow-light"><span />{t.cta.eyebrow}</p>
-              <h2 className="mt-6 max-w-4xl whitespace-pre-line text-[clamp(2.6rem,5vw,4.2rem)] font-medium leading-[1.06] tracking-[-0.055em]">{t.cta.title}</h2>
-              <p className="mt-6 max-w-2xl text-base leading-8 text-white/62">{t.cta.body}</p>
+              <h2 className="mt-5 max-w-4xl whitespace-pre-line text-[clamp(2.35rem,4.6vw,3.8rem)] font-medium leading-[1.05] tracking-[-0.055em]">{t.cta.title}</h2>
+              <p className="mt-4 max-w-2xl text-base leading-7 text-white/62">{t.cta.body}</p>
             </div>
             <div className="lg:justify-self-end">
               <Button asChild size="lg" className="h-12 rounded-sm bg-[var(--gold)] px-6 text-[var(--navy)] shadow-none hover:bg-[var(--gold-hover)]">
                 <Link href={localizedPath(locale, "/contact")}>{t.cta.action}<ArrowUpRight className="size-4" /></Link>
               </Button>
-              <div className="mt-7 space-y-2 text-sm text-white/60">
+              <div className="mt-5 space-y-1 text-sm text-white/60">
                 <a href={`mailto:${siteConfig.email}`} className="block min-h-11 py-3 transition-colors hover:text-white">{siteConfig.email}</a>
                 <SocialLinks showLabels linkClassName="min-h-11 justify-start text-white/60 hover:text-white" />
               </div>
