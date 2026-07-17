@@ -18,6 +18,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { getProductManagerSession } from "@/lib/admin-auth";
 import { getProductTranslationJob, getTranslationServiceState } from "@/lib/repositories/product-translation-jobs";
+import { normalizeTranslationResult } from "@/lib/translation-response-parser";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "翻译任务", robots: { index: false, follow: false } };
@@ -113,6 +114,7 @@ export default async function TranslationJobPage({
               {job.items.map((item) => {
                 const title = item.product.translations.find(({ locale }) => locale === item.targetLocale)?.title ?? item.product.translations.find(({ locale }) => locale === job.sourceLocale)?.title ?? item.productSlug;
                 const itemWarnings = warningList(item.warnings);
+                const normalizedOutput = item.output ? normalizeTranslationResult(item.output) : null;
                 return (
                   <tr key={item.id} className="align-top hover:bg-[#FCFCFD]">
                     <td className="px-5 py-4"><p className="max-w-xs truncate font-medium text-[#344054]">{title}</p><p className="mt-1 font-mono text-xs text-[#98A2B3]">{item.productSku}</p></td>
@@ -124,6 +126,12 @@ export default async function TranslationJobPage({
                         <details className="mt-2 rounded-md border border-[#E4E7EC] bg-[#FCFCFD] text-left">
                           <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-[#475467]">查看错误详情与执行记录</summary>
                           <div className="max-h-96 space-y-3 overflow-y-auto border-t border-[#E4E7EC] p-3">
+                            {normalizedOutput ? (
+                              <article className="rounded-md bg-white p-3 text-xs text-[#475467]">
+                                <p className="font-medium text-[#344054]">规范化翻译结果</p>
+                                <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded bg-[#101828] p-3 font-mono text-[11px] leading-5 text-white/75">{JSON.stringify(normalizedOutput, null, 2)}</pre>
+                              </article>
+                            ) : null}
                             {item.logs.map((log) => (
                               <article key={log.id} className="rounded-md bg-white p-3 text-xs text-[#475467]">
                                 <div className="grid gap-1 sm:grid-cols-2">
@@ -135,7 +143,7 @@ export default async function TranslationJobPage({
                                   <p><span className="text-[#98A2B3]">时间：</span>{formatter.format(log.requestFinishedAt)}</p>
                                 </div>
                                 {log.errorMessage ? <p className="mt-2 whitespace-pre-wrap text-rose-700">{log.errorMessage}</p> : null}
-                                {log.rawResponse ? <pre className="mt-2 max-h-44 overflow-auto whitespace-pre-wrap break-words rounded bg-[#101828] p-3 font-mono text-[11px] leading-5 text-white/75">{log.rawResponse}</pre> : null}
+                                {log.errorType && log.rawResponse ? <pre className="mt-2 max-h-44 overflow-auto whitespace-pre-wrap break-words rounded bg-[#101828] p-3 font-mono text-[11px] leading-5 text-white/75">{log.rawResponse}</pre> : null}
                               </article>
                             ))}
                           </div>

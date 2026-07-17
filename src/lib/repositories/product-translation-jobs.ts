@@ -264,6 +264,7 @@ export async function getProductTranslationJob(id: string) {
           currentRunAttemptCount: true,
           durationMs: true,
           responseId: true,
+          output: true,
           startedAt: true,
           completedAt: true,
           logs: {
@@ -318,20 +319,20 @@ const saveGeneratedTranslation = async (
     await tx.productTranslation.upsert({
       where: { productId_locale: { productId, locale: targetLocale } },
       update: {
-        title: output.title,
-        summary: output.summary,
-        seoTitle: output.seoTitle,
-        seoDescription: output.seoDescription,
+        title: output.product.title,
+        summary: output.product.summary,
+        seoTitle: output.product.seoTitle,
+        seoDescription: output.product.seoDescription,
         status: TranslationStatus.MACHINE_DRAFT,
         publishedAt: null,
       },
       create: {
         productId,
         locale: targetLocale,
-        title: output.title,
-        summary: output.summary,
-        seoTitle: output.seoTitle,
-        seoDescription: output.seoDescription,
+        title: output.product.title,
+        summary: output.product.summary,
+        seoTitle: output.product.seoTitle,
+        seoDescription: output.product.seoDescription,
         status: TranslationStatus.MACHINE_DRAFT,
       },
     });

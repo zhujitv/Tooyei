@@ -3,7 +3,9 @@ import test from "node:test";
 
 import {
   extractJsonObjectCandidates,
+  getTranslationResultQcWarnings,
   normalizeTranslationCoreFields,
+  normalizeTranslationResult,
   parseTranslationResponse,
   TranslationResponseParseError,
 } from "./translation-response-parser";
@@ -51,6 +53,32 @@ test("missing fields become empty strings and produce warnings", () => {
   assert.equal(output.title, "");
   assert.equal(output.summary, "Only summary");
   assert.ok(warnings.some((warning) => warning.includes("title")));
+});
+
+test("normalizes historical root product fields into the product object", () => {
+  const normalized = normalizeTranslationResult({ title: "abc" });
+  assert.equal(normalized.product.title, "abc");
+});
+
+test("preserves current nested product fields", () => {
+  const normalized = normalizeTranslationResult({ product: { title: "abc" } });
+  assert.equal(normalized.product.title, "abc");
+});
+
+test("QC reads normalized product fields without false missing warnings", () => {
+  const normalized = normalizeTranslationResult({
+    product: {
+      title: "abc",
+      summary: "summary",
+      seoTitle: "seo title",
+      seoDescription: "seo description",
+    },
+  });
+  const warnings = getTranslationResultQcWarnings(normalized);
+
+  assert.equal(warnings.includes("模型响应缺少 title"), false);
+  assert.equal(warnings.includes("模型响应缺少 summary"), false);
+  assert.equal(warnings.includes("模型响应缺少 seoTitle"), false);
 });
 
 test("throws a recognizable error for unparseable text", () => {

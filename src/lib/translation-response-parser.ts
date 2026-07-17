@@ -14,6 +14,20 @@ export type TranslationCoreFields = {
   content: string;
 };
 
+export type NormalizedTranslationProduct = Pick<
+  TranslationCoreFields,
+  "title" | "summary" | "seoTitle" | "seoDescription"
+>;
+
+export type NormalizedTranslationResult = {
+  product: NormalizedTranslationProduct;
+  media: unknown[];
+  features: unknown[];
+  specifications: unknown[];
+  applications: unknown[];
+  downloads: unknown[];
+};
+
 type ParseErrorContext = {
   responseId?: string | null;
   promptTokens?: number | null;
@@ -155,4 +169,45 @@ export function normalizeTranslationCoreFields(record: Record<string, unknown>) 
   }
 
   return { output, warnings };
+}
+
+/**
+ * Canonical entry point for AI translation payloads.
+ *
+ * Historical responses stored the product fields at the JSON root, while the
+ * current contract stores them under `product`. Both shapes are normalized to
+ * the current nested structure before QC, persistence, or display code sees
+ * the result.
+ */
+export function normalizeTranslationResult(result: unknown): NormalizedTranslationResult {
+  const root = asRecord(result) ?? {};
+  const product = asRecord(root.product) ?? root;
+  const { output } = normalizeTranslationCoreFields(product);
+  const array = (key: keyof Omit<NormalizedTranslationResult, "product">) =>
+    Array.isArray(root[key]) ? root[key] : [];
+
+  return {
+    product: {
+      title: output.title,
+      summary: output.summary,
+      seoTitle: output.seoTitle,
+      seoDescription: output.seoDescription,
+    },
+    media: array("media"),
+    features: array("features"),
+    specifications: array("specifications"),
+    applications: array("applications"),
+    downloads: array("downloads"),
+  };
+}
+
+export function getTranslationResultQcWarnings(normalized: NormalizedTranslationResult) {
+  const warnings: string[] = [];
+  const requiredFields = ["title", "summary", "seoTitle", "seoDescription"] as const;
+
+  for (const field of requiredFields) {
+    if (!normalized.product[field].trim()) warnings.push(`模型响应缺少 ${field}`);
+  }
+
+  return warnings;
 }

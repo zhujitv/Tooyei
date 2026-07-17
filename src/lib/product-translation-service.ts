@@ -7,13 +7,14 @@ import { getPrisma } from "@/lib/db";
 import { getTranslationProviderState } from "@/lib/translation-providers/config";
 import { getTranslationProvider } from "@/lib/translation-providers/registry";
 import {
-  normalizeTranslationCoreFields,
+  getTranslationResultQcWarnings,
+  normalizeTranslationResult,
   parseTranslationResponse,
   readTranslationString,
   TranslationResponseParseError,
 } from "@/lib/translation-response-parser";
 
-export const productTranslationPromptVersion = "tooyei-product-json-v2";
+export const productTranslationPromptVersion = "tooyei-product-json-v3";
 
 export class TranslationBusinessError extends Error {
   readonly name = "TranslationBusinessError";
@@ -50,11 +51,15 @@ const textItemSchema = z.object({
   description: z.string().max(1200),
 });
 
-export const productTranslationOutputSchema = z.object({
+const productTranslationProductSchema = z.object({
   title: z.string().trim().max(180),
   summary: z.string().trim().max(800),
   seoTitle: z.string().trim().max(70),
   seoDescription: z.string().trim().max(180),
+});
+
+export const productTranslationOutputSchema = z.object({
+  product: productTranslationProductSchema,
   media: z.array(z.object({ id: z.string().min(1), alt: z.string().max(240), caption: z.string().max(500) })),
   features: z.array(textItemSchema),
   specifications: z.array(z.object({
@@ -83,10 +88,17 @@ const arrayOf = (properties: Record<string, unknown>, required: string[]) => ({
 const productTranslationJsonSchema = {
   type: "object",
   properties: {
-    title: stringProperty,
-    summary: stringProperty,
-    seoTitle: stringProperty,
-    seoDescription: stringProperty,
+    product: {
+      type: "object",
+      properties: {
+        title: stringProperty,
+        summary: stringProperty,
+        seoTitle: stringProperty,
+        seoDescription: stringProperty,
+      },
+      required: ["title", "summary", "seoTitle", "seoDescription"],
+      additionalProperties: false,
+    },
     media: arrayOf({ id: stringProperty, alt: stringProperty, caption: stringProperty }, ["id", "alt", "caption"]),
     features: arrayOf({ id: stringProperty, title: stringProperty, description: stringProperty }, ["id", "title", "description"]),
     specifications: arrayOf(
@@ -100,7 +112,7 @@ const productTranslationJsonSchema = {
     downloads: arrayOf({ id: stringProperty, title: stringProperty, description: stringProperty }, ["id", "title", "description"]),
   },
   required: [
-    "title", "summary", "seoTitle", "seoDescription", "media", "features",
+    "product", "media", "features",
     "specifications", "applications", "downloads",
   ],
   additionalProperties: false,
@@ -275,7 +287,8 @@ export async function generateProductTranslation(
     "Write a concise SEO title no longer than 70 characters and an accurate SEO description no longer than 180 characters in the target language.",
     "For Arabic, use natural Modern Standard Arabic. For Chinese, use Simplified Chinese. For Japanese, use natural Japanese industry terminology.",
     "Return one valid JSON object only. Do not return Markdown, explanations, headings, comments, or ```json fences.",
-    "Do not rename or omit fields. Every schema field must be present and every field value defined as a string must be a JSON string, including HTML content.",
+    "Return the translated title, summary, seoTitle, and seoDescription inside the product object. Keep media, features, specifications, applications, and downloads as root arrays.",
+    "Do not rename or omit fields. Every schema field must be present and every field value defined as a string must be a JSON string.",
   ].join(" ");
   const generated = await getTranslationProvider(state.provider).generateStructured({
     systemPrompt,
@@ -299,37 +312,35 @@ export async function generateProductTranslation(
     throw error;
   }
 
-  const normalizedCore = normalizeTranslationCoreFields({
-    ...parsed,
-    // Product rich content is managed by the existing structured modules;
-    // supply an explicit empty core field so its absence is not reported as a
-    // translation defect for this workflow.
-    content: Object.hasOwn(parsed, "content") || Object.hasOwn(parsed, "body")
-      ? (parsed.content ?? parsed.body)
-      : "",
-  });
-  const warnings = normalizedCore.warnings.filter((warning) => !warning.includes("content"));
+  const rawResult = parsed;
+  const normalizedResult = normalizeTranslationResult(rawResult);
+  const warnings = getTranslationResultQcWarnings(normalizedResult);
   const normalized = {
-    title: normalizedCore.output.title,
-    summary: normalizedCore.output.summary,
-    seoTitle: normalizedCore.output.seoTitle,
-    seoDescription: normalizedCore.output.seoDescription,
-    media: normalizeStructuredItems(parsed.media, source.media, {
+    product: normalizedResult.product,
+    media: normalizeStructuredItems(normalizedResult.media, source.media, {
       alt: ["alt"], caption: ["caption"],
     }, "媒体", warnings),
-    features: normalizeStructuredItems(parsed.features, source.features, {
+    features: normalizeStructuredItems(normalizedResult.features, source.features, {
       title: ["title", "value", "name"], description: ["description", "summary"],
     }, "卖点", warnings),
-    specifications: normalizeStructuredItems(parsed.specifications, source.specifications, {
+    specifications: normalizeStructuredItems(normalizedResult.specifications, source.specifications, {
       group: ["group"], label: ["label", "name", "title"], displayValue: ["displayValue", "display_value", "value"],
     }, "参数", warnings),
-    applications: normalizeStructuredItems(parsed.applications, source.applications, {
+    applications: normalizeStructuredItems(normalizedResult.applications, source.applications, {
       title: ["title", "name"], description: ["description", "summary"], imageAlt: ["imageAlt", "image_alt", "alt"],
     }, "应用场景", warnings),
-    downloads: normalizeStructuredItems(parsed.downloads, source.downloads, {
+    downloads: normalizeStructuredItems(normalizedResult.downloads, source.downloads, {
       title: ["title", "name"], description: ["description", "summary"],
     }, "下载资料", warnings),
   };
+
+  console.log("Raw AI Response", rawResult);
+  console.log("Normalized Response", normalized);
+  console.log("Product", normalized.product);
+  console.log("Title", normalized.product.title);
+  console.log("Summary", normalized.product.summary);
+  console.log("SeoTitle", normalized.product.seoTitle);
+
   const validated = productTranslationOutputSchema.safeParse(normalized);
   if (!validated.success) {
     throw new TranslationResponseValidationError(
