@@ -4,7 +4,7 @@ import { z } from "zod";
 import { getTranslationManagerSession } from "@/lib/admin-auth";
 import {
   processNextProductTranslationJobItem,
-  startProductTranslationJobExecution,
+  getOrStartProductTranslationJobExecution,
 } from "@/lib/repositories/product-translation-jobs";
 import { contentLocales, localizedPath } from "@/lib/site";
 
@@ -25,7 +25,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
 
   try {
     const executionId = parsedBody.data.executionId
-      ?? (await startProductTranslationJobExecution(parsedId.data, session.email)).executionId;
+      ?? (await getOrStartProductTranslationJobExecution(parsedId.data, session.email)).executionId;
     const result = await processNextProductTranslationJobItem(parsedId.data, executionId);
     revalidatePath("/admin/translations");
     revalidatePath(`/admin/translations/${parsedId.data}`);

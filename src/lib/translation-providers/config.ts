@@ -5,7 +5,8 @@ import type {
   TranslationProviderId,
   TranslationResponseFormat,
 } from "@/lib/translation-providers/types";
-import { translationProviderIds } from "@/lib/translation-providers/types";
+import { productTranslationProviderId } from "@/lib/translation-providers/types";
+import { translationWorkerConfig } from "@/lib/translation-worker-config";
 
 const providerAliases: Record<string, TranslationProviderId> = {
   openai: "openai-responses",
@@ -20,14 +21,16 @@ const providerAliases: Record<string, TranslationProviderId> = {
 const providerLabels: Record<TranslationProviderId, string> = {
   "openai-responses": "OpenAI Responses",
   "openai-compatible": "OpenAI-compatible API",
-  "volcengine-doubao": "火山引擎（豆包）· OpenAI SDK",
+  "volcengine-doubao": "火山引擎豆包大模型",
 };
 
 const cleanBaseUrl = (value: string) => value.trim().replace(/\/+$/, "");
 
 const parseTimeoutMs = (value: string | undefined) => {
   const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed >= 10_000 && parsed <= 120_000 ? Math.round(parsed) : 110_000;
+  return Number.isFinite(parsed) && parsed >= 10_000
+    ? Math.min(Math.round(parsed), translationWorkerConfig.providerTimeoutMs)
+    : translationWorkerConfig.providerTimeoutMs;
 };
 
 const parseResponseFormat = (
@@ -40,7 +43,7 @@ export const resolveTranslationProviderId = (value: string | undefined | null): 
   return providerAliases[normalized] ?? null;
 };
 
-const defaultProviderValue = () => (process.env.TRANSLATION_PROVIDER || "openai-responses").trim().toLowerCase();
+const defaultProviderValue = () => productTranslationProviderId;
 
 type ResolvedProviderValues = {
   apiKey: string;
@@ -50,51 +53,43 @@ type ResolvedProviderValues = {
   responseFormat: TranslationResponseFormat;
 };
 
-const genericValue = (provider: TranslationProviderId, value: string | undefined) =>
-  resolveTranslationProviderId(defaultProviderValue()) === provider ? value?.trim() || "" : "";
-
 const resolveProviderValues = (provider: TranslationProviderId): ResolvedProviderValues => {
   switch (provider) {
     case "openai-responses":
       return {
-        apiKey: genericValue(provider, process.env.TRANSLATION_API_KEY) || process.env.OPENAI_API_KEY?.trim() || "",
-        baseUrl: cleanBaseUrl(genericValue(provider, process.env.TRANSLATION_API_BASE_URL) || "https://api.openai.com/v1"),
-        model: genericValue(provider, process.env.TRANSLATION_MODEL) || process.env.OPENAI_TRANSLATION_MODEL?.trim() || "gpt-5.6-sol",
-        timeoutMs: parseTimeoutMs(genericValue(provider, process.env.TRANSLATION_REQUEST_TIMEOUT_MS)),
+        apiKey: process.env.OPENAI_API_KEY?.trim() || "",
+        baseUrl: "https://api.openai.com/v1",
+        model: process.env.OPENAI_TRANSLATION_MODEL?.trim() || "gpt-5.6-sol",
+        timeoutMs: parseTimeoutMs(undefined),
         responseFormat: "json_schema",
       };
     case "openai-compatible":
       return {
-        apiKey: genericValue(provider, process.env.TRANSLATION_API_KEY) || process.env.OPENAI_COMPATIBLE_API_KEY?.trim() || "",
-        baseUrl: cleanBaseUrl(genericValue(provider, process.env.TRANSLATION_API_BASE_URL) || process.env.OPENAI_COMPATIBLE_BASE_URL || ""),
-        model: genericValue(provider, process.env.TRANSLATION_MODEL) || process.env.OPENAI_COMPATIBLE_MODEL?.trim() || "",
-        timeoutMs: parseTimeoutMs(genericValue(provider, process.env.TRANSLATION_REQUEST_TIMEOUT_MS)),
+        apiKey: process.env.OPENAI_COMPATIBLE_API_KEY?.trim() || "",
+        baseUrl: cleanBaseUrl(process.env.OPENAI_COMPATIBLE_BASE_URL || ""),
+        model: process.env.OPENAI_COMPATIBLE_MODEL?.trim() || "",
+        timeoutMs: parseTimeoutMs(undefined),
         responseFormat: parseResponseFormat(
-          genericValue(provider, process.env.TRANSLATION_RESPONSE_FORMAT) || process.env.OPENAI_COMPATIBLE_RESPONSE_FORMAT,
+          process.env.OPENAI_COMPATIBLE_RESPONSE_FORMAT,
           "json_object",
         ),
       };
     case "volcengine-doubao":
       return {
-        apiKey: genericValue(provider, process.env.TRANSLATION_API_KEY)
-          || process.env.DOUBAO_API_KEY?.trim()
+        apiKey: process.env.DOUBAO_API_KEY?.trim()
           || process.env.ARK_API_KEY?.trim()
           || "",
         baseUrl: cleanBaseUrl(
-          genericValue(provider, process.env.TRANSLATION_API_BASE_URL)
-            || process.env.DOUBAO_API_BASE_URL
+          process.env.DOUBAO_API_BASE_URL
             || "https://ark.cn-beijing.volces.com/api/v3",
         ),
-        model: genericValue(provider, process.env.TRANSLATION_MODEL)
-          || process.env.DOUBAO_MODEL?.trim()
+        model: process.env.DOUBAO_MODEL?.trim()
           || "doubao-seed-2-0-lite-260215",
         timeoutMs: parseTimeoutMs(
-          genericValue(provider, process.env.TRANSLATION_REQUEST_TIMEOUT_MS)
-            || process.env.DOUBAO_REQUEST_TIMEOUT_MS,
+          process.env.DOUBAO_REQUEST_TIMEOUT_MS,
         ),
         responseFormat: parseResponseFormat(
-          genericValue(provider, process.env.TRANSLATION_RESPONSE_FORMAT)
-            || process.env.DOUBAO_RESPONSE_FORMAT,
+          process.env.DOUBAO_RESPONSE_FORMAT,
           "json_object",
         ),
       };
@@ -143,10 +138,6 @@ export function getTranslationProviderState(requestedProvider?: string): Transla
     responseFormat: values.responseFormat,
     error: missing.length ? `缺少配置：${missing.join("、")}` : null,
   };
-}
-
-export function getTranslationProviderStates(): TranslationProviderState[] {
-  return translationProviderIds.map((provider) => getTranslationProviderState(provider));
 }
 
 export function getTranslationProviderConfig(requestedProvider?: string): TranslationProviderConfig {

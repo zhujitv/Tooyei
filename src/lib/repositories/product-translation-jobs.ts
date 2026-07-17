@@ -23,14 +23,22 @@ import {
   deriveRestoredTranslationJobStatus,
   type TranslationItemCounts,
 } from "@/lib/translation-job-state";
+import { getTranslationJobExecutionStatus } from "@/lib/translation-execution-status";
 import {
   getTranslationProviderState,
-  getTranslationProviderStates,
 } from "@/lib/translation-providers/config";
 import {
   TranslationProviderRequestError,
   type TranslationProviderId,
 } from "@/lib/translation-providers/types";
+import {
+  hasTranslationContentType,
+  translationContentTypes,
+  translationWorkerConfig,
+  type TranslationContentType,
+  type TranslationExecutionStatus,
+  type TranslationProcessingStep,
+} from "@/lib/translation-worker-config";
 
 export const translationLocales = [
   Locale.EN,
@@ -56,6 +64,7 @@ export type CreateTranslationJobInput = {
   kind?: ProductKind;
   productIds?: string[];
   productLimit: number;
+  contentTypes?: TranslationContentType[];
 };
 
 const assertDatabase = () => {
@@ -63,9 +72,24 @@ const assertDatabase = () => {
 };
 
 export const getTranslationServiceState = (provider?: string) => getTranslationProviderState(provider);
-export const getTranslationServiceStates = () => getTranslationProviderStates();
 
-export async function getTranslationDashboard(status?: TranslationJobStatus) {
+const executionStatusWhere = (status?: TranslationExecutionStatus): Prisma.ProductTranslationJobWhereInput | undefined => {
+  switch (status) {
+    case "PENDING": return { status: TranslationJobStatus.PENDING, startedAt: null };
+    case "QUEUED": return { status: TranslationJobStatus.PENDING, startedAt: { not: null } };
+    case "PROCESSING": return { status: TranslationJobStatus.RUNNING, items: { some: { status: TranslationJobItemStatus.RUNNING } } };
+    case "RETRYING": return { OR: [
+      { status: TranslationJobStatus.PAUSED },
+      { status: TranslationJobStatus.RUNNING, items: { some: { status: TranslationJobItemStatus.PENDING, retryCount: { gt: 0 } } } },
+    ] };
+    case "SUCCESS": return { status: TranslationJobStatus.COMPLETED };
+    case "FAILED": return { status: { in: [TranslationJobStatus.FAILED, TranslationJobStatus.PARTIAL_FAILED] } };
+    case "CANCELLED": return { status: { in: [TranslationJobStatus.CANCELLED, TranslationJobStatus.CLOSED] } };
+    default: return undefined;
+  }
+};
+
+export async function getTranslationDashboard(status?: TranslationExecutionStatus) {
   if (!isDatabaseConfigured()) {
     return {
       totalProducts: 0,
@@ -83,7 +107,7 @@ export async function getTranslationDashboard(status?: TranslationJobStatus) {
       _count: { _all: true },
     }),
     prisma.productTranslationJob.findMany({
-      where: status ? { status } : undefined,
+      where: executionStatusWhere(status),
       orderBy: { createdAt: "desc" },
       take: 30,
       select: {
@@ -102,6 +126,14 @@ export async function getTranslationDashboard(status?: TranslationJobStatus) {
         completionTokens: true,
         totalTokens: true,
         lastError: true,
+        startedAt: true,
+        heartbeatAt: true,
+        items: {
+          where: { status: { in: [TranslationJobItemStatus.RUNNING, TranslationJobItemStatus.PENDING] } },
+          orderBy: { updatedAt: "desc" },
+          take: 1,
+          select: { status: true, processingStep: true, retryCount: true, nextAttemptAt: true },
+        },
         createdAt: true,
         completedAt: true,
         cancelledAt: true,
@@ -154,6 +186,8 @@ export async function createProductTranslationJob(input: CreateTranslationJobInp
   }
   const targetLocales = Array.from(new Set(input.targetLocales)).filter((locale) => locale !== input.sourceLocale);
   if (!targetLocales.length) throw new Error("请至少选择一种不同于源语言的目标语言。");
+  const contentTypes = Array.from(new Set(input.contentTypes?.length ? input.contentTypes : translationContentTypes));
+  const translatesMainRecord = contentTypes.some((type) => type === "PRODUCT" || type === "SEO");
 
   const prisma = getPrisma();
   const actor = await prisma.adminUser.findUnique({
@@ -190,8 +224,10 @@ export async function createProductTranslationJob(input: CreateTranslationJobInp
 
   const items = products.flatMap((product) => targetLocales.flatMap((targetLocale) => {
     const current = product.translations.find(({ locale }) => locale === targetLocale);
-    if (current?.status === TranslationStatus.PUBLISHED) return [];
-    if (input.scope === "MISSING" && current && current.status !== TranslationStatus.MISSING) return [];
+    // Structured rows have their own translation records. A published product title must
+    // protect the main record without preventing a media/feature/spec translation job.
+    if (translatesMainRecord && current?.status === TranslationStatus.PUBLISHED) return [];
+    if (translatesMainRecord && input.scope === "MISSING" && current && current.status !== TranslationStatus.MISSING) return [];
     return [{
       productId: product.id,
       productSlug: product.slug,
@@ -207,9 +243,10 @@ export async function createProductTranslationJob(input: CreateTranslationJobInp
       targetLocales,
       provider: service.provider,
       model: service.model,
+      contentTypes,
       totalItems: items.length,
       requestedById: actor.id,
-      items: { create: items },
+      items: { create: items.map((item) => ({ ...item, contentTypes })) },
     },
     select: { id: true, totalItems: true },
   });
@@ -242,6 +279,8 @@ export async function getProductTranslationJob(id: string) {
       closedAt: true,
       executionId: true,
       lockedAt: true,
+      heartbeatAt: true,
+      contentTypes: true,
       requestedBy: { select: { name: true, email: true } },
       items: {
         orderBy: [{ status: "asc" }, { createdAt: "asc" }],
@@ -263,6 +302,10 @@ export async function getProductTranslationJob(id: string) {
           retryCount: true,
           currentRunAttemptCount: true,
           durationMs: true,
+          contentTypes: true,
+          processingStep: true,
+          heartbeatAt: true,
+          nextAttemptAt: true,
           responseId: true,
           output: true,
           startedAt: true,
@@ -307,6 +350,7 @@ const saveGeneratedTranslation = async (
   productId: string,
   targetLocale: Locale,
   output: ProductTranslationOutput,
+  contentTypes: readonly string[],
 ) => {
   const prisma = getPrisma();
   return prisma.$transaction(async (tx) => {
@@ -314,70 +358,100 @@ const saveGeneratedTranslation = async (
       where: { productId_locale: { productId, locale: targetLocale } },
       select: { status: true },
     });
-    if (current?.status === TranslationStatus.PUBLISHED) return { skipped: true };
+    let wroteTranslation = false;
+    const mainRecordPublished = current?.status === TranslationStatus.PUBLISHED;
 
-    await tx.productTranslation.upsert({
-      where: { productId_locale: { productId, locale: targetLocale } },
-      update: {
-        title: output.product.title,
-        summary: output.product.summary,
-        seoTitle: output.product.seoTitle,
-        seoDescription: output.product.seoDescription,
-        status: TranslationStatus.MACHINE_DRAFT,
-        publishedAt: null,
-      },
-      create: {
-        productId,
-        locale: targetLocale,
-        title: output.product.title,
-        summary: output.product.summary,
-        seoTitle: output.product.seoTitle,
-        seoDescription: output.product.seoDescription,
-        status: TranslationStatus.MACHINE_DRAFT,
-      },
-    });
+    const translateProduct = hasTranslationContentType(contentTypes, "PRODUCT");
+    const translateSeo = hasTranslationContentType(contentTypes, "SEO");
+    if ((translateProduct || translateSeo) && !mainRecordPublished) {
+      await tx.productTranslation.upsert({
+        where: { productId_locale: { productId, locale: targetLocale } },
+        update: {
+          title: translateProduct ? output.product.title : undefined,
+          summary: translateProduct ? output.product.summary : undefined,
+          seoTitle: translateSeo ? output.product.seoTitle : undefined,
+          seoDescription: translateSeo ? output.product.seoDescription : undefined,
+          status: TranslationStatus.MACHINE_DRAFT,
+          publishedAt: null,
+        },
+        create: {
+          productId,
+          locale: targetLocale,
+          title: output.product.title,
+          summary: output.product.summary,
+          seoTitle: translateSeo ? output.product.seoTitle : "",
+          seoDescription: translateSeo ? output.product.seoDescription : "",
+          status: TranslationStatus.MACHINE_DRAFT,
+        },
+      });
+      wroteTranslation = true;
+    }
 
-    for (const item of output.media) {
+    const translateMediaAlt = hasTranslationContentType(contentTypes, "MEDIA_ALT");
+    const translateMediaCaption = hasTranslationContentType(contentTypes, "MEDIA_CAPTION");
+    for (const item of translateMediaAlt || translateMediaCaption ? output.media : []) {
       await tx.productMediaTranslation.upsert({
         where: { productId_assetId_locale: { productId, assetId: item.id, locale: targetLocale } },
-        update: { alt: item.alt, caption: item.caption || null },
+        update: {
+          alt: translateMediaAlt ? item.alt : undefined,
+          caption: translateMediaCaption ? item.caption || null : undefined,
+        },
         create: { productId, assetId: item.id, locale: targetLocale, alt: item.alt, caption: item.caption || null },
       });
+      wroteTranslation = true;
     }
-    for (const item of output.features) {
+    const translateFeatureTitle = hasTranslationContentType(contentTypes, "FEATURE_TITLE");
+    const translateFeatureDescription = hasTranslationContentType(contentTypes, "FEATURE_DESCRIPTION");
+    for (const item of translateFeatureTitle || translateFeatureDescription ? output.features : []) {
       await tx.productFeatureTranslation.upsert({
         where: { featureId_locale: { featureId: item.id, locale: targetLocale } },
-        update: { value: item.title, description: item.description || null },
+        update: {
+          value: translateFeatureTitle ? item.title : undefined,
+          description: translateFeatureDescription ? item.description || null : undefined,
+        },
         create: { featureId: item.id, locale: targetLocale, value: item.title, description: item.description || null },
       });
+      wroteTranslation = true;
     }
-    for (const item of output.specifications) {
+    const translateSpecLabel = hasTranslationContentType(contentTypes, "SPEC_LABEL");
+    const translateSpecValue = hasTranslationContentType(contentTypes, "SPEC_VALUE");
+    for (const item of translateSpecLabel || translateSpecValue ? output.specifications : []) {
       await tx.productSpecificationTranslation.upsert({
         where: { specificationId_locale: { specificationId: item.id, locale: targetLocale } },
-        update: { group: item.group || null, label: item.label, displayValue: item.displayValue || null },
+        update: {
+          group: translateSpecLabel ? item.group || null : undefined,
+          label: translateSpecLabel ? item.label : undefined,
+          displayValue: translateSpecValue ? item.displayValue || null : undefined,
+        },
         create: { specificationId: item.id, locale: targetLocale, group: item.group || null, label: item.label, displayValue: item.displayValue || null },
       });
+      wroteTranslation = true;
     }
-    for (const item of output.applications) {
+    const translateApplicationTitle = hasTranslationContentType(contentTypes, "APPLICATION_TITLE");
+    const translateApplicationDescription = hasTranslationContentType(contentTypes, "APPLICATION_DESCRIPTION");
+    for (const item of translateApplicationTitle || translateApplicationDescription ? output.applications : []) {
       await tx.productApplicationTranslation.upsert({
         where: { applicationId_locale: { applicationId: item.id, locale: targetLocale } },
-        update: { title: item.title, description: item.description || null, imageAlt: item.imageAlt || null },
+        update: {
+          title: translateApplicationTitle ? item.title : undefined,
+          description: translateApplicationDescription ? item.description || null : undefined,
+        },
         create: { applicationId: item.id, locale: targetLocale, title: item.title, description: item.description || null, imageAlt: item.imageAlt || null },
       });
+      wroteTranslation = true;
     }
-    for (const item of output.downloads) {
+    for (const item of hasTranslationContentType(contentTypes, "DOWNLOAD_TITLE") ? output.downloads : []) {
       await tx.productDownloadTranslation.upsert({
         where: { downloadId_locale: { downloadId: item.id, locale: targetLocale } },
-        update: { title: item.title, description: item.description || null },
+        update: { title: item.title },
         create: { downloadId: item.id, locale: targetLocale, title: item.title, description: item.description || null },
       });
+      wroteTranslation = true;
     }
-    return { skipped: false };
+    return { skipped: !wroteTranslation };
   });
 };
 
-const maxAttemptsPerRun = 3;
-const retryBackoffMs = [500, 1_500] as const;
 const rawResponseLimit = 64_000;
 const executionStatuses = [
   TranslationJobStatus.PENDING,
@@ -393,8 +467,6 @@ const limitRawResponse = (value: string | null | undefined) => {
   const suffix = "\n…[响应已截断]";
   return `${value.slice(0, rawResponseLimit - suffix.length)}${suffix}`;
 };
-
-const delay = (durationMs: number) => new Promise((resolve) => setTimeout(resolve, durationMs));
 
 type TranslationFailure = {
   errorType: string;
@@ -459,13 +531,16 @@ const classifyTranslationFailure = (error: unknown): TranslationFailure => {
 
 export async function refreshProductTranslationJobSummary(jobId: string) {
   const prisma = getPrisma();
-  const [job, aggregates] = await Promise.all([
+  const [job, aggregates, retryingItems] = await Promise.all([
     prisma.productTranslationJob.findUnique({ where: { id: jobId }, select: { status: true } }),
     prisma.productTranslationJobItem.groupBy({
       by: ["status"],
       where: { jobId },
       _count: { _all: true },
       _sum: { promptTokens: true, completionTokens: true, totalTokens: true },
+    }),
+    prisma.productTranslationJobItem.count({
+      where: { jobId, status: TranslationJobItemStatus.PENDING, retryCount: { gt: 0 } },
     }),
   ]);
   if (!job) throw new Error("翻译任务不存在。");
@@ -496,7 +571,7 @@ export async function refreshProductTranslationJobSummary(jobId: string) {
   };
   const terminal = remaining === 0 && status !== TranslationJobStatus.CANCELLED && status !== TranslationJobStatus.CLOSED;
 
-  return prisma.productTranslationJob.update({
+  const updated = await prisma.productTranslationJob.update({
     where: { id: jobId },
     data: {
       status,
@@ -511,6 +586,7 @@ export async function refreshProductTranslationJobSummary(jobId: string) {
       executionId: status === TranslationJobStatus.RUNNING ? undefined : null,
       lockedAt: status === TranslationJobStatus.RUNNING ? undefined : null,
       lockedBy: status === TranslationJobStatus.RUNNING ? undefined : null,
+      heartbeatAt: status === TranslationJobStatus.RUNNING ? undefined : null,
     },
     select: {
       id: true,
@@ -523,8 +599,21 @@ export async function refreshProductTranslationJobSummary(jobId: string) {
       promptTokens: true,
       completionTokens: true,
       totalTokens: true,
+      startedAt: true,
     },
   });
+  return {
+    ...updated,
+    pendingItems,
+    runningItems,
+    retryingItems,
+    executionStatus: getTranslationJobExecutionStatus({
+      status: updated.status,
+      startedAt: updated.startedAt,
+      runningItems,
+      retryingItems,
+    }),
+  };
 }
 
 export async function startProductTranslationJobExecution(jobId: string, actorEmail: string) {
@@ -550,6 +639,31 @@ export async function startProductTranslationJobExecution(jobId: string, actorEm
       where: { jobId, status: TranslationJobItemStatus.RUNNING },
     });
     if (runningItems) throw new Error("任务仍有正在处理的项目，请等待完成或先停止任务。");
+
+    // “继续执行未完成任务” is intentionally server-side: a forged form or
+    // stale page cannot omit failed/timeout items from the resumed batch.
+    await tx.productTranslationJobItem.updateMany({
+      where: {
+        jobId,
+        OR: [
+          { status: TranslationJobItemStatus.FAILED },
+          { errorType: "TIMEOUT", status: { notIn: [TranslationJobItemStatus.COMPLETED, TranslationJobItemStatus.SKIPPED] } },
+        ],
+      },
+      data: {
+        status: TranslationJobItemStatus.PENDING,
+        processingStep: "QUEUED",
+        errorType: null,
+        errorMessage: null,
+        startedAt: null,
+        completedAt: null,
+        retryCount: 0,
+        currentRunAttemptCount: 0,
+        nextAttemptAt: null,
+        heartbeatAt: null,
+        workerId: null,
+      },
+    });
     const pendingItems = await tx.productTranslationJobItem.count({
       where: { jobId, status: TranslationJobItemStatus.PENDING },
     });
@@ -566,6 +680,7 @@ export async function startProductTranslationJobExecution(jobId: string, actorEm
         executionId,
         lockedAt: new Date(),
         lockedBy: actorEmail,
+        heartbeatAt: new Date(),
         startedAt: job.startedAt ?? new Date(),
         completedAt: null,
         closedAt: null,
@@ -577,12 +692,68 @@ export async function startProductTranslationJobExecution(jobId: string, actorEm
   });
 }
 
+export async function getOrStartProductTranslationJobExecution(jobId: string, actorEmail: string) {
+  assertDatabase();
+  const findActive = () => getPrisma().productTranslationJob.findFirst({
+    where: { id: jobId, status: TranslationJobStatus.RUNNING, executionId: { not: null } },
+    select: { executionId: true },
+  });
+  const active = await findActive();
+  if (active?.executionId) return { executionId: active.executionId };
+  try {
+    return await startProductTranslationJobExecution(jobId, actorEmail);
+  } catch (error) {
+    // A scheduled worker and an administrator may race to start the same job.
+    // Reuse the winning execution instead of reporting a false failure.
+    const raced = await findActive();
+    if (raced?.executionId) return { executionId: raced.executionId };
+    throw error;
+  }
+}
+
 const executionIsActive = async (jobId: string, executionId: string) => {
   const job = await getPrisma().productTranslationJob.findFirst({
     where: { id: jobId, status: TranslationJobStatus.RUNNING, executionId },
     select: { id: true },
   });
   return Boolean(job);
+};
+
+const dueItemWhere = (now: Date): Prisma.ProductTranslationJobItemWhereInput => ({
+  status: TranslationJobItemStatus.PENDING,
+  OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now } }],
+});
+
+const updateTranslationItemStep = async (
+  jobId: string,
+  itemId: string,
+  executionId: string,
+  workerId: string,
+  step: TranslationProcessingStep,
+) => {
+  const now = new Date();
+  await Promise.all([
+    getPrisma().productTranslationJobItem.updateMany({
+      where: { id: itemId, jobId, status: TranslationJobItemStatus.RUNNING, workerId },
+      data: { processingStep: step, heartbeatAt: now },
+    }),
+    getPrisma().productTranslationJob.updateMany({
+      where: { id: jobId, status: TranslationJobStatus.RUNNING, executionId },
+      data: { heartbeatAt: now, lockedAt: now },
+    }),
+  ]);
+};
+
+const startTranslationItemHeartbeat = (
+  jobId: string,
+  itemId: string,
+  executionId: string,
+  workerId: string,
+) => {
+  const beat = () => updateTranslationItemStep(jobId, itemId, executionId, workerId, "CALL_MODEL")
+    .catch((error) => console.error("Translation heartbeat failed", error instanceof Error ? error.message : error));
+  const timer = setInterval(() => void beat(), translationWorkerConfig.heartbeatIntervalMs);
+  return () => clearInterval(timer);
 };
 
 export async function processNextProductTranslationJobItem(jobId: string, executionId: string) {
@@ -597,14 +768,14 @@ export async function processNextProductTranslationJobItem(jobId: string, execut
   if (!service.configured) {
     await prisma.productTranslationJob.updateMany({
       where: { id: jobId, status: TranslationJobStatus.RUNNING, executionId },
-      data: { status: TranslationJobStatus.PAUSED, executionId: null, lockedAt: null, lockedBy: null },
+      data: { status: TranslationJobStatus.PAUSED, executionId: null, lockedAt: null, lockedBy: null, heartbeatAt: null },
     });
     throw new Error(service.error || "该任务的翻译 Provider 尚未配置完整，任务已暂停。");
   }
   if (service.model !== jobConfig.model) {
     await prisma.productTranslationJob.updateMany({
       where: { id: jobId, status: TranslationJobStatus.RUNNING, executionId },
-      data: { status: TranslationJobStatus.PAUSED, executionId: null, lockedAt: null, lockedBy: null },
+      data: { status: TranslationJobStatus.PAUSED, executionId: null, lockedAt: null, lockedBy: null, heartbeatAt: null },
     });
     throw new Error(`任务使用 ${jobConfig.provider} / ${jobConfig.model}，该 Provider 当前模型为 ${service.model}；请恢复模型配置或新建任务。`);
   }
@@ -616,189 +787,296 @@ export async function processNextProductTranslationJobItem(jobId: string, execut
     });
     if (!job) throw new Error("任务已停止，Worker 不再领取新项目。");
 
+    const now = new Date();
     const candidate = await tx.productTranslationJobItem.findFirst({
-      where: { jobId, status: TranslationJobItemStatus.PENDING },
+      where: { jobId, ...dueItemWhere(now) },
       orderBy: { createdAt: "asc" },
-      select: { id: true, productId: true, productSlug: true, targetLocale: true },
+      select: { id: true, productId: true, productSlug: true, targetLocale: true, retryCount: true, contentTypes: true },
     });
     if (!candidate) return null;
+    const workerId = randomUUID();
     const claimed = await tx.productTranslationJobItem.updateMany({
-      where: { id: candidate.id, jobId, status: TranslationJobItemStatus.PENDING },
+      where: { id: candidate.id, jobId, ...dueItemWhere(now) },
       data: {
         status: TranslationJobItemStatus.RUNNING,
-        startedAt: new Date(),
+        processingStep: "GET_CONTENT",
+        workerId,
+        heartbeatAt: now,
+        nextAttemptAt: null,
+        startedAt: now,
         completedAt: null,
         errorType: null,
         errorMessage: null,
-        currentRunAttemptCount: 0,
-        retryCount: 0,
       },
     });
     if (!claimed.count) return null;
     await tx.productTranslationJob.update({
       where: { id: jobId },
-      data: { lockedAt: new Date(), lastError: null },
+      data: { lockedAt: now, heartbeatAt: now, lastError: null },
     });
-    return { ...candidate, sourceLocale: job.sourceLocale, provider: job.provider, model: job.model };
+    return { ...candidate, workerId, sourceLocale: job.sourceLocale, provider: job.provider, model: job.model };
   });
 
-  if (!item) return { processed: false, executionId, job: await refreshProductTranslationJobSummary(jobId) };
-
-  for (let attemptIndex = 0; attemptIndex < maxAttemptsPerRun; attemptIndex += 1) {
-    if (attemptIndex > 0 && !await executionIsActive(jobId, executionId)) {
-      const message = "任务已停止，当前项目不再重试。";
-      await prisma.productTranslationJobItem.update({
-        where: { id: item.id },
-        data: {
-          status: TranslationJobItemStatus.CANCELLED,
-          errorType: "CANCELLED",
-          errorMessage: message,
-          completedAt: new Date(),
-        },
-      });
-      return { processed: true, executionId, itemId: item.id, error: message, job: await refreshProductTranslationJobSummary(jobId) };
-    }
-
-    const attempt = await prisma.productTranslationJobItem.update({
-      where: { id: item.id },
-      data: {
-        attemptCount: { increment: 1 },
-        currentRunAttemptCount: { increment: 1 },
-        retryCount: attemptIndex,
-        errorType: null,
-        errorMessage: null,
-      },
-      select: { attemptCount: true },
+  if (!item) {
+    const next = await prisma.productTranslationJobItem.findFirst({
+      where: { jobId, status: TranslationJobItemStatus.PENDING, nextAttemptAt: { not: null } },
+      orderBy: { nextAttemptAt: "asc" },
+      select: { nextAttemptAt: true },
     });
-    const requestStartedAt = new Date();
-
-    try {
-      const generated = await generateProductTranslation(
-        item.productId,
-        item.sourceLocale,
-        item.targetLocale,
-        { provider: item.provider, model: item.model },
-      );
-      const requestFinishedAt = new Date();
-      const durationMs = requestFinishedAt.getTime() - requestStartedAt.getTime();
-      const saved = await saveGeneratedTranslation(item.productId, item.targetLocale, generated.output);
-      await prisma.$transaction([
-        prisma.productTranslationLog.create({
-          data: {
-            jobId,
-            itemId: item.id,
-            provider: item.provider,
-            model: item.model,
-            targetLocale: item.targetLocale,
-            promptVersion: generated.promptVersion,
-            attemptNumber: attempt.attemptCount,
-            rawResponse: limitRawResponse(generated.rawResponse),
-            requestStartedAt,
-            requestFinishedAt,
-            durationMs,
-            promptTokens: generated.promptTokens,
-            completionTokens: generated.completionTokens,
-            totalTokens: generated.totalTokens,
-          },
-        }),
-        prisma.productTranslationJobItem.update({
-          where: { id: item.id },
-          data: {
-            status: saved.skipped ? TranslationJobItemStatus.SKIPPED : TranslationJobItemStatus.COMPLETED,
-            inputHash: generated.inputHash,
-            responseId: generated.responseId,
-            output: generated.output as Prisma.InputJsonValue,
-            warnings: generated.warnings as Prisma.InputJsonValue,
-            rawResponse: limitRawResponse(generated.rawResponse),
-            promptTokens: generated.promptTokens,
-            completionTokens: generated.completionTokens,
-            totalTokens: generated.totalTokens,
-            durationMs,
-            errorType: null,
-            errorMessage: null,
-            completedAt: requestFinishedAt,
-          },
-        }),
-      ]);
-      return {
-        processed: true,
-        executionId,
-        itemId: item.id,
-        productSlug: item.productSlug,
-        targetLocale: item.targetLocale,
-        job: await refreshProductTranslationJobSummary(jobId),
-      };
-    } catch (error) {
-      const requestFinishedAt = new Date();
-      const durationMs = requestFinishedAt.getTime() - requestStartedAt.getTime();
-      const failure = classifyTranslationFailure(error);
-      await prisma.$transaction([
-        prisma.productTranslationLog.create({
-          data: {
-            jobId,
-            itemId: item.id,
-            provider: item.provider,
-            model: item.model,
-            targetLocale: item.targetLocale,
-            promptVersion: productTranslationPromptVersion,
-            attemptNumber: attempt.attemptCount,
-            errorType: failure.errorType,
-            errorMessage: failure.errorMessage,
-            rawResponse: failure.rawResponse,
-            requestStartedAt,
-            requestFinishedAt,
-            durationMs,
-            promptTokens: failure.promptTokens,
-            completionTokens: failure.completionTokens,
-            totalTokens: failure.totalTokens,
-          },
-        }),
-        prisma.productTranslationJobItem.update({
-          where: { id: item.id },
-          data: {
-            responseId: failure.responseId,
-            errorType: failure.errorType,
-            errorMessage: failure.errorMessage,
-            rawResponse: failure.rawResponse,
-            promptTokens: failure.promptTokens,
-            completionTokens: failure.completionTokens,
-            totalTokens: failure.totalTokens,
-            durationMs,
-          },
-        }),
-      ]);
-
-      const canRetry = failure.retryable
-        && attemptIndex < maxAttemptsPerRun - 1
-        && await executionIsActive(jobId, executionId);
-      if (canRetry) {
-        await delay(retryBackoffMs[attemptIndex] ?? retryBackoffMs.at(-1)!);
-        continue;
-      }
-
-      await prisma.$transaction([
-        prisma.productTranslationJobItem.update({
-          where: { id: item.id },
-          data: { status: TranslationJobItemStatus.FAILED, completedAt: new Date() },
-        }),
-        prisma.productTranslationJob.update({
-          where: { id: jobId },
-          data: { lastError: failure.errorMessage, lockedAt: new Date() },
-        }),
-      ]);
-      return {
-        processed: true,
-        executionId,
-        itemId: item.id,
-        productSlug: item.productSlug,
-        targetLocale: item.targetLocale,
-        error: failure.errorMessage,
-        job: await refreshProductTranslationJobSummary(jobId),
-      };
-    }
+    return {
+      processed: false,
+      executionId,
+      nextRunAt: next?.nextAttemptAt?.toISOString() ?? null,
+      job: await refreshProductTranslationJobSummary(jobId),
+    };
   }
 
-  throw new Error("翻译任务重试状态异常。");
+  if (!await executionIsActive(jobId, executionId)) {
+    const message = "任务已停止，当前项目不再执行。";
+    await prisma.productTranslationJobItem.updateMany({
+      where: { id: item.id, status: TranslationJobItemStatus.RUNNING, workerId: item.workerId },
+      data: { status: TranslationJobItemStatus.CANCELLED, processingStep: "CANCELLED", workerId: null, errorType: "CANCELLED", errorMessage: message, completedAt: new Date() },
+    });
+    return { processed: true, executionId, itemId: item.id, error: message, job: await refreshProductTranslationJobSummary(jobId) };
+  }
+
+  const attempt = await prisma.productTranslationJobItem.update({
+    where: { id: item.id },
+    data: {
+      attemptCount: { increment: 1 },
+      currentRunAttemptCount: { increment: 1 },
+      errorType: null,
+      errorMessage: null,
+    },
+    select: { attemptCount: true },
+  });
+  const requestStartedAt = new Date();
+  const stopHeartbeat = startTranslationItemHeartbeat(jobId, item.id, executionId, item.workerId);
+
+  try {
+    const generated = await generateProductTranslation(
+      item.productId,
+      item.sourceLocale,
+      item.targetLocale,
+      { provider: item.provider, model: item.model, contentTypes: item.contentTypes },
+      (step) => updateTranslationItemStep(jobId, item.id, executionId, item.workerId, step),
+    );
+    await updateTranslationItemStep(jobId, item.id, executionId, item.workerId, "SAVE_RESULT");
+    const saved = await saveGeneratedTranslation(item.productId, item.targetLocale, generated.output, item.contentTypes);
+    const requestFinishedAt = new Date();
+    const durationMs = requestFinishedAt.getTime() - requestStartedAt.getTime();
+    await prisma.$transaction([
+      prisma.productTranslationLog.create({
+        data: {
+          jobId,
+          itemId: item.id,
+          provider: item.provider,
+          model: item.model,
+          targetLocale: item.targetLocale,
+          promptVersion: generated.promptVersion,
+          attemptNumber: attempt.attemptCount,
+          rawResponse: limitRawResponse(generated.rawResponse),
+          requestStartedAt,
+          requestFinishedAt,
+          durationMs,
+          promptTokens: generated.promptTokens,
+          completionTokens: generated.completionTokens,
+          totalTokens: generated.totalTokens,
+        },
+      }),
+      prisma.productTranslationJobItem.update({
+        where: { id: item.id },
+        data: {
+          status: saved.skipped ? TranslationJobItemStatus.SKIPPED : TranslationJobItemStatus.COMPLETED,
+          processingStep: "DONE",
+          workerId: null,
+          heartbeatAt: requestFinishedAt,
+          nextAttemptAt: null,
+          inputHash: generated.inputHash,
+          responseId: generated.responseId,
+          output: generated.output as Prisma.InputJsonValue,
+          warnings: generated.warnings as Prisma.InputJsonValue,
+          rawResponse: limitRawResponse(generated.rawResponse),
+          promptTokens: generated.promptTokens,
+          completionTokens: generated.completionTokens,
+          totalTokens: generated.totalTokens,
+          durationMs,
+          errorType: null,
+          errorMessage: null,
+          completedAt: requestFinishedAt,
+        },
+      }),
+    ]);
+    return {
+      processed: true,
+      executionId,
+      itemId: item.id,
+      productSlug: item.productSlug,
+      targetLocale: item.targetLocale,
+      job: await refreshProductTranslationJobSummary(jobId),
+    };
+  } catch (error) {
+    const requestFinishedAt = new Date();
+    const durationMs = requestFinishedAt.getTime() - requestStartedAt.getTime();
+    const failure = classifyTranslationFailure(error);
+    const canRetry = failure.retryable
+      && item.retryCount < translationWorkerConfig.maxRetries
+      && await executionIsActive(jobId, executionId);
+    const retryDelayMs = canRetry ? translationWorkerConfig.retryDelaysMs.at(item.retryCount) : null;
+    const nextAttemptAt = retryDelayMs === null || retryDelayMs === undefined
+      ? null
+      : new Date(requestFinishedAt.getTime() + retryDelayMs);
+
+    await prisma.$transaction([
+      prisma.productTranslationLog.create({
+        data: {
+          jobId,
+          itemId: item.id,
+          provider: item.provider,
+          model: item.model,
+          targetLocale: item.targetLocale,
+          promptVersion: productTranslationPromptVersion,
+          attemptNumber: attempt.attemptCount,
+          errorType: failure.errorType,
+          errorMessage: failure.errorMessage,
+          rawResponse: failure.rawResponse,
+          requestStartedAt,
+          requestFinishedAt,
+          durationMs,
+          promptTokens: failure.promptTokens,
+          completionTokens: failure.completionTokens,
+          totalTokens: failure.totalTokens,
+        },
+      }),
+      prisma.productTranslationJobItem.update({
+        where: { id: item.id },
+        data: {
+          status: canRetry ? TranslationJobItemStatus.PENDING : TranslationJobItemStatus.FAILED,
+          processingStep: canRetry ? "RETRY_WAIT" : "FAILED",
+          workerId: null,
+          heartbeatAt: requestFinishedAt,
+          nextAttemptAt,
+          retryCount: canRetry ? { increment: 1 } : undefined,
+          responseId: failure.responseId,
+          errorType: failure.errorType,
+          errorMessage: failure.errorMessage,
+          rawResponse: failure.rawResponse,
+          promptTokens: failure.promptTokens,
+          completionTokens: failure.completionTokens,
+          totalTokens: failure.totalTokens,
+          durationMs,
+          completedAt: canRetry ? null : requestFinishedAt,
+        },
+      }),
+      prisma.productTranslationJob.update({
+        where: { id: jobId },
+        data: { lastError: failure.errorMessage, lockedAt: requestFinishedAt, heartbeatAt: requestFinishedAt },
+      }),
+    ]);
+    return {
+      processed: true,
+      executionId,
+      itemId: item.id,
+      productSlug: item.productSlug,
+      targetLocale: item.targetLocale,
+      error: failure.errorMessage,
+      retrying: canRetry,
+      nextRunAt: nextAttemptAt?.toISOString() ?? null,
+      job: await refreshProductTranslationJobSummary(jobId),
+    };
+  } finally {
+    stopHeartbeat();
+  }
+}
+
+export async function recoverStaleProductTranslationWorkers(now = new Date()) {
+  assertDatabase();
+  const prisma = getPrisma();
+  const cutoff = new Date(now.getTime() - translationWorkerConfig.staleWorkerMs);
+  const staleJobs = await prisma.productTranslationJob.findMany({
+    where: {
+      status: TranslationJobStatus.RUNNING,
+      OR: [
+        { heartbeatAt: { lt: cutoff } },
+        { heartbeatAt: null, lockedAt: { lt: cutoff } },
+        { heartbeatAt: null, lockedAt: null, updatedAt: { lt: cutoff } },
+      ],
+    },
+    select: { id: true },
+    take: 20,
+  });
+
+  let recoveredItems = 0;
+  for (const job of staleJobs) {
+    await prisma.$transaction(async (tx) => {
+      const items = await tx.productTranslationJobItem.findMany({
+        where: { jobId: job.id, status: TranslationJobItemStatus.RUNNING },
+        select: { id: true, retryCount: true },
+      });
+      for (const item of items) {
+        const canRetry = item.retryCount < translationWorkerConfig.maxRetries;
+        await tx.productTranslationJobItem.update({
+          where: { id: item.id },
+          data: {
+            status: canRetry ? TranslationJobItemStatus.PENDING : TranslationJobItemStatus.FAILED,
+            processingStep: canRetry ? "QUEUED" : "FAILED",
+            workerId: null,
+            heartbeatAt: now,
+            nextAttemptAt: canRetry ? now : null,
+            retryCount: canRetry ? { increment: 1 } : undefined,
+            errorType: "TIMEOUT",
+            errorMessage: "Worker 心跳超过 5 分钟未更新，已自动释放锁并重新排队。",
+            completedAt: canRetry ? null : now,
+          },
+        });
+        recoveredItems += 1;
+      }
+      await tx.productTranslationJob.updateMany({
+        where: { id: job.id, status: TranslationJobStatus.RUNNING },
+        data: {
+          status: TranslationJobStatus.PENDING,
+          executionId: null,
+          lockedAt: null,
+          lockedBy: null,
+          heartbeatAt: null,
+          lastError: "Worker 心跳超时，任务已自动恢复队列。",
+        },
+      });
+    });
+    await refreshProductTranslationJobSummary(job.id);
+  }
+  return { recoveredJobs: staleJobs.length, recoveredItems };
+}
+
+export async function runNextProductTranslationWorkerPass() {
+  assertDatabase();
+  const prisma = getPrisma();
+  const recovery = await recoverStaleProductTranslationWorkers();
+  const now = new Date();
+  const running = await prisma.productTranslationJob.findFirst({
+    where: {
+      status: TranslationJobStatus.RUNNING,
+      executionId: { not: null },
+      items: { some: dueItemWhere(now) },
+    },
+    orderBy: { updatedAt: "asc" },
+    select: { id: true, executionId: true },
+  });
+  if (running?.executionId) {
+    return { recovery, jobId: running.id, result: await processNextProductTranslationJobItem(running.id, running.executionId) };
+  }
+
+  const queued = await prisma.productTranslationJob.findFirst({
+    where: {
+      status: TranslationJobStatus.PENDING,
+      items: { some: dueItemWhere(now) },
+    },
+    orderBy: { createdAt: "asc" },
+    select: { id: true },
+  });
+  if (!queued) return { recovery, jobId: null, result: null };
+  const execution = await getOrStartProductTranslationJobExecution(queued.id, "translation-worker");
+  return { recovery, jobId: queued.id, result: await processNextProductTranslationJobItem(queued.id, execution.executionId) };
 }
 
 export async function retryFailedProductTranslationJobItems(jobId: string) {
@@ -813,6 +1091,10 @@ export async function retryFailedProductTranslationJobItems(jobId: string) {
       where: { jobId, status: TranslationJobItemStatus.FAILED },
       data: {
         status: TranslationJobItemStatus.PENDING,
+        processingStep: "QUEUED",
+        workerId: null,
+        heartbeatAt: null,
+        nextAttemptAt: null,
         errorType: null,
         errorMessage: null,
         startedAt: null,
@@ -833,6 +1115,7 @@ export async function retryFailedProductTranslationJobItems(jobId: string) {
           executionId: null,
           lockedAt: null,
           lockedBy: null,
+          heartbeatAt: null,
         },
       });
     }
@@ -850,6 +1133,7 @@ export async function cancelProductTranslationJob(jobId: string) {
       executionId: null,
       lockedAt: null,
       lockedBy: null,
+      heartbeatAt: null,
     },
   });
   if (!result.count) throw new Error("只有执行中的任务可以停止。");
@@ -876,6 +1160,7 @@ export async function closeProductTranslationJob(jobId: string) {
         executionId: null,
         lockedAt: null,
         lockedBy: null,
+        heartbeatAt: null,
       },
     });
     return { closed: true };
@@ -907,7 +1192,7 @@ export async function restoreProductTranslationJob(jobId: string) {
     } satisfies TranslationItemCounts);
     await tx.productTranslationJob.update({
       where: { id: jobId },
-      data: { status, closedAt: null, executionId: null, lockedAt: null, lockedBy: null },
+      data: { status, closedAt: null, executionId: null, lockedAt: null, lockedBy: null, heartbeatAt: null },
     });
     return { status };
   });

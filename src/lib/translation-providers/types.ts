@@ -7,6 +7,7 @@ export const translationProviderIds = [
 ] as const;
 
 export type TranslationProviderId = (typeof translationProviderIds)[number];
+export const productTranslationProviderId = "volcengine-doubao" as const satisfies TranslationProviderId;
 export type TranslationResponseFormat = "json_schema" | "json_object";
 
 export type TranslationProviderConfig = {

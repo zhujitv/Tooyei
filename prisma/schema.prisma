@@ -247,6 +247,8 @@ model ProductTranslationJob {
   executionId    String?                  @unique
   lockedAt       DateTime?
   lockedBy       String?
+  heartbeatAt    DateTime?
+  contentTypes   String[]                 @default(["PRODUCT", "MEDIA_ALT", "MEDIA_CAPTION", "FEATURE_TITLE", "FEATURE_DESCRIPTION", "SPEC_LABEL", "SPEC_VALUE", "APPLICATION_TITLE", "APPLICATION_DESCRIPTION", "DOWNLOAD_TITLE", "SEO"])
   requestedById  String?
   requestedBy    AdminUser?               @relation(fields: [requestedById], references: [id], onDelete: SetNull)
   items          ProductTranslationJobItem[]
@@ -259,6 +261,7 @@ model ProductTranslationJob {
   updatedAt      DateTime                 @updatedAt
 
   @@index([status, createdAt])
+  @@index([status, heartbeatAt])
   @@index([requestedById, createdAt])
 }
 
@@ -286,6 +289,11 @@ model ProductTranslationJobItem {
   retryCount   Int                      @default(0)
   currentRunAttemptCount Int            @default(0)
   durationMs   Int?
+  contentTypes String[]                 @default(["PRODUCT", "MEDIA_ALT", "MEDIA_CAPTION", "FEATURE_TITLE", "FEATURE_DESCRIPTION", "SPEC_LABEL", "SPEC_VALUE", "APPLICATION_TITLE", "APPLICATION_DESCRIPTION", "DOWNLOAD_TITLE", "SEO"])
+  processingStep String                 @default("QUEUED")
+  heartbeatAt DateTime?
+  nextAttemptAt DateTime?
+  workerId     String?
   logs         ProductTranslationLog[]
   createdAt    DateTime                 @default(now())
   startedAt    DateTime?
@@ -294,6 +302,7 @@ model ProductTranslationJobItem {
 
   @@unique([jobId, productId, targetLocale])
   @@index([jobId, status, createdAt])
+  @@index([status, nextAttemptAt, createdAt])
   @@index([productId, targetLocale, createdAt])
 }
 

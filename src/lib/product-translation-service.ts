@@ -4,8 +4,11 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import { Locale } from "@/generated/prisma/client";
 import { getPrisma } from "@/lib/db";
+import { buildBuildingMaterialsGlossaryPrompt } from "@/lib/translation-glossary";
 import { getTranslationProviderState } from "@/lib/translation-providers/config";
 import { getTranslationProvider } from "@/lib/translation-providers/registry";
+import type { TranslationProcessingStep } from "@/lib/translation-worker-config";
+import { translationContentTypes } from "@/lib/translation-worker-config";
 import {
   getTranslationResultQcWarnings,
   normalizeTranslationResult,
@@ -190,7 +193,8 @@ export async function generateProductTranslation(
   productId: string,
   sourceLocale: Locale,
   targetLocale: Locale,
-  expected?: { provider: string; model: string },
+  expected?: { provider: string; model: string; contentTypes?: readonly string[] },
+  onStep?: (step: Extract<TranslationProcessingStep, "GET_CONTENT" | "BUILD_PROMPT" | "CALL_MODEL">) => Promise<void>,
 ): Promise<GeneratedProductTranslation> {
   if (sourceLocale === targetLocale) throw new TranslationBusinessError("源语言和目标语言不能相同。");
   const state = getTranslationProviderState(expected?.provider);
@@ -199,6 +203,7 @@ export async function generateProductTranslation(
     throw new TranslationBusinessError(`任务使用 ${expected.provider} / ${expected.model}，该 Provider 当前模型为 ${state.model}；请恢复模型配置或新建任务。`);
   }
 
+  await onStep?.("GET_CONTENT");
   const prisma = getPrisma();
   const product = await prisma.product.findUnique({
     where: { id: productId },
@@ -237,6 +242,7 @@ export async function generateProductTranslation(
     throw new TranslationBusinessError(`产品 ${product.sku} 缺少完整的 ${localeNames[sourceLocale]} 源语言标题或摘要。`);
   }
 
+  const requestedContentTypes = expected?.contentTypes?.length ? expected.contentTypes : translationContentTypes;
   const source = {
     product: {
       slug: product.slug,
@@ -247,15 +253,15 @@ export async function generateProductTranslation(
       seoTitle: main.seoTitle ?? "",
       seoDescription: main.seoDescription ?? "",
     },
-    media: product.media.map((item) => {
+    media: requestedContentTypes.some((type) => type === "MEDIA_ALT" || type === "MEDIA_CAPTION") ? product.media.map((item) => {
       const translation = preferredTranslation(item.translations, sourceLocale);
       return { id: item.assetId, alt: translation?.alt ?? item.alt ?? "", caption: translation?.caption ?? item.caption ?? "" };
-    }),
-    features: product.features.map((item) => {
+    }) : [],
+    features: requestedContentTypes.some((type) => type === "FEATURE" || type === "FEATURE_TITLE" || type === "FEATURE_DESCRIPTION") ? product.features.map((item) => {
       const translation = preferredTranslation(item.translations, sourceLocale);
       return { id: item.id, title: translation?.value ?? "", description: translation?.description ?? "" };
-    }),
-    specifications: product.specifications.map((item) => {
+    }) : [],
+    specifications: requestedContentTypes.some((type) => type === "SPECIFICATION" || type === "SPEC_LABEL" || type === "SPEC_VALUE") ? product.specifications.map((item) => {
       const translation = preferredTranslation(item.translations, sourceLocale);
       return {
         id: item.id,
@@ -263,17 +269,18 @@ export async function generateProductTranslation(
         label: translation?.label ?? "",
         displayValue: translation?.displayValue ?? [item.value, item.unit].filter(Boolean).join(" "),
       };
-    }),
-    applications: product.applications.map((item) => {
+    }) : [],
+    applications: requestedContentTypes.some((type) => type === "APPLICATION" || type === "APPLICATION_TITLE" || type === "APPLICATION_DESCRIPTION") ? product.applications.map((item) => {
       const translation = preferredTranslation(item.translations, sourceLocale);
       return { id: item.id, title: translation?.title ?? "", description: translation?.description ?? "", imageAlt: translation?.imageAlt ?? "" };
-    }),
-    downloads: product.downloads.map((item) => {
+    }) : [],
+    downloads: requestedContentTypes.some((type) => type === "DOWNLOAD" || type === "DOWNLOAD_TITLE") ? product.downloads.map((item) => {
       const translation = preferredTranslation(item.translations, sourceLocale);
       return { id: item.id, kind: item.kind, title: translation?.title ?? "", description: translation?.description ?? "" };
-    }),
+    }) : [],
   };
 
+  await onStep?.("BUILD_PROMPT");
   const sourceJson = JSON.stringify(source);
   const inputHash = createHash("sha256")
     .update(`${state.provider}:${state.model}:${sourceLocale}:${targetLocale}:${sourceJson}`)
@@ -289,7 +296,10 @@ export async function generateProductTranslation(
     "Return one valid JSON object only. Do not return Markdown, explanations, headings, comments, or ```json fences.",
     "Return the translated title, summary, seoTitle, and seoDescription inside the product object. Keep media, features, specifications, applications, and downloads as root arrays.",
     "Do not rename or omit fields. Every schema field must be present and every field value defined as a string must be a JSON string.",
-  ].join(" ");
+    `Requested translation types: ${requestedContentTypes.join(", ")}.`,
+    buildBuildingMaterialsGlossaryPrompt(sourceJson, targetLocale),
+  ].filter(Boolean).join(" ");
+  await onStep?.("CALL_MODEL");
   const generated = await getTranslationProvider(state.provider).generateStructured({
     systemPrompt,
     sourceJson,

@@ -108,6 +108,7 @@ export type AdminProductDownloadItem = {
 };
 
 export type AdminEditableProduct = {
+  id: string;
   slug: string;
   sku: string;
   category: string;
@@ -322,6 +323,7 @@ const sampleEditableProduct = (slug: string): AdminEditableProduct | undefined =
   const product = sampleProducts.find((candidate) => candidate.slug === slug);
   if (!product) return undefined;
   return {
+    id: `sample:${product.slug}`,
     slug: product.slug,
     sku: product.sku,
     category: product.category,
@@ -615,6 +617,7 @@ const toEditableProduct = (product: AdminEditableProductRecord): AdminEditablePr
   }
 
   return {
+    id: product.id,
     slug: product.slug,
     sku: product.sku,
     category: categoryLabel(product.category),

@@ -10,8 +10,9 @@ import {
   Sparkles,
   TriangleAlert,
 } from "lucide-react";
-import { ProductKind, TranslationJobStatus } from "@/generated/prisma/client";
+import { ProductKind } from "@/generated/prisma/client";
 import { TranslationJobActions } from "@/components/translation-job-actions";
+import { TranslationLiveRefresh } from "@/components/translation-live-refresh";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,10 +23,16 @@ import {
   getTranslationDashboard,
   getTranslationProductOptions,
   getTranslationServiceState,
-  getTranslationServiceStates,
   translationLocales,
 } from "@/lib/repositories/product-translation-jobs";
 import { createTranslationJobAction } from "./actions";
+import { getTranslationJobExecutionStatus } from "@/lib/translation-execution-status";
+import {
+  isTranslationProcessingStep,
+  translationExecutionStatuses,
+  translationProcessingStepLabels,
+  type TranslationExecutionStatus,
+} from "@/lib/translation-worker-config";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "翻译中心", robots: { index: false, follow: false } };
@@ -54,37 +61,35 @@ const kindLabels: Record<ProductKind, string> = {
   ACCESSORY: "配件",
 };
 
-const jobLabel: Record<TranslationJobStatus, string> = {
-  PENDING: "等待执行",
-  RUNNING: "执行中",
-  PAUSED: "已暂停",
-  COMPLETED: "已完成",
-  PARTIAL_FAILED: "部分失败",
-  FAILED: "执行失败",
-  CANCELLED: "已停止",
-  CLOSED: "已关闭",
+const jobLabel: Record<TranslationExecutionStatus, string> = {
+  PENDING: "PENDING · 待处理",
+  QUEUED: "QUEUED · 已排队",
+  PROCESSING: "PROCESSING · 执行中",
+  SUCCESS: "SUCCESS · 已完成",
+  FAILED: "FAILED · 失败",
+  RETRYING: "RETRYING · 重试中",
+  CANCELLED: "CANCELLED · 已取消",
 };
 
-const statusTone: Record<TranslationJobStatus, string> = {
+const statusTone: Record<TranslationExecutionStatus, string> = {
   PENDING: "bg-slate-100 text-slate-600",
-  RUNNING: "bg-violet-50 text-violet-700",
-  PAUSED: "bg-blue-50 text-blue-700",
-  COMPLETED: "bg-emerald-50 text-emerald-700",
-  PARTIAL_FAILED: "bg-amber-50 text-amber-700",
+  QUEUED: "bg-blue-50 text-blue-700",
+  PROCESSING: "bg-violet-50 text-violet-700",
+  SUCCESS: "bg-emerald-50 text-emerald-700",
   FAILED: "bg-rose-50 text-rose-700",
+  RETRYING: "bg-amber-50 text-amber-700",
   CANCELLED: "bg-slate-100 text-slate-500",
-  CLOSED: "bg-zinc-100 text-zinc-500",
 };
 
-const statusFilters: Array<[TranslationJobStatus | "", string]> = [
+const statusFilters: Array<[TranslationExecutionStatus | "", string]> = [
   ["", "全部"],
-  [TranslationJobStatus.PENDING, "等待"],
-  [TranslationJobStatus.RUNNING, "执行中"],
-  [TranslationJobStatus.COMPLETED, "已完成"],
-  [TranslationJobStatus.PARTIAL_FAILED, "部分失败"],
-  [TranslationJobStatus.FAILED, "失败"],
-  [TranslationJobStatus.CANCELLED, "已停止"],
-  [TranslationJobStatus.CLOSED, "已关闭"],
+  ["PENDING", "PENDING"],
+  ["QUEUED", "QUEUED"],
+  ["PROCESSING", "PROCESSING"],
+  ["SUCCESS", "SUCCESS"],
+  ["FAILED", "FAILED"],
+  ["RETRYING", "RETRYING"],
+  ["CANCELLED", "CANCELLED"],
 ];
 
 const dateTime = new Intl.DateTimeFormat("zh-CN", {
@@ -100,16 +105,11 @@ export default async function TranslationCenterPage({
   searchParams: Promise<{ q?: string; error?: string; status?: string; saved?: string }>;
 }) {
   const filters = await searchParams;
-  const selectedStatus = Object.values(TranslationJobStatus).includes(filters.status as TranslationJobStatus)
-    ? filters.status as TranslationJobStatus
+  const selectedStatus = translationExecutionStatuses.includes(filters.status as TranslationExecutionStatus)
+    ? filters.status as TranslationExecutionStatus
     : undefined;
   const databaseReady = isDatabaseConfigured();
-  const defaultService = getTranslationServiceState();
-  const services = getTranslationServiceStates();
-  const configuredServices = services.filter((service) => service.configured && service.provider);
-  const selectedProvider = defaultService.configured && defaultService.provider
-    ? defaultService.provider
-    : configuredServices[0]?.provider;
+  const translationService = getTranslationServiceState();
   const [dashboard, products, productManager] = await Promise.all([
     getTranslationDashboard(selectedStatus),
     getTranslationProductOptions(filters.q),
@@ -118,6 +118,7 @@ export default async function TranslationCenterPage({
 
   return (
     <main className="admin-page">
+      <TranslationLiveRefresh active={dashboard.jobs.some((job) => job.status === "PENDING" || job.status === "RUNNING" || job.status === "PAUSED")} />
       <header className="flex flex-col gap-4 border-b border-[#E4E7EC] pb-6 md:flex-row md:items-end md:justify-between">
         <div>
           <div className="flex items-center gap-2 text-xs font-medium text-[#667085]">
@@ -131,7 +132,7 @@ export default async function TranslationCenterPage({
             <Database className="size-3.5" />{databaseReady ? "数据库已连接" : "数据库未连接"}
           </span>
           <span className="inline-flex items-center gap-2 rounded-md border border-[#E4E7EC] bg-white px-3 py-2 text-xs text-[#475467]">
-            <Bot className="size-3.5" />{configuredServices.length}/{services.length} 个翻译引擎可用
+            <Bot className="size-3.5" />{translationService.configured ? "火山大模型已就绪" : "火山大模型待配置"}
           </span>
         </div>
       </header>
@@ -150,11 +151,11 @@ export default async function TranslationCenterPage({
           <AlertDescription>任务明细和执行日志已清理，已经写入产品的译文保持不变。</AlertDescription>
         </Alert>
       ) : null}
-      {!configuredServices.length ? (
+      {!translationService.configured ? (
         <Alert className="mt-5 border-amber-200 bg-amber-50 text-amber-900">
           <TriangleAlert className="size-4" />
-          <AlertTitle>需要配置翻译 Provider</AlertTitle>
-          <AlertDescription>OpenAI 或豆包至少需要配置一个可用的 API Key。任务数据和现有产品不受影响。</AlertDescription>
+          <AlertTitle>需要配置火山大模型</AlertTitle>
+          <AlertDescription>请在服务端配置 DOUBAO_API_KEY；任务数据和现有产品不受影响。</AlertDescription>
         </Alert>
       ) : null}
 
@@ -192,46 +193,21 @@ export default async function TranslationCenterPage({
           </div>
 
           <form action={createTranslationJobAction} className="mt-5 space-y-5">
-            <fieldset>
-              <legend className="admin-label">翻译引擎</legend>
-              <div className="mt-2 grid gap-2 lg:grid-cols-2">
-                {services.map((service) => (
-                  <label
-                    key={service.provider}
-                    className={`relative rounded-lg border px-3.5 py-3 transition-colors ${
-                      service.configured
-                        ? "cursor-pointer border-[#D0D5DD] bg-white hover:border-[#98A2B3]"
-                        : "cursor-not-allowed border-[#EAECF0] bg-[#F9FAFB] opacity-70"
-                    }`}
-                  >
-                    <span className="flex items-start gap-3">
-                      <input
-                        type="radio"
-                        name="provider"
-                        value={service.provider ?? ""}
-                        required
-                        disabled={!service.configured}
-                        defaultChecked={service.provider === selectedProvider}
-                        className="mt-1 size-4 accent-[#25344F]"
-                      />
-                      <span className="min-w-0 flex-1">
-                        <span className="flex flex-wrap items-center justify-between gap-2">
-                          <span className="text-sm font-semibold text-[#344054]">{service.providerLabel}</span>
-                          <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${service.configured ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
-                            {service.configured ? "可用" : "待配置"}
-                          </span>
-                        </span>
-                        <span className="mt-1 block truncate font-mono text-[11px] text-[#667085]">{service.model || "未设置模型"}</span>
-                        <span className="mt-1 block truncate text-[11px] text-[#98A2B3]">
-                          {service.configured ? service.baseUrl : service.error || service.baseUrl}
-                        </span>
-                      </span>
+            <div className={`rounded-lg border px-3.5 py-3 ${translationService.configured ? "border-[#D0D5DD] bg-white" : "border-[#EAECF0] bg-[#F9FAFB]"}`}>
+              <div className="flex items-start gap-3">
+                <span className="grid size-8 shrink-0 place-items-center rounded-md bg-violet-50 text-violet-700"><Bot className="size-4" /></span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-sm font-semibold text-[#344054]">{translationService.providerLabel}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${translationService.configured ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+                      {translationService.configured ? "可用" : "待配置"}
                     </span>
-                  </label>
-                ))}
+                  </div>
+                  <p className="mt-1 truncate font-mono text-[11px] text-[#667085]">{translationService.model || "未设置模型"}</p>
+                  <p className="mt-1 text-[11px] text-[#98A2B3]">翻译中心的新任务统一使用火山大模型；任务会永久记录模型信息，API Key 仅保存在服务端。</p>
+                </div>
               </div>
-              <p className="mt-2 text-xs text-[#98A2B3]">任务会永久记录所选引擎和模型；API Key 仅保存在服务端环境变量中。</p>
-            </fieldset>
+            </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
@@ -296,7 +272,7 @@ export default async function TranslationCenterPage({
               </div>
             </details>
 
-            <Button type="submit" disabled={!databaseReady || !configuredServices.length} className="bg-[#25344F] text-white hover:bg-[#172033]">
+            <Button type="submit" disabled={!databaseReady || !translationService.configured} className="bg-[#25344F] text-white hover:bg-[#172033]">
               <Sparkles className="size-4" />创建可恢复翻译任务
             </Button>
           </form>
@@ -316,15 +292,26 @@ export default async function TranslationCenterPage({
             {dashboard.jobs.map((job) => {
               const finished = job.completedItems + job.failedItems + job.skippedItems + job.cancelledItems;
               const progress = job.totalItems ? Math.round((finished / job.totalItems) * 100) : 0;
+              const activeItem = job.items[0];
+              const executionStatus = getTranslationJobExecutionStatus({
+                status: job.status,
+                startedAt: job.startedAt,
+                runningItems: activeItem?.status === "RUNNING" ? 1 : 0,
+                retryingItems: activeItem?.status === "PENDING" && activeItem.retryCount > 0 ? 1 : 0,
+              });
+              const step = activeItem && isTranslationProcessingStep(activeItem.processingStep)
+                ? translationProcessingStepLabels[activeItem.processingStep]
+                : executionStatus === "SUCCESS" ? "处理完成" : "等待队列";
               return (
                 <div key={job.id} className="group px-5 py-4 transition-colors hover:bg-[#F9FAFB]">
                   <div className="flex items-start justify-between gap-3">
                     <Link href={`/admin/translations/${job.id}`} className="min-w-0 flex-1 rounded outline-none focus-visible:ring-2 focus-visible:ring-[#98A2B3]">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusTone[job.status]}`}>{jobLabel[job.status]}</span>
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusTone[executionStatus]}`}>{jobLabel[executionStatus]}</span>
                         <span className="text-xs text-[#667085]">{localeMeta[job.sourceLocale as keyof typeof localeMeta]?.[1] ?? job.sourceLocale} → {job.targetLocales.length} 种语言</span>
                       </div>
-                      <p className="mt-2 truncate text-sm font-medium text-[#344054]">{job.provider} · {job.model}</p>
+                      <p className="mt-2 truncate text-sm font-medium text-[#344054]">当前步骤：{step}</p>
+                      <p className="mt-1 truncate font-mono text-[11px] text-[#98A2B3]">{job.provider} · {job.model}</p>
                       <p className="mt-1 text-xs text-[#98A2B3]">{dateTime.format(job.createdAt)} · {job.requestedBy?.name ?? job.requestedBy?.email ?? "管理员"}</p>
                     </Link>
                     <TranslationJobActions jobId={job.id} status={job.status} failedItems={job.failedItems} canDelete={Boolean(productManager)} mode="menu" />

@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 type ConfirmAction = "STOP" | "CLOSE" | "DELETE";
 type MutationAction = ConfirmAction | "REQUEUE_FAILED" | "RESTORE";
 
-const runnableStatuses = new Set(["PENDING", "PAUSED", "CANCELLED"]);
+const runnableStatuses = new Set(["PENDING", "PAUSED", "CANCELLED", "FAILED", "PARTIAL_FAILED"]);
 
 export function TranslationJobActions({
   jobId,
@@ -81,7 +81,7 @@ export function TranslationJobActions({
   const actionButtons = (
     <>
       {mode === "menu" ? <DropdownMenu.Item asChild><Link href={`/admin/translations/${jobId}`} className="flex cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm outline-none hover:bg-[#F2F4F7]"><Eye className="size-4" />查看</Link></DropdownMenu.Item> : null}
-      {mode === "menu" && available.run ? <DropdownMenu.Item asChild><Link href={`/admin/translations/${jobId}?run=1`} className="flex cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm outline-none hover:bg-[#F2F4F7]"><Play className="size-4" />继续执行</Link></DropdownMenu.Item> : null}
+      {mode === "menu" && available.run ? <DropdownMenu.Item asChild><Link href={`/admin/translations/${jobId}?run=1`} className="flex cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm outline-none hover:bg-[#F2F4F7]"><Play className="size-4" />继续执行未完成任务</Link></DropdownMenu.Item> : null}
       {available.stop ? <button type="button" onClick={() => setConfirmAction("STOP")} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-[#344054] hover:bg-[#F2F4F7]"><Pause className="size-4" />停止</button> : null}
       {available.requeue ? <button type="button" onClick={() => void mutate("REQUEUE_FAILED")} disabled={Boolean(pending)} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-[#344054] hover:bg-[#F2F4F7] disabled:opacity-50"><RotateCcw className="size-4" />重新排队失败项</button> : null}
       {available.close ? <button type="button" onClick={() => setConfirmAction("CLOSE")} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-[#344054] hover:bg-[#F2F4F7]"><Archive className="size-4" />关闭任务</button> : null}

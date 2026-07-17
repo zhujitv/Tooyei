@@ -53,17 +53,21 @@ Link a public Blob store and provide `BLOB_READ_WRITE_TOKEN` before using upload
 The product translation center at `/admin/translations` can create resumable
 jobs across English, German, French, Spanish, Russian, Japanese, Italian,
 Arabic and Chinese. The translation layer uses a provider interface rather
-than calling a vendor from queue code. OpenAI Responses, generic
-OpenAI-compatible Chat Completions, and Volcengine Doubao through the OpenAI
-Node SDK compatibility mode are included. Configure OpenAI with the generic
-`TRANSLATION_*` variables and Doubao with `DOUBAO_API_KEY`,
-`DOUBAO_API_BASE_URL` and `DOUBAO_MODEL`; operators choose the engine for each
-job in the translation center. Legacy `OPENAI_API_KEY` and
-`OPENAI_TRANSLATION_MODEL` names remain supported by the OpenAI adapter. Each
+than calling a vendor from queue code. New translation-center jobs use
+Volcengine Doubao exclusively. Configure it with `DOUBAO_API_KEY`,
+`DOUBAO_API_BASE_URL` and `DOUBAO_MODEL`. Historical jobs retain their recorded
+provider and model metadata and continue to resolve the matching adapter. Each
 product-language item persists its
 status, response ID, input hash, token usage, errors and QA warnings. Generated
 main content, SEO metadata and structured product fields are saved as
 `MACHINE_DRAFT`; existing `PUBLISHED` translations are never overwritten.
+
+Translation execution is backed by durable per-item queue metadata. The admin
+page can drive the queue interactively, while `/api/cron/translation-worker`
+continues one item per scheduled invocation when the page is closed. Configure
+`CRON_SECRET` in Vercel. Provider calls are capped at 90 seconds, workers write
+a heartbeat every 30 seconds, locks older than five minutes are recovered, and
+retryable failures are persisted for retries after 10, 30 and 120 seconds.
 
 The legacy catalogue migration discovers all product URLs from the existing
 Tooyei sitemap and exports English, Spanish and German content, product images

@@ -14,16 +14,20 @@ type Progress = {
   failedItems: number;
   skippedItems: number;
   cancelledItems: number;
+  pendingItems: number;
+  runningItems: number;
+  retryingItems: number;
 };
 
 type RunResponse = {
   ok: boolean;
   error?: string;
-  result?: { processed: boolean; executionId: string; error?: string; job: Progress };
+  result?: { processed: boolean; executionId: string; error?: string; retrying?: boolean; nextRunAt?: string | null; job: Progress & { executionStatus?: string } };
 };
 
-const terminalStatuses = new Set(["COMPLETED", "PARTIAL_FAILED", "FAILED", "CANCELLED", "CLOSED"]);
-const resumableStatuses = new Set(["PENDING", "PAUSED", "CANCELLED"]);
+const terminalStatuses = new Set(["SUCCESS", "FAILED", "CANCELLED"]);
+const resumableStatuses = new Set(["PENDING", "QUEUED", "FAILED", "CANCELLED"]);
+const wait = (durationMs: number) => new Promise((resolve) => window.setTimeout(resolve, durationMs));
 
 export function TranslationJobRunner({
   jobId,
@@ -47,12 +51,12 @@ export function TranslationJobRunner({
 
   const finished = progress.completedItems + progress.failedItems + progress.skippedItems + progress.cancelledItems;
   const percent = progress.totalItems ? Math.round((finished / progress.totalItems) * 100) : 0;
-  const hasPending = finished < progress.totalItems;
-  const canRun = configured && hasPending && resumableStatuses.has(progress.status) && !running && !stopping;
-  const canStop = progress.status === "RUNNING" || running;
+  const hasUnfinished = progress.completedItems + progress.skippedItems + progress.cancelledItems < progress.totalItems;
+  const canRun = configured && hasUnfinished && resumableStatuses.has(progress.status) && !running && !stopping;
+  const canStop = progress.status === "PROCESSING" || progress.status === "RETRYING" || running;
 
   const run = useCallback(async () => {
-    if (running || stopping || !configured || !hasPending) return;
+    if (running || stopping || !configured || !hasUnfinished) return;
     continueRef.current = true;
     setRunning(true);
     setMessage(null);
@@ -71,10 +75,19 @@ export function TranslationJobRunner({
           throw new Error(body?.error || `执行请求失败（HTTP ${response.status}）。`);
         }
         executionId = body.result.executionId;
-        current = body.result.job;
+        current = { ...body.result.job, status: body.result.job.executionStatus ?? body.result.job.status };
         setProgress(current);
-        if (body.result.error) setMessage(`一项任务失败：${body.result.error}；其余待处理项目将继续。`);
-        if (!body.result.processed || terminalStatuses.has(current.status)) break;
+        if (body.result.error) {
+          setMessage(body.result.retrying
+            ? `一项任务暂时失败，已自动进入重试队列：${body.result.error}`
+            : `一项任务失败：${body.result.error}；其余待处理项目将继续。`);
+        }
+        if (terminalStatuses.has(current.status)) break;
+        if (!body.result.processed) {
+          if (!body.result.nextRunAt) break;
+          const remainingMs = new Date(body.result.nextRunAt).getTime() - Date.now();
+          await wait(Math.max(1_000, Math.min(30_000, remainingMs)));
+        }
       }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "翻译任务执行失败。");
@@ -83,7 +96,7 @@ export function TranslationJobRunner({
       setRunning(false);
       router.refresh();
     }
-  }, [configured, hasPending, jobId, progress, router, running, stopping]);
+  }, [configured, hasUnfinished, jobId, progress, router, running, stopping]);
 
   useEffect(() => {
     if (!autoStart || autoStartedRef.current || !canRun) return;
@@ -104,7 +117,7 @@ export function TranslationJobRunner({
       });
       const body = await response.json().catch(() => null) as { ok?: boolean; error?: string } | null;
       if (!response.ok || !body?.ok) throw new Error(body?.error || "停止任务失败。");
-      setProgress((current) => ({ ...current, status: "CANCELLED" }));
+      setProgress((current) => ({ ...current, status: "CANCELLED", runningItems: 0 }));
       setStopOpen(false);
       setMessage("任务已停止，当前正在处理的单项可能仍会完成。");
       router.refresh();
@@ -153,14 +166,13 @@ export function TranslationJobRunner({
           ) : (
             <Button id="translation-run-button" type="button" onClick={run} disabled={!canRun} className="bg-[#25344F] text-white hover:bg-[#172033]">
               {finished ? <RefreshCw className="size-4" /> : <Play className="size-4" />}
-              {finished ? "继续执行" : "开始执行"}
+              {finished ? "继续执行未完成任务" : "开始执行"}
             </Button>
           )}
           {running ? <span className="inline-flex items-center gap-2 px-2 text-xs text-violet-700"><LoaderCircle className="size-4 animate-spin" />正在处理</span> : null}
         </div>
       </div>
       {!configured ? <p className="mt-3 text-xs text-amber-700">配置翻译 Provider 和 API 密钥后才能运行；当前任务已安全保存在数据库。</p> : null}
-      {progress.status === "CLOSED" ? <p className="mt-3 text-xs text-slate-600">任务已关闭归档；恢复后才能继续执行。</p> : null}
       {message ? <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">{message}</p> : null}
     </div>
   );

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { ContentStatus, MediaKind, ProductDownloadKind, ProductMediaRole, TranslationStatus } from "@/generated/prisma/client";
+import { ContentStatus, Locale, MediaKind, ProductDownloadKind, ProductMediaRole, TranslationStatus } from "@/generated/prisma/client";
 import { getProductManagerSession, requireProductManagerSession, requireTranslationManagerSession } from "@/lib/admin-auth";
 import { isDatabaseConfigured } from "@/lib/db";
 import { productAssetFinalizeSchema, type ProductAssetFinalizeInput } from "@/lib/product-asset-policy";
@@ -11,6 +11,7 @@ import { persistProductAssetUpload } from "@/lib/product-asset-service";
 import { safeWriteAuditLog } from "@/lib/repositories/audit-logs";
 import {
   replaceProductStructuredContent,
+  getAdminProduct,
   updateProductStructuredTranslations,
   updateProductCore,
   updateProductTranslation,
@@ -21,7 +22,13 @@ import {
   type AdminProductSpecificationItem,
   type UpdateProductStructuredTranslationsInput,
 } from "@/lib/repositories/admin-products";
+import { createProductTranslationJob, type TranslationLocale } from "@/lib/repositories/product-translation-jobs";
 import { contentLocales, localizedPath } from "@/lib/site";
+import { productTranslationProviderId } from "@/lib/translation-providers/types";
+import {
+  structuredTranslationContentTypes,
+  type TranslationContentType,
+} from "@/lib/translation-worker-config";
 
 const translationSchema = z.object({
   locale: z.enum(contentLocales),
@@ -313,6 +320,83 @@ export async function updateProductStructuredTranslationAction(slug: string, for
 
   revalidateProductPaths(slug, locale.data);
   redirect(`/admin/products/${slug}?saved=structured-${locale.data}`);
+}
+
+const contentLocaleToDatabaseLocale: Record<(typeof contentLocales)[number], TranslationLocale> = {
+  en: Locale.EN,
+  de: Locale.DE,
+  fr: Locale.FR,
+  es: Locale.ES,
+  ru: Locale.RU,
+  ja: Locale.JA,
+  it: Locale.IT,
+  ar: Locale.AR,
+  zh: Locale.ZH,
+};
+
+const isStructuredTranslationType = (value: string): value is TranslationContentType =>
+  structuredTranslationContentTypes.includes(value as (typeof structuredTranslationContentTypes)[number]);
+
+export async function createProductStructuredTranslationJobAction(slug: string, formData: FormData) {
+  const session = await requireTranslationManagerSession();
+  if (!isDatabaseConfigured()) redirect(`/admin/products/${slug}?error=database`);
+
+  const request = String(formData.get("aiRequest") ?? "");
+  const [mode, rawTypes = "all"] = request.split(":", 2);
+  if (!["ALL_LANGUAGES", "MISSING_LANGUAGES", "CHANGED_FIELDS"].includes(mode)) {
+    redirect(`/admin/products/${slug}?error=structured-translation-request`);
+  }
+  const requestedTypes = rawTypes === "all"
+    ? [...structuredTranslationContentTypes]
+    : rawTypes.split(",").filter(isStructuredTranslationType);
+  if (!requestedTypes.length) redirect(`/admin/products/${slug}?error=structured-translation-request`);
+
+  const product = await getAdminProduct(slug);
+  if (!product) redirect(`/admin/products/${slug}?error=product-not-found`);
+
+  const isMissingForLocale = (locale: (typeof contentLocales)[number]) => requestedTypes.some((type) => {
+    if (type === "MEDIA_ALT") return product.media.some((item) => !item.translations?.[locale]?.alt.trim());
+    if (type === "MEDIA_CAPTION") return product.media.some((item) => item.caption.trim() && !item.translations?.[locale]?.caption.trim());
+    if (type === "FEATURE_TITLE") return product.features.some((item) => !item.translations?.[locale]?.title.trim());
+    if (type === "FEATURE_DESCRIPTION") return product.features.some((item) => item.description.trim() && !item.translations?.[locale]?.description.trim());
+    if (type === "SPEC_LABEL") return product.specifications.some((item) => !item.translations?.[locale]?.label.trim());
+    if (type === "SPEC_VALUE") return product.specifications.some((item) => !item.translations?.[locale]?.displayValue.trim());
+    if (type === "APPLICATION_TITLE") return product.applications.some((item) => !item.translations?.[locale]?.title.trim());
+    if (type === "APPLICATION_DESCRIPTION") return product.applications.some((item) => item.description.trim() && !item.translations?.[locale]?.description.trim());
+    if (type === "DOWNLOAD_TITLE") return product.downloads.some((item) => !item.translations?.[locale]?.title.trim());
+    return false;
+  });
+
+  const targetContentLocales = contentLocales.filter((locale) => locale !== "zh" && (
+    mode !== "MISSING_LANGUAGES" || isMissingForLocale(locale)
+  ));
+  if (!targetContentLocales.length) redirect(`/admin/products/${slug}?error=structured-translations-complete`);
+
+  let job: { id: string; totalItems: number };
+  try {
+    job = await createProductTranslationJob({
+      actorEmail: session.email,
+      provider: productTranslationProviderId,
+      sourceLocale: Locale.ZH,
+      targetLocales: targetContentLocales.map((locale) => contentLocaleToDatabaseLocale[locale]),
+      scope: "NON_PUBLISHED",
+      productIds: [product.id],
+      productLimit: 1,
+      contentTypes: requestedTypes,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "创建结构化翻译任务失败。";
+    redirect(`/admin/products/${slug}?error=${encodeURIComponent(message.slice(0, 180))}`);
+  }
+
+  await safeWriteAuditLog({
+    actorEmail: session.email,
+    action: "product.structured_translation_job_created",
+    entityType: "ProductTranslationJob",
+    entityId: job.id,
+    metadata: { productId: product.id, slug, mode, contentTypes: requestedTypes, totalItems: job.totalItems },
+  });
+  redirect(`/admin/translations/${job.id}?run=1`);
 }
 
 export type ProductAssetFinalizeActionResult = {

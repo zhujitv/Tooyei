@@ -33,6 +33,7 @@ import {
   updateProductCoreAction,
   finalizeProductAssetUploadAction,
   updateProductStructuredContentAction,
+  createProductStructuredTranslationJobAction,
   updateProductStructuredTranslationAction,
   updateProductTranslationAction,
 } from "./actions";
@@ -117,6 +118,7 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
   const saveTranslationAction = updateProductTranslationAction.bind(null, slug);
   const saveStructuredAction = updateProductStructuredContentAction.bind(null, slug);
   const saveStructuredTranslationAction = updateProductStructuredTranslationAction.bind(null, slug);
+  const translateStructuredAction = createProductStructuredTranslationJobAction.bind(null, slug);
   const finalizeAssetAction = finalizeProductAssetUploadAction.bind(null, slug);
   const blobConfigured = Boolean(process.env.BLOB_READ_WRITE_TOKEN);
 
@@ -329,6 +331,7 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
         <CardContent className="pt-1">
           <ProductStructuredContentEditor
             action={saveStructuredAction}
+            translationAction={translateStructuredAction}
             disabled={!databaseReady}
             initial={{ media: product.media, features: product.features, specifications: product.specifications, applications: product.applications, downloads: product.downloads }}
             mediaRoleOptions={mediaRoleOptions}
