@@ -5,7 +5,7 @@ import {
   ProductMediaRole,
   TranslationStatus,
 } from "@/generated/prisma/client";
-import { products as sampleProducts, type LocalizedText, type Product } from "@/lib/content";
+import { products as sampleProducts, type LocalizedText, type Product, type ProductMediaItem } from "@/lib/content";
 import { getPrisma, isDatabaseConfigured } from "@/lib/db";
 import { locales, type Locale } from "@/lib/site";
 
@@ -60,7 +60,7 @@ const productInclude = {
   media: {
     where: { visible: true },
     orderBy: [{ role: "asc" as const }, { sortOrder: "asc" as const }],
-    include: { asset: true },
+    include: { asset: true, translations: true },
   },
   translations: { where: { status: TranslationStatus.PUBLISHED } },
   features: {
@@ -157,12 +157,14 @@ const isAllowedPublicAssetUrl = (url?: string | null) => {
 
 const toProduct = (product: DatabaseProduct): Product => {
   const sampleImage = sampleProducts.find(({ slug }) => slug === product.slug)?.image;
-  const media = product.media
+  const media: ProductMediaItem[] = product.media
     .filter(({ asset }) => isAllowedPublicAssetUrl(asset.url))
-    .map(({ asset, alt, caption, role }) => ({
+    .map(({ asset, alt, caption, role, translations }) => ({
       url: asset.url,
       alt: alt || asset.alt || product.sku,
+      altLocalized: localizedText(translations, ({ alt: localizedAlt }) => localizedAlt),
       caption: caption ?? undefined,
+      captionLocalized: localizedText(translations, ({ caption: localizedCaption }) => localizedCaption ?? ""),
       role,
     }));
   const hasPrimaryMedia = media.some(({ url, role }) => role === ProductMediaRole.PRIMARY && url === product.primaryImage?.url);
@@ -202,8 +204,10 @@ const toProduct = (product: DatabaseProduct): Product => {
     ),
     specifications: product.specifications.map(({ translations, group, unit, value }) => ({
       group: group ?? undefined,
+      groupLocalized: localizedText(translations, ({ group: localizedGroup }) => localizedGroup ?? ""),
       label: localizedText(translations, ({ label }) => label),
       value,
+      displayValue: localizedText(translations, ({ displayValue }) => displayValue ?? ""),
       unit: unit ?? undefined,
     })),
     applications: product.applications.map(({ translations, imageAsset }) => ({
@@ -211,6 +215,7 @@ const toProduct = (product: DatabaseProduct): Product => {
       description: localizedText(translations, ({ description }) => description ?? ""),
       image: isAllowedPublicAssetUrl(imageAsset?.url) ? imageAsset?.url : undefined,
       imageAlt: imageAsset?.alt ?? undefined,
+      imageAltLocalized: localizedText(translations, ({ imageAlt }) => imageAlt ?? ""),
     })),
     downloads: product.downloads
       .filter(({ asset }) => isAllowedPublicAssetUrl(asset.url))

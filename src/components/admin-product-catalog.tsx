@@ -4,8 +4,10 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
   Check,
+  CircleAlert,
   ExternalLink,
   FileText,
+  FolderInput,
   Grid2X2,
   ImageIcon,
   Languages,
@@ -16,16 +18,19 @@ import {
   Sparkles,
 } from "lucide-react";
 import type { ContentStatus, ProductKind, TranslationStatus } from "@/generated/prisma/client";
+import type { AdminProductCategoryOption, BatchProductOperation } from "@/lib/repositories/admin-products";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { languageMarkers, type ContentLocale } from "@/lib/site";
+import { contentLocales, languageMarkers, type ContentLocale } from "@/lib/site";
 
 export type ProductCatalogItem = {
   slug: string;
   sku: string;
   category: string;
+  categoryId: string | null;
+  isClassified: boolean;
   kind: ProductKind;
   status: ContentStatus;
   featured: boolean;
@@ -35,6 +40,7 @@ export type ProductCatalogItem = {
   thumbnailAlt: string;
   updatedAt: string | null;
   translationStates: Record<ContentLocale, TranslationStatus>;
+  seoStates: Record<ContentLocale, boolean>;
   publishedTranslations: number;
   seoReadyTranslations: number;
   completion: number;
@@ -49,8 +55,11 @@ export type ProductCatalogItem = {
 
 type Props = {
   products: ProductCatalogItem[];
+  categories: AdminProductCategoryOption[];
   databaseReady: boolean;
+  returnTo: string;
   quickAction: (formData: FormData) => Promise<void>;
+  quickCategoryAction: (formData: FormData) => Promise<void>;
   batchAction: (formData: FormData) => Promise<void>;
 };
 
@@ -154,13 +163,15 @@ function ProductMeta({ product }: { product: ProductCatalogItem }) {
         {(Object.keys(product.translationStates) as ContentLocale[]).map((locale) => (
           <span
             key={locale}
-            title={`${localeLabels[locale]}：${product.translationStates[locale]}`}
+            title={`${localeLabels[locale]}：${product.translationStates[locale]}；SEO ${product.seoStates[locale] ? "已完整" : "待完善"}`}
             className={cn(
-              "grid h-5 min-w-6 place-items-center rounded border px-1 text-[9px] font-semibold",
+              "relative grid h-5 min-w-6 place-items-center rounded border px-1 text-[9px] font-semibold",
               translationClass[product.translationStates[locale]],
+              !product.seoStates[locale] && product.translationStates[locale] !== "MISSING" && "ring-1 ring-inset ring-amber-400/45",
             )}
           >
             <span aria-hidden>{languageMarkers[locale]}</span>{localeLabels[locale]}
+            {!product.seoStates[locale] ? <span className="absolute -right-0.5 -top-0.5 size-1.5 rounded-full bg-amber-400" aria-hidden /> : null}
           </span>
         ))}
         <span className="ml-auto text-[10px] text-zinc-700">更新于 {formatDate(product.updatedAt)}</span>
@@ -175,7 +186,7 @@ function ProductMeta({ product }: { product: ProductCatalogItem }) {
           <p className="mt-0.5 text-[9px] text-zinc-700">结构内容</p>
         </div>
         <div className="px-3">
-          <p className="font-mono text-sm text-zinc-300">{product.seoReadyTranslations}/4</p>
+          <p className="font-mono text-sm text-zinc-300">{product.seoReadyTranslations}/{contentLocales.length}</p>
           <p className="mt-0.5 text-[9px] text-zinc-700">SEO 就绪</p>
         </div>
       </div>
@@ -183,7 +194,21 @@ function ProductMeta({ product }: { product: ProductCatalogItem }) {
   );
 }
 
-function QuickSettings({ product, disabled, action }: { product: ProductCatalogItem; disabled: boolean; action: Props["quickAction"] }) {
+function QuickSettings({
+  product,
+  categories,
+  disabled,
+  returnTo,
+  action,
+  categoryAction,
+}: {
+  product: ProductCatalogItem;
+  categories: AdminProductCategoryOption[];
+  disabled: boolean;
+  returnTo: string;
+  action: Props["quickAction"];
+  categoryAction: Props["quickCategoryAction"];
+}) {
   return (
     <details className="group/details border-t border-white/[0.06]">
       <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-[11px] text-zinc-600 transition-colors hover:bg-white/[0.025] hover:text-zinc-300">
@@ -192,6 +217,7 @@ function QuickSettings({ product, disabled, action }: { product: ProductCatalogI
       </summary>
       <form action={action} className="grid gap-3 border-t border-white/[0.06] bg-black/15 p-4">
         <input type="hidden" name="slug" value={product.slug} />
+        <input type="hidden" name="returnTo" value={returnTo} />
         <div className="grid grid-cols-[1fr_88px] gap-2">
           <select name="status" defaultValue={product.status} disabled={disabled} className="admin-select h-8 px-2 text-xs">
             <option value="DRAFT">草稿</option>
@@ -211,13 +237,27 @@ function QuickSettings({ product, disabled, action }: { product: ProductCatalogI
           </Button>
         </div>
       </form>
+      <form action={categoryAction} className="grid gap-2 border-t border-white/[0.06] bg-black/15 p-4">
+        <input type="hidden" name="slug" value={product.slug} />
+        <input type="hidden" name="returnTo" value={returnTo} />
+        <label className="text-[10px] font-medium text-zinc-600" htmlFor={`category-${product.slug}`}>快速归类</label>
+        <div className="flex gap-2">
+          <select id={`category-${product.slug}`} name="categoryId" defaultValue={product.categoryId ?? categories[0]?.id} disabled={disabled || !categories.length} className="admin-select h-8 min-w-0 flex-1 px-2 text-xs">
+            {categories.map((category) => <option key={category.id} value={category.id}>{category.depth ? "↳ " : ""}{category.label}{category.isActive ? "" : "（停用）"}</option>)}
+          </select>
+          <Button type="submit" size="sm" disabled={disabled || !categories.length} variant="outline">
+            <FolderInput />归类
+          </Button>
+        </div>
+      </form>
     </details>
   );
 }
 
-export function AdminProductCatalog({ products, databaseReady, quickAction, batchAction }: Props) {
+export function AdminProductCatalog({ products, categories, databaseReady, returnTo, quickAction, quickCategoryAction, batchAction }: Props) {
   const [view, setView] = useState<"grid" | "list">("grid");
   const [selected, setSelected] = useState<string[]>([]);
+  const [batchOperation, setBatchOperation] = useState<BatchProductOperation>("PUBLISH");
   const selectedSet = useMemo(() => new Set(selected), [selected]);
   const allSelected = products.length > 0 && selected.length === products.length;
 
@@ -299,7 +339,10 @@ export function AdminProductCatalog({ products, databaseReady, quickAction, batc
                       <div className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-600">
                         <span>{kindLabel[product.kind]}</span>
                         <span className="size-0.5 rounded-full bg-zinc-700" />
-                        <span className="truncate normal-case tracking-normal">{product.category}</span>
+                        <span className={cn("flex min-w-0 items-center gap-1 truncate normal-case tracking-normal", !product.isClassified && "text-rose-400")}>
+                          {!product.isClassified ? <CircleAlert className="size-3 shrink-0" /> : null}
+                          <span className="truncate">{product.isClassified ? product.category : "未归类"}</span>
+                        </span>
                       </div>
                       <Link href={`/admin/products/${product.slug}`} className="mt-2 block truncate text-[15px] font-medium tracking-[-0.01em] text-zinc-100 hover:text-white">
                         {product.title}
@@ -319,8 +362,8 @@ export function AdminProductCatalog({ products, databaseReady, quickAction, batc
                   </div>
                   <div className="mt-4 flex items-center justify-between border-t border-white/[0.06] pt-3">
                     <div className="flex items-center gap-3 text-[10px] text-zinc-600">
-                      <span className="flex items-center gap-1"><Languages className="size-3" /> {product.publishedTranslations}/4</span>
-                      <span className="flex items-center gap-1"><FileText className="size-3" /> SEO {product.seoReadyTranslations}/4</span>
+                      <span className="flex items-center gap-1"><Languages className="size-3" /> {product.publishedTranslations}/{contentLocales.length}</span>
+                      <span className="flex items-center gap-1"><FileText className="size-3" /> SEO {product.seoReadyTranslations}/{contentLocales.length}</span>
                     </div>
                     <Button asChild size="sm" className="bg-zinc-100 text-zinc-950 hover:bg-white">
                       <Link href={`/admin/products/${product.slug}`}>编辑产品</Link>
@@ -328,7 +371,7 @@ export function AdminProductCatalog({ products, databaseReady, quickAction, batc
                   </div>
                 </div>
                 <div className={cn(view === "list" && "md:border-l md:border-white/[0.06]")}>
-                  <QuickSettings product={product} disabled={!databaseReady} action={quickAction} />
+                  <QuickSettings product={product} categories={categories} disabled={!databaseReady} returnTo={returnTo} action={quickAction} categoryAction={quickCategoryAction} />
                 </div>
               </article>
             );
@@ -342,17 +385,25 @@ export function AdminProductCatalog({ products, databaseReady, quickAction, batc
           className="fixed bottom-5 left-1/2 z-40 flex w-[min(calc(100%-2rem),620px)] -translate-x-1/2 flex-wrap items-center gap-2 rounded-xl border border-white/[0.12] bg-[#1a1a1d]/95 p-2.5 shadow-[0_20px_70px_rgba(0,0,0,0.55)] backdrop-blur-xl lg:left-[calc(50%+7.5rem)]"
         >
           {selected.map((slug) => <input key={slug} type="hidden" name="slugs" value={slug} />)}
+          <input type="hidden" name="returnTo" value={returnTo} />
           <div className="flex min-w-28 items-center gap-2 px-2 text-xs font-medium text-zinc-200">
             <span className="grid size-5 place-items-center rounded bg-violet-400 text-[10px] font-bold text-violet-950">{selected.length}</span>
             已选择
           </div>
-          <select name="operation" className="admin-select h-8 min-w-36 flex-1 px-2 text-xs" defaultValue="PUBLISH">
+          <select name="operation" className="admin-select h-8 min-w-36 flex-1 px-2 text-xs" value={batchOperation} onChange={(event) => setBatchOperation(event.target.value as BatchProductOperation)}>
             <option value="PUBLISH">批量发布</option>
             <option value="DRAFT">设为草稿</option>
             <option value="ARCHIVE">批量归档</option>
             <option value="FEATURE">设为精选</option>
             <option value="UNFEATURE">取消精选</option>
+            <option value="ASSIGN_CATEGORY">批量归类</option>
+            <option value="FILL_SEO">补齐已有翻译 SEO</option>
           </select>
+          {batchOperation === "ASSIGN_CATEGORY" ? (
+            <select name="categoryId" required className="admin-select h-8 min-w-44 flex-1 px-2 text-xs" defaultValue={categories[0]?.id}>
+              {categories.map((category) => <option key={category.id} value={category.id}>{category.depth ? "↳ " : ""}{category.label}{category.isActive ? "" : "（停用）"}</option>)}
+            </select>
+          ) : null}
           <Button type="submit" size="sm" disabled={!databaseReady} className="bg-zinc-100 text-zinc-950 hover:bg-white">
             应用操作
           </Button>

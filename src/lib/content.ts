@@ -13,8 +13,10 @@ export type ProductFeatureItem = LocalizedText & {
 export type ProductMediaItem = {
   url: string;
   alt: string;
+  altLocalized?: LocalizedText;
   role: "PRIMARY" | "GALLERY" | "DETAIL" | "APPLICATION" | "PACKAGING" | "VIDEO";
   caption?: string;
+  captionLocalized?: LocalizedText;
 };
 
 export type ProductApplicationItem = {
@@ -22,6 +24,7 @@ export type ProductApplicationItem = {
   description: LocalizedText;
   image?: string;
   imageAlt?: string;
+  imageAltLocalized?: LocalizedText;
 };
 
 export type ProductDownloadItem = {
@@ -50,7 +53,14 @@ export type Product = {
   image: string;
   media?: ProductMediaItem[];
   features: ProductFeatureItem[];
-  specifications: { group?: string; label: LocalizedText; value: string; unit?: string }[];
+  specifications: {
+    group?: string;
+    groupLocalized?: LocalizedText;
+    label: LocalizedText;
+    value: string;
+    displayValue?: LocalizedText;
+    unit?: string;
+  }[];
   applications?: ProductApplicationItem[];
   downloads?: ProductDownloadItem[];
 };

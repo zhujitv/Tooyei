@@ -5,10 +5,13 @@ import {
   ChevronDown,
   Database,
   Filter,
+  FolderCheck,
+  FolderX,
   Languages,
   Package,
   Plus,
   Search,
+  SearchCheck,
   Sparkles,
   TriangleAlert,
 } from "lucide-react";
@@ -26,10 +29,12 @@ import {
   getAdminProductStats,
 } from "@/lib/repositories/admin-products";
 import {
+  assignProductCategoryAction,
   batchUpdateProductsAction,
   createProductAction,
   updateProductListSettingsAction,
 } from "./actions";
+import { contentLocales, languageMarkers, languageNames, type ContentLocale } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "产品管理", robots: { index: false, follow: false } };
@@ -64,12 +69,14 @@ const parseKind = (value?: string) =>
 const feedbackCopy = {
   saved: {
     quick: ["产品设置已保存", "发布状态、精选状态或排序已经更新。"],
+    category: ["产品归类已更新", "主栏目和动态栏目关联已经同步。"],
     batch: ["批量操作已完成", "所选产品已更新，公开页面缓存已经刷新。"],
   },
   error: {
     database: ["数据库未连接", "产品新增和保存需要 PostgreSQL 数据库。"],
     create: ["新建失败", "请检查 slug、SKU、分类、中文标题和摘要；slug/SKU 不能重复。"],
     quick: ["保存失败", "请检查产品是否存在、状态和排序值是否有效。"],
+    category: ["归类失败", "请选择有效栏目，并确认产品仍然存在。"],
     batch: ["批量操作失败", "请至少选择一个产品，并检查操作类型是否有效。"],
   },
 } as const;
@@ -77,17 +84,40 @@ const feedbackCopy = {
 export default async function AdminProductsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string; kind?: string; saved?: string; error?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    status?: string;
+    kind?: string;
+    classification?: string;
+    locale?: string;
+    translationState?: string;
+    seoState?: string;
+    page?: string;
+    saved?: string;
+    error?: string;
+  }>;
 }) {
   const filters = await searchParams;
   const databaseReady = isDatabaseConfigured();
   const status = parseStatus(filters.status);
   const kind = parseKind(filters.kind);
-  const [products, stats, categories] = await Promise.all([
-    getAdminProducts({ q: filters.q, status, kind }),
+  const classification = ["CLASSIFIED", "UNCLASSIFIED"].includes(filters.classification ?? "")
+    ? (filters.classification as "CLASSIFIED" | "UNCLASSIFIED")
+    : undefined;
+  const locale = contentLocales.includes(filters.locale as ContentLocale) ? (filters.locale as ContentLocale) : undefined;
+  const translationState = ["MISSING", "NOT_PUBLISHED"].includes(filters.translationState ?? "")
+    ? (filters.translationState as "MISSING" | "NOT_PUBLISHED")
+    : undefined;
+  const seoState = ["READY", "MISSING"].includes(filters.seoState ?? "")
+    ? (filters.seoState as "READY" | "MISSING")
+    : undefined;
+  const page = Math.max(1, Number.parseInt(filters.page ?? "1", 10) || 1);
+  const [productPage, stats, categories] = await Promise.all([
+    getAdminProducts({ q: filters.q, status, kind, classification, locale, translationState, seoState, page }),
     getAdminProductStats(),
     getAdminProductCategoryOptions(),
   ]);
+  const products = productPage.items;
   const defaultCategoryId = categories[0]?.id ?? "";
   const successFeedback = filters.saved ? feedbackCopy.saved[filters.saved as keyof typeof feedbackCopy.saved] : undefined;
   const errorFeedback = filters.error ? feedbackCopy.error[filters.error as keyof typeof feedbackCopy.error] : undefined;
@@ -99,11 +129,32 @@ export default async function AdminProductsPage({
     updatedAt: product.updatedAt?.toISOString() ?? null,
   }));
 
+  const currentQuery = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value && key !== "saved" && key !== "error") currentQuery.set(key, value);
+  }
+  const returnTo = `/admin/products${currentQuery.size ? `?${currentQuery}` : ""}`;
+  const filteredHref = (updates: Record<string, string | null>) => {
+    const query = new URLSearchParams(currentQuery);
+    query.delete("page");
+    for (const [key, value] of Object.entries(updates)) {
+      if (value) query.set(key, value);
+      else query.delete(key);
+    }
+    return `/admin/products${query.size ? `?${query}` : ""}`;
+  };
+  const pageHref = (targetPage: number) => {
+    const query = new URLSearchParams(currentQuery);
+    query.set("page", String(targetPage));
+    return `/admin/products?${query}`;
+  };
+
   const metrics = [
-    { label: "产品总数", value: stats.total, detail: `${stats.draft} 个草稿`, icon: Package, tone: "text-zinc-100" },
-    { label: "已发布", value: stats.published, detail: `${stats.archived} 个已归档`, icon: CheckCircle2, tone: "text-emerald-300" },
-    { label: "平均完整度", value: `${averageCompletion}%`, detail: "按当前筛选结果", icon: Sparkles, tone: "text-violet-300" },
-    { label: "待处理语言", value: stats.needsReview + stats.missing, detail: "缺失或等待审核", icon: Languages, tone: "text-amber-300" },
+    { label: "产品总数", value: stats.total, detail: `${stats.published} 个已发布 · ${stats.draft} 个草稿`, icon: Package, tone: "text-zinc-100" },
+    { label: "未归类", value: stats.unclassified, detail: "尚未关联动态栏目", icon: FolderX, tone: stats.unclassified ? "text-rose-300" : "text-emerald-300" },
+    { label: "翻译待完善", value: stats.missing, detail: `覆盖 ${contentLocales.length} 个语言版本`, icon: Languages, tone: stats.missing ? "text-amber-300" : "text-emerald-300" },
+    { label: "SEO 待完善", value: stats.missingSeo, detail: "缺少本语言 SEO 标题或描述", icon: SearchCheck, tone: stats.missingSeo ? "text-violet-300" : "text-emerald-300" },
+    { label: "平均完整度", value: `${averageCompletion}%`, detail: "按当前页产品计算", icon: Sparkles, tone: "text-violet-300" },
   ];
 
   return (
@@ -148,7 +199,7 @@ export default async function AdminProductsPage({
         </Alert>
       ) : null}
 
-      <section className="mt-5 grid gap-px overflow-hidden rounded-xl border border-white/[0.07] bg-white/[0.07] sm:grid-cols-2 xl:grid-cols-4">
+      <section className="mt-5 grid gap-px overflow-hidden rounded-xl border border-white/[0.07] bg-white/[0.07] sm:grid-cols-2 xl:grid-cols-5">
         {metrics.map(({ label, value, detail, icon: Icon, tone }) => (
           <div key={label} className="bg-[#111113] p-4">
             <div className="flex items-center justify-between">
@@ -159,6 +210,24 @@ export default async function AdminProductsPage({
             <p className="mt-1 text-[10px] text-zinc-700">{detail}</p>
           </div>
         ))}
+      </section>
+
+      <section className="mt-4 grid gap-3 lg:grid-cols-3" aria-label="产品运营待办">
+        <Link href={filteredHref({ classification: "UNCLASSIFIED", translationState: null, seoState: null })} className="group flex items-center gap-3 rounded-xl border border-[#E4E7EC] bg-white p-4 transition-colors hover:border-[#B8C0CC]">
+          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-rose-50 text-rose-600"><FolderX className="size-4" /></span>
+          <span className="min-w-0 flex-1"><span className="block text-sm font-medium text-[#172033]">处理未归类产品</span><span className="mt-1 block text-xs text-[#667085]">{stats.unclassified ? `${stats.unclassified} 个产品等待归类` : "所有产品均已归类"}</span></span>
+          <FolderCheck className="size-4 text-[#98A2B3] transition-colors group-hover:text-[#344054]" />
+        </Link>
+        <Link href={filteredHref({ classification: null, translationState: "MISSING", seoState: null })} className="group flex items-center gap-3 rounded-xl border border-[#E4E7EC] bg-white p-4 transition-colors hover:border-[#B8C0CC]">
+          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-amber-50 text-amber-600"><Languages className="size-4" /></span>
+          <span className="min-w-0 flex-1"><span className="block text-sm font-medium text-[#172033]">补齐语言翻译</span><span className="mt-1 block text-xs text-[#667085]">{stats.missing ? `${stats.missing} 个产品缺少至少一种语言` : "九语言内容已覆盖"}</span></span>
+          <Search className="size-4 text-[#98A2B3] transition-colors group-hover:text-[#344054]" />
+        </Link>
+        <Link href={filteredHref({ classification: null, translationState: null, seoState: "MISSING" })} className="group flex items-center gap-3 rounded-xl border border-[#E4E7EC] bg-white p-4 transition-colors hover:border-[#B8C0CC]">
+          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-violet-50 text-violet-600"><SearchCheck className="size-4" /></span>
+          <span className="min-w-0 flex-1"><span className="block text-sm font-medium text-[#172033]">完善各语言 SEO</span><span className="mt-1 block text-xs text-[#667085]">{stats.missingSeo ? `${stats.missingSeo} 个产品的 SEO 字段不完整` : "九语言 SEO 已完整"}</span></span>
+          <Search className="size-4 text-[#98A2B3] transition-colors group-hover:text-[#344054]" />
+        </Link>
       </section>
 
       <details id="new-product" className="group mt-5 rounded-xl border border-white/[0.075] bg-[#111113] open:border-white/[0.12]">
@@ -219,26 +288,47 @@ export default async function AdminProductsPage({
       </details>
 
       <section className="mt-5 rounded-xl border border-white/[0.075] bg-[#111113] p-3">
-        <form action="/admin/products" className="grid gap-2 lg:grid-cols-[minmax(260px,1fr)_180px_200px_auto_auto]">
-          <div className="relative">
+        <form action="/admin/products" className="grid gap-2 md:grid-cols-2 xl:grid-cols-12">
+          <div className="relative xl:col-span-3">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-zinc-700" />
             <Input id="q" name="q" defaultValue={filters.q || ""} placeholder="搜索产品名、SKU、slug 或分类…" className="admin-field pl-8" />
           </div>
-          <select id="status" name="status" defaultValue={status || ""} className="admin-select h-8 px-2.5 text-xs">
+          <select id="status" name="status" defaultValue={status || ""} className="admin-select h-8 px-2.5 text-xs xl:col-span-2">
             <option value="">全部状态</option>
             {productStatuses.map((item) => <option key={item} value={item}>{statusLabel[item]}</option>)}
           </select>
-          <select id="kind" name="kind" defaultValue={kind || ""} className="admin-select h-8 px-2.5 text-xs">
+          <select id="kind" name="kind" defaultValue={kind || ""} className="admin-select h-8 px-2.5 text-xs xl:col-span-2">
             <option value="">全部产品类型</option>
             {productKinds.map((item) => <option key={item} value={item}>{kindLabel[item]}</option>)}
           </select>
-          <Button type="submit" size="sm" variant="outline" className="border-white/[0.1] bg-white/[0.04] text-zinc-300 hover:bg-white/[0.08] hover:text-white">
-            <Filter />
-            筛选
-          </Button>
-          <Button asChild type="button" size="sm" variant="ghost" className="text-zinc-600 hover:bg-white/[0.04] hover:text-zinc-300">
-            <Link href="/admin/products">清空</Link>
-          </Button>
+          <select id="classification" name="classification" defaultValue={classification || ""} className="admin-select h-8 px-2.5 text-xs xl:col-span-2">
+            <option value="">全部归类状态</option>
+            <option value="UNCLASSIFIED">未归类</option>
+            <option value="CLASSIFIED">已归类</option>
+          </select>
+          <select id="locale" name="locale" defaultValue={locale || ""} className="admin-select h-8 px-2.5 text-xs xl:col-span-2">
+            <option value="">全部语言</option>
+            {contentLocales.map((item) => <option key={item} value={item}>{languageMarkers[item]} {languageNames[item]}</option>)}
+          </select>
+          <select id="translationState" name="translationState" defaultValue={translationState || ""} className="admin-select h-8 px-2.5 text-xs xl:col-span-2">
+            <option value="">全部翻译状态</option>
+            <option value="MISSING">翻译缺失</option>
+            <option value="NOT_PUBLISHED">尚未发布</option>
+          </select>
+          <select id="seoState" name="seoState" defaultValue={seoState || ""} className="admin-select h-8 px-2.5 text-xs xl:col-span-2">
+            <option value="">全部 SEO 状态</option>
+            <option value="MISSING">SEO 待完善</option>
+            <option value="READY">SEO 已完整</option>
+          </select>
+          <div className="flex items-center gap-2 md:col-span-2 xl:col-span-3">
+            <Button type="submit" size="sm" variant="outline" className="flex-1 border-white/[0.1] bg-white/[0.04] text-zinc-300 hover:bg-white/[0.08] hover:text-white">
+              <Filter />
+              筛选
+            </Button>
+            <Button asChild type="button" size="sm" variant="ghost" className="flex-1 text-zinc-600 hover:bg-white/[0.04] hover:text-zinc-300">
+              <Link href="/admin/products">清空</Link>
+            </Button>
+          </div>
         </form>
       </section>
 
@@ -252,10 +342,27 @@ export default async function AdminProductsPage({
 
       <AdminProductCatalog
         products={catalogProducts}
+        categories={categories}
         databaseReady={databaseReady}
+        returnTo={returnTo}
         quickAction={updateProductListSettingsAction}
+        quickCategoryAction={assignProductCategoryAction}
         batchAction={batchUpdateProductsAction}
       />
+
+      <nav className="mt-5 flex flex-col gap-3 rounded-xl border border-[#E4E7EC] bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between" aria-label="产品分页">
+        <p className="text-xs text-[#667085]">
+          共 <span className="font-mono text-[#344054]">{productPage.total}</span> 个结果，当前第 <span className="font-mono text-[#344054]">{productPage.page}</span> / {productPage.totalPages} 页，每页 {productPage.pageSize} 个
+        </p>
+        <div className="flex items-center gap-2">
+          <Button asChild={productPage.page > 1} size="sm" variant="outline" disabled={productPage.page <= 1}>
+            {productPage.page > 1 ? <Link href={pageHref(productPage.page - 1)}>上一页</Link> : <span>上一页</span>}
+          </Button>
+          <Button asChild={productPage.page < productPage.totalPages} size="sm" variant="outline" disabled={productPage.page >= productPage.totalPages}>
+            {productPage.page < productPage.totalPages ? <Link href={pageHref(productPage.page + 1)}>下一页</Link> : <span>下一页</span>}
+          </Button>
+        </div>
+      </nav>
     </main>
   );
 }

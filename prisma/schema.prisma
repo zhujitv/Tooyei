@@ -255,7 +255,9 @@ model ProductSpecificationTranslation {
   specificationId String
   specification   ProductSpecification @relation(fields: [specificationId], references: [id], onDelete: Cascade)
   locale          Locale
+  group           String?
   label           String
+  displayValue    String?
 
   @@unique([specificationId, locale])
 }
@@ -287,6 +289,7 @@ model ProductMedia {
   role      ProductMediaRole @default(GALLERY)
   alt       String?
   caption   String?
+  translations ProductMediaTranslation[]
   visible   Boolean    @default(true)
   sortOrder Int        @default(0)
   createdAt DateTime   @default(now())
@@ -295,6 +298,19 @@ model ProductMedia {
   @@id([productId, assetId])
   @@index([productId, sortOrder])
   @@index([productId, role, visible, sortOrder])
+}
+
+model ProductMediaTranslation {
+  id        String       @id @default(cuid())
+  productId String
+  assetId   String
+  media     ProductMedia @relation(fields: [productId, assetId], references: [productId, assetId], onDelete: Cascade)
+  locale    Locale
+  alt       String
+  caption   String?
+
+  @@unique([productId, assetId, locale])
+  @@index([locale])
 }
 
 model ProductApplication {
@@ -319,6 +335,7 @@ model ProductApplicationTranslation {
   locale        Locale
   title         String
   description   String?
+  imageAlt      String?
 
   @@unique([applicationId, locale])
 }

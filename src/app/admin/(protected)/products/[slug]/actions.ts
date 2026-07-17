@@ -1,16 +1,17 @@
 "use server";
 
-import { del, put } from "@vercel/blob";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { ContentStatus, MediaKind, ProductDownloadKind, ProductMediaRole, TranslationStatus } from "@/generated/prisma/client";
-import { requireProductManagerSession } from "@/lib/admin-auth";
+import { getProductManagerSession, requireProductManagerSession } from "@/lib/admin-auth";
 import { isDatabaseConfigured } from "@/lib/db";
+import { productAssetFinalizeSchema, type ProductAssetFinalizeInput } from "@/lib/product-asset-policy";
+import { persistProductAssetUpload } from "@/lib/product-asset-service";
 import { safeWriteAuditLog } from "@/lib/repositories/audit-logs";
 import {
   replaceProductStructuredContent,
-  attachUploadedProductAsset,
+  updateProductStructuredTranslations,
   updateProductCore,
   updateProductTranslation,
   type AdminProductApplicationItem,
@@ -18,37 +19,16 @@ import {
   type AdminProductFeatureItem,
   type AdminProductMediaItem,
   type AdminProductSpecificationItem,
+  type UpdateProductStructuredTranslationsInput,
 } from "@/lib/repositories/admin-products";
 import { contentLocales, localizedPath } from "@/lib/site";
-
-const uploadSchema = z.object({
-  kind: z.enum(["media", "download"]),
-  role: z.enum(ProductMediaRole),
-  downloadKind: z.enum(ProductDownloadKind),
-  title: z.string().trim().max(180),
-  alt: z.string().trim().max(240),
-  caption: z.string().trim().max(500),
-});
-
-const mediaUploadTypes = new Set([
-  "image/jpeg", "image/png", "image/webp", "image/avif", "video/mp4", "video/webm",
-]);
-
-const documentUploadTypes = new Set([
-  "application/pdf", "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-]);
-
-const safeUploadName = (name: string) =>
-  name.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "") || "asset";
 
 const translationSchema = z.object({
   locale: z.enum(contentLocales),
   title: z.string().trim().min(3).max(180),
   summary: z.string().trim().min(20).max(800),
-  seoTitle: z.string().trim().max(220).optional(),
-  seoDescription: z.string().trim().max(360).optional(),
+  seoTitle: z.string().trim().max(70).optional(),
+  seoDescription: z.string().trim().max(180).optional(),
   status: z.enum(["MISSING", "MACHINE_DRAFT", "NEEDS_REVIEW", "PUBLISHED"]),
 });
 
@@ -67,6 +47,24 @@ const structuredSchema = z.object({
   specifications: z.string().max(40000),
   applications: z.string().max(40000),
   downloads: z.string().max(40000),
+});
+
+const structuredTranslationPayloadSchema = z.object({
+  media: z.array(z.object({ id: z.string().min(1), alt: z.string().trim().max(240), caption: z.string().trim().max(500) })).max(200),
+  features: z.array(z.object({ id: z.string().min(1), title: z.string().trim().max(180), description: z.string().trim().max(1200) })).max(200),
+  specifications: z.array(z.object({
+    id: z.string().min(1),
+    group: z.string().trim().max(120),
+    label: z.string().trim().max(180),
+    displayValue: z.string().trim().max(500),
+  })).max(500),
+  applications: z.array(z.object({
+    id: z.string().min(1),
+    title: z.string().trim().max(180),
+    description: z.string().trim().max(1200),
+    imageAlt: z.string().trim().max(240),
+  })).max(200),
+  downloads: z.array(z.object({ id: z.string().min(1), title: z.string().trim().max(180), description: z.string().trim().max(1200) })).max(200),
 });
 
 const revalidateProductPaths = (slug: string, locale?: string) => {
@@ -104,9 +102,10 @@ const parseEnum = <T extends Record<string, string>>(values: T, value: string | 
 
 const parseMediaRows = (value: string): AdminProductMediaItem[] =>
   splitLines(value)
-    .map(([role, url, alt, caption, sortOrder, visible], index) => {
+    .map(([id, role, url, alt, caption, sortOrder, visible], index) => {
       const parsedRole = parseEnum(ProductMediaRole, role, index === 0 ? ProductMediaRole.PRIMARY : ProductMediaRole.GALLERY);
       return {
+        id: id ?? "",
         role: parsedRole,
         kind: parsedRole === ProductMediaRole.VIDEO ? MediaKind.VIDEO : MediaKind.IMAGE,
         url: url ?? "",
@@ -120,7 +119,8 @@ const parseMediaRows = (value: string): AdminProductMediaItem[] =>
 
 const parseFeatureRows = (value: string): AdminProductFeatureItem[] =>
   splitLines(value)
-    .map(([title, description, icon, sortOrder, visible], index) => ({
+    .map(([id, title, description, icon, sortOrder, visible], index) => ({
+      id: id ?? "",
       title: title ?? "",
       description: description ?? "",
       icon: icon ?? "",
@@ -131,7 +131,8 @@ const parseFeatureRows = (value: string): AdminProductFeatureItem[] =>
 
 const parseSpecificationRows = (value: string): AdminProductSpecificationItem[] =>
   splitLines(value)
-    .map(([group, label, rawValue, unit, sortOrder, visible], index) => ({
+    .map(([id, group, label, rawValue, unit, sortOrder, visible], index) => ({
+      id: id ?? "",
       group: group ?? "",
       label: label ?? "",
       value: rawValue ?? "",
@@ -143,7 +144,8 @@ const parseSpecificationRows = (value: string): AdminProductSpecificationItem[] 
 
 const parseApplicationRows = (value: string): AdminProductApplicationItem[] =>
   splitLines(value)
-    .map(([title, description, imageUrl, imageAlt, sortOrder, visible], index) => ({
+    .map(([id, title, description, imageUrl, imageAlt, sortOrder, visible], index) => ({
+      id: id ?? "",
       title: title ?? "",
       description: description ?? "",
       imageUrl: imageUrl ?? "",
@@ -155,7 +157,8 @@ const parseApplicationRows = (value: string): AdminProductApplicationItem[] =>
 
 const parseDownloadRows = (value: string): AdminProductDownloadItem[] =>
   splitLines(value)
-    .map(([kind, title, url, description, sortOrder, visible], index) => ({
+    .map(([id, kind, title, url, description, sortOrder, visible], index) => ({
+      id: id ?? "",
       kind: parseEnum(ProductDownloadKind, kind, ProductDownloadKind.OTHER),
       title: title ?? "",
       url: url ?? "",
@@ -277,65 +280,65 @@ export async function updateProductStructuredContentAction(slug: string, formDat
   redirect(`/admin/products/${slug}?saved=structured`);
 }
 
-export async function uploadProductAssetAction(slug: string, formData: FormData) {
+export async function updateProductStructuredTranslationAction(slug: string, formData: FormData) {
   const session = await requireProductManagerSession();
   if (!isDatabaseConfigured()) redirect(`/admin/products/${slug}?error=database`);
-  if (!process.env.BLOB_READ_WRITE_TOKEN) redirect(`/admin/products/${slug}?error=upload`);
 
-  const file = formData.get("file");
-  const parsed = uploadSchema.safeParse({
-    kind: formData.get("kind"),
-    role: formData.get("role"),
-    downloadKind: formData.get("downloadKind"),
-    title: formData.get("title") || "",
-    alt: formData.get("alt") || "",
-    caption: formData.get("caption") || "",
-  });
-  if (!(file instanceof File) || !file.size || file.size > 3_800_000 || !parsed.success) {
-    redirect(`/admin/products/${slug}?error=upload`);
+  const locale = z.enum(contentLocales).safeParse(formData.get("locale"));
+  const rawPayload = formData.get("payload");
+  if (!locale.success || typeof rawPayload !== "string" || rawPayload.length > 250_000) {
+    redirect(`/admin/products/${slug}?error=structured-translation`);
   }
 
-  const isMediaUpload = parsed.data.kind === "media";
-  const isVideo = file.type.startsWith("video/");
-  const typeMatchesPurpose = isMediaUpload ? mediaUploadTypes.has(file.type) : documentUploadTypes.has(file.type);
-  const roleMatchesMedia = !isMediaUpload || isVideo || parsed.data.role !== ProductMediaRole.VIDEO;
-  if (!typeMatchesPurpose || !roleMatchesMedia) {
-    redirect(`/admin/products/${slug}?error=upload`);
-  }
-
-  let blob: Awaited<ReturnType<typeof put>> | undefined;
+  let payload: z.infer<typeof structuredTranslationPayloadSchema>;
   try {
-    blob = await put(`products/${slug}/${safeUploadName(file.name)}`, file, {
-      access: "public",
-      addRandomSuffix: true,
-      contentType: file.type,
-    });
-    const result = await attachUploadedProductAsset({
-      slug,
-      pathname: blob.pathname,
-      url: blob.url,
-      contentType: file.type,
-      sizeBytes: file.size,
-      kind: parsed.data.kind,
-      role: parsed.data.role,
-      downloadKind: parsed.data.downloadKind,
-      title: parsed.data.title,
-      alt: parsed.data.alt,
-      caption: parsed.data.caption,
-    });
-    await safeWriteAuditLog({
-      actorEmail: session.email,
-      action: "product.asset_uploaded",
-      entityType: "Product",
-      entityId: slug,
-      metadata: result,
-    });
-  } catch (error) {
-    if (blob) await del(blob.url).catch(() => undefined);
-    console.error("Product asset upload failed", error instanceof Error ? error.message : error);
-    redirect(`/admin/products/${slug}?error=upload`);
+    payload = structuredTranslationPayloadSchema.parse(JSON.parse(rawPayload));
+  } catch {
+    redirect(`/admin/products/${slug}?error=structured-translation`);
   }
 
-  revalidateProductPaths(slug);
-  redirect(`/admin/products/${slug}?saved=upload`);
+  const result = await updateProductStructuredTranslations({
+    slug,
+    locale: locale.data,
+    ...payload,
+  } satisfies UpdateProductStructuredTranslationsInput);
+
+  await safeWriteAuditLog({
+    actorEmail: session.email,
+    action: "product.structured_translation_updated",
+    entityType: "Product",
+    entityId: slug,
+    metadata: result,
+  });
+
+  revalidateProductPaths(slug, locale.data);
+  redirect(`/admin/products/${slug}?saved=structured-${locale.data}`);
+}
+
+export type ProductAssetFinalizeActionResult = {
+  ok: boolean;
+  message: string;
+};
+
+export async function finalizeProductAssetUploadAction(
+  slug: string,
+  input: ProductAssetFinalizeInput,
+): Promise<ProductAssetFinalizeActionResult> {
+  const session = await getProductManagerSession();
+  if (!session) return { ok: false, message: "登录已过期或没有产品管理权限，请重新登录。" };
+  if (!isDatabaseConfigured()) return { ok: false, message: "数据库尚未配置，无法关联产品。" };
+  if (!process.env.BLOB_READ_WRITE_TOKEN) return { ok: false, message: "Vercel Blob 尚未配置。" };
+
+  const parsed = productAssetFinalizeSchema.safeParse(input);
+  if (!parsed.success || parsed.data.metadata.slug !== slug) {
+    return { ok: false, message: "上传文件信息校验失败。" };
+  }
+
+  try {
+    await persistProductAssetUpload(parsed.data, session.email);
+    return { ok: true, message: "文件已上传并关联到当前产品。" };
+  } catch (error) {
+    console.error("Product asset finalization failed", error instanceof Error ? error.message : error);
+    return { ok: false, message: error instanceof Error ? error.message : "文件关联失败，请重试。" };
+  }
 }

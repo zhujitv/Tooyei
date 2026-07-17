@@ -15,6 +15,7 @@ type SelectOption = {
 
 type MediaRow = {
   id: string;
+  databaseId: string;
   role: string;
   url: string;
   alt: string;
@@ -25,6 +26,7 @@ type MediaRow = {
 
 type FeatureRow = {
   id: string;
+  databaseId: string;
   title: string;
   description: string;
   icon: string;
@@ -34,6 +36,7 @@ type FeatureRow = {
 
 type SpecificationRow = {
   id: string;
+  databaseId: string;
   group: string;
   label: string;
   value: string;
@@ -44,6 +47,7 @@ type SpecificationRow = {
 
 type ApplicationRow = {
   id: string;
+  databaseId: string;
   title: string;
   description: string;
   imageUrl: string;
@@ -54,6 +58,7 @@ type ApplicationRow = {
 
 type DownloadRow = {
   id: string;
+  databaseId: string;
   kind: string;
   title: string;
   description: string;
@@ -66,11 +71,11 @@ type Props = {
   action: (formData: FormData) => Promise<void>;
   disabled?: boolean;
   initial: {
-    media: Omit<MediaRow, "id">[];
-    features: Omit<FeatureRow, "id">[];
-    specifications: Omit<SpecificationRow, "id">[];
-    applications: Omit<ApplicationRow, "id">[];
-    downloads: Omit<DownloadRow, "id">[];
+    media: Array<Omit<MediaRow, "databaseId">>;
+    features: Array<Omit<FeatureRow, "databaseId">>;
+    specifications: Array<Omit<SpecificationRow, "databaseId">>;
+    applications: Array<Omit<ApplicationRow, "databaseId">>;
+    downloads: Array<Omit<DownloadRow, "databaseId">>;
   };
   mediaRoleOptions: SelectOption[];
   downloadKindOptions: SelectOption[];
@@ -81,12 +86,13 @@ const visibleLabel = (visible: boolean) => (visible ? "显示" : "隐藏");
 const safeCell = (value: string | number | boolean) =>
   String(value).replaceAll("|", "｜").replace(/\s*\r?\n\s*/g, " ").trim();
 
-const withIds = <T extends object>(prefix: string, rows: T[]): Array<T & { id: string }> =>
-  rows.map((row, index) => ({ ...row, id: `${prefix}-${index}` }));
+const withIds = <T extends { id: string }>(prefix: string, rows: T[]) =>
+  rows.map((row, index) => ({ ...row, databaseId: row.id, id: row.id || `${prefix}-${index}` }));
 
 const nextId = (prefix: string, length: number) => `${prefix}-${Date.now()}-${length}`;
 
 const emptyMediaRow = (sortOrder: number): Omit<MediaRow, "id"> => ({
+  databaseId: "",
   role: "GALLERY",
   url: "",
   alt: "",
@@ -96,6 +102,7 @@ const emptyMediaRow = (sortOrder: number): Omit<MediaRow, "id"> => ({
 });
 
 const emptyFeatureRow = (sortOrder: number): Omit<FeatureRow, "id"> => ({
+  databaseId: "",
   title: "",
   description: "",
   icon: "",
@@ -104,6 +111,7 @@ const emptyFeatureRow = (sortOrder: number): Omit<FeatureRow, "id"> => ({
 });
 
 const emptySpecificationRow = (sortOrder: number): Omit<SpecificationRow, "id"> => ({
+  databaseId: "",
   group: "",
   label: "",
   value: "",
@@ -113,6 +121,7 @@ const emptySpecificationRow = (sortOrder: number): Omit<SpecificationRow, "id"> 
 });
 
 const emptyApplicationRow = (sortOrder: number): Omit<ApplicationRow, "id"> => ({
+  databaseId: "",
   title: "",
   description: "",
   imageUrl: "",
@@ -122,6 +131,7 @@ const emptyApplicationRow = (sortOrder: number): Omit<ApplicationRow, "id"> => (
 });
 
 const emptyDownloadRow = (sortOrder: number): Omit<DownloadRow, "id"> => ({
+  databaseId: "",
   kind: "OTHER",
   title: "",
   description: "",
@@ -134,7 +144,7 @@ const serializeMedia = (rows: MediaRow[]) =>
   rows
     .filter((row) => row.url.trim())
     .map((row) =>
-      [row.role, row.url, row.alt, row.caption, row.sortOrder, visibleLabel(row.visible)].map(safeCell).join(" | "),
+      [row.databaseId, row.role, row.url, row.alt, row.caption, row.sortOrder, visibleLabel(row.visible)].map(safeCell).join(" | "),
     )
     .join("\n");
 
@@ -142,7 +152,7 @@ const serializeFeatures = (rows: FeatureRow[]) =>
   rows
     .filter((row) => row.title.trim())
     .map((row) =>
-      [row.title, row.description, row.icon, row.sortOrder, visibleLabel(row.visible)].map(safeCell).join(" | "),
+      [row.databaseId, row.title, row.description, row.icon, row.sortOrder, visibleLabel(row.visible)].map(safeCell).join(" | "),
     )
     .join("\n");
 
@@ -150,7 +160,7 @@ const serializeSpecifications = (rows: SpecificationRow[]) =>
   rows
     .filter((row) => row.label.trim() && row.value.trim())
     .map((row) =>
-      [row.group, row.label, row.value, row.unit, row.sortOrder, visibleLabel(row.visible)].map(safeCell).join(" | "),
+      [row.databaseId, row.group, row.label, row.value, row.unit, row.sortOrder, visibleLabel(row.visible)].map(safeCell).join(" | "),
     )
     .join("\n");
 
@@ -158,7 +168,7 @@ const serializeApplications = (rows: ApplicationRow[]) =>
   rows
     .filter((row) => row.title.trim())
     .map((row) =>
-      [row.title, row.description, row.imageUrl, row.imageAlt, row.sortOrder, visibleLabel(row.visible)]
+      [row.databaseId, row.title, row.description, row.imageUrl, row.imageAlt, row.sortOrder, visibleLabel(row.visible)]
         .map(safeCell)
         .join(" | "),
     )
@@ -168,7 +178,7 @@ const serializeDownloads = (rows: DownloadRow[]) =>
   rows
     .filter((row) => row.title.trim() && row.url.trim())
     .map((row) =>
-      [row.kind, row.title, row.url, row.description, row.sortOrder, visibleLabel(row.visible)].map(safeCell).join(" | "),
+      [row.databaseId, row.kind, row.title, row.url, row.description, row.sortOrder, visibleLabel(row.visible)].map(safeCell).join(" | "),
     )
     .join("\n");
 
@@ -235,19 +245,19 @@ export function ProductStructuredContentEditor({
   downloadKindOptions,
 }: Props) {
   const [media, setMedia] = useState<MediaRow[]>(() =>
-    withIds("media", initial.media.length ? initial.media : [emptyMediaRow(0)]),
+    withIds("media", initial.media.length ? initial.media : [{ ...emptyMediaRow(0), id: "" }]),
   );
   const [features, setFeatures] = useState<FeatureRow[]>(() =>
-    withIds("feature", initial.features.length ? initial.features : [emptyFeatureRow(0)]),
+    withIds("feature", initial.features.length ? initial.features : [{ ...emptyFeatureRow(0), id: "" }]),
   );
   const [specifications, setSpecifications] = useState<SpecificationRow[]>(() =>
-    withIds("spec", initial.specifications.length ? initial.specifications : [emptySpecificationRow(0)]),
+    withIds("spec", initial.specifications.length ? initial.specifications : [{ ...emptySpecificationRow(0), id: "" }]),
   );
   const [applications, setApplications] = useState<ApplicationRow[]>(() =>
-    withIds("application", initial.applications.length ? initial.applications : [emptyApplicationRow(0)]),
+    withIds("application", initial.applications.length ? initial.applications : [{ ...emptyApplicationRow(0), id: "" }]),
   );
   const [downloads, setDownloads] = useState<DownloadRow[]>(() =>
-    withIds("download", initial.downloads.length ? initial.downloads : [emptyDownloadRow(0)]),
+    withIds("download", initial.downloads.length ? initial.downloads : [{ ...emptyDownloadRow(0), id: "" }]),
   );
 
   const serialized = useMemo(

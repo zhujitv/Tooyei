@@ -106,12 +106,13 @@ const sectionCopy: Record<ContentLocale, Record<string, string>> = {
   },
 };
 
-function ProductVisual({ media, priority = false }: { media: ProductMediaItem; priority?: boolean }) {
+function ProductVisual({ media, locale, priority = false }: { media: ProductMediaItem; locale: Locale; priority?: boolean }) {
+  const alt = media.altLocalized ? readLocalizedText(media.altLocalized, locale) || media.alt : media.alt;
   if (media.url.startsWith("/")) {
     return (
       <Image
         src={media.url}
-        alt={media.alt}
+        alt={alt}
         fill
         priority={priority}
         sizes="(max-width: 1024px) 100vw, 50vw"
@@ -120,7 +121,7 @@ function ProductVisual({ media, priority = false }: { media: ProductMediaItem; p
     );
   }
 
-  return <img src={media.url} alt={media.alt} className="size-full object-cover" loading={priority ? "eager" : "lazy"} />;
+  return <img src={media.url} alt={alt} className="size-full object-cover" loading={priority ? "eager" : "lazy"} />;
 }
 
 export async function ProductPage({ product, locale }: { product: Product; locale: Locale }) {
@@ -173,7 +174,7 @@ export async function ProductPage({ product, locale }: { product: Product; local
           <div className="grid gap-12 lg:grid-cols-2 lg:items-start">
             <div className="space-y-4">
               <div className="relative aspect-square overflow-hidden rounded-3xl bg-[#e7eaf0] shadow-[0_24px_70px_rgba(15,23,42,0.12)]">
-                <ProductVisual media={primaryMedia} priority />
+                <ProductVisual media={primaryMedia} locale={locale} priority />
               </div>
               {gallery.length ? (
                 <div>
@@ -181,7 +182,7 @@ export async function ProductPage({ product, locale }: { product: Product; local
                   <div className="grid grid-cols-3 gap-3">
                     {gallery.map((item) => (
                       <div key={`${item.role}-${item.url}`} className="relative aspect-square overflow-hidden rounded-2xl bg-[#e7eaf0]">
-                        <ProductVisual media={item} />
+                        <ProductVisual media={item} locale={locale} />
                       </div>
                     ))}
                   </div>
@@ -236,11 +237,11 @@ export async function ProductPage({ product, locale }: { product: Product; local
                   {product.specifications.map((item) => (
                     <div key={`${item.group}-${item.label.zh}-${item.value}`} className="grid gap-2 py-4 text-sm sm:grid-cols-[180px_1fr]">
                       <dt>
-                        {item.group ? <p className="mb-1 text-xs uppercase tracking-[0.12em] text-muted-foreground">{item.group}</p> : null}
+                        {item.group || item.groupLocalized ? <p className="mb-1 text-xs uppercase tracking-[0.12em] text-muted-foreground">{item.groupLocalized ? readLocalizedText(item.groupLocalized, locale) || item.group : item.group}</p> : null}
                         <span className="text-muted-foreground">{readLocalizedText(item.label, locale)}</span>
                       </dt>
                       <dd className="font-medium">
-                        {item.value}
+                        {item.displayValue ? readLocalizedText(item.displayValue, locale) || item.value : item.value}
                         {item.unit ? <span className="ml-1 text-muted-foreground">{item.unit}</span> : null}
                       </dd>
                     </div>
@@ -274,8 +275,10 @@ export async function ProductPage({ product, locale }: { product: Product; local
                           media={{
                             url: application.image,
                             alt: application.imageAlt || readLocalizedText(application.title, locale),
+                            altLocalized: application.imageAltLocalized,
                             role: "APPLICATION",
                           }}
+                          locale={locale}
                         />
                       </div>
                     ) : null}

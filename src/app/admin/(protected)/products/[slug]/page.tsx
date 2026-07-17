@@ -25,14 +25,16 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ProductAssetUpload } from "@/components/product-asset-upload";
 import { ProductStructuredContentEditor } from "@/components/product-structured-content-editor";
+import { ProductStructuredTranslationEditor } from "@/components/product-structured-translation-editor";
 import { isDatabaseConfigured } from "@/lib/db";
 import { getAdminProduct, getAdminProductCategoryOptions } from "@/lib/repositories/admin-products";
-import { languageMarkers, languageNames } from "@/lib/site";
+import { contentLocales, languageMarkers, languageNames } from "@/lib/site";
 import {
   updateProductCoreAction,
+  finalizeProductAssetUploadAction,
   updateProductStructuredContentAction,
+  updateProductStructuredTranslationAction,
   updateProductTranslationAction,
-  uploadProductAssetAction,
 } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -114,16 +116,23 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
   const saveCoreAction = updateProductCoreAction.bind(null, slug);
   const saveTranslationAction = updateProductTranslationAction.bind(null, slug);
   const saveStructuredAction = updateProductStructuredContentAction.bind(null, slug);
-  const uploadAssetAction = uploadProductAssetAction.bind(null, slug);
+  const saveStructuredTranslationAction = updateProductStructuredTranslationAction.bind(null, slug);
+  const finalizeAssetAction = finalizeProductAssetUploadAction.bind(null, slug);
+  const blobConfigured = Boolean(process.env.BLOB_READ_WRITE_TOKEN);
 
+  const structuredTranslationSaved = feedback.saved?.startsWith("structured-") ?? false;
+  const savedStructuredLocale = structuredTranslationSaved ? feedback.saved?.slice("structured-".length) : undefined;
+  const initialStructuredLocale = contentLocales.includes(savedStructuredLocale as (typeof contentLocales)[number])
+    ? savedStructuredLocale as (typeof contentLocales)[number]
+    : "en";
   const savedLocale =
-    feedback.saved && !["core", "structured", "upload", "created"].includes(feedback.saved)
+    feedback.saved && !["core", "structured", "upload", "created"].includes(feedback.saved) && !structuredTranslationSaved
       ? feedback.saved.toUpperCase()
       : undefined;
   const initialTab: ProductTabId =
     feedback.saved === "upload"
       ? "media"
-      : feedback.saved === "structured"
+      : feedback.saved === "structured" || structuredTranslationSaved
         ? "content"
         : savedLocale
           ? "languages"
@@ -150,8 +159,8 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
   const completeness = completenessSections.reduce((sum, section) => sum + section.score, 0);
   const readinessItems = [
     ["至少 1 个可见媒体", product.media.some((item) => item.visible)],
-    ["4 个语言版本均已发布", publishedLocales === product.translations.length],
-    ["4 个语言版本 SEO 完整", seoReadyLocales === product.translations.length],
+    [`全部 ${product.translations.length} 个语言版本均已发布`, publishedLocales === product.translations.length],
+    [`全部 ${product.translations.length} 个语言版本 SEO 完整`, seoReadyLocales === product.translations.length],
     ["已填写核心卖点", product.features.length > 0],
     ["已填写产品规格", product.specifications.length > 0],
     ["已填写应用场景", product.applications.length > 0],
@@ -271,7 +280,14 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
           <CardTitle className="text-sm">上传媒体与文件</CardTitle>
           <p className="text-xs text-zinc-600">文件上传后会自动关联当前产品。</p>
         </CardHeader>
-        <CardContent className="pt-1"><ProductAssetUpload action={uploadAssetAction} disabled={!databaseReady} /></CardContent>
+        <CardContent className="pt-1">
+          <ProductAssetUpload
+            slug={slug}
+            finalizeAction={finalizeAssetAction}
+            disabled={!databaseReady}
+            blobConfigured={blobConfigured}
+          />
+        </CardContent>
       </Card>
       <Card className="admin-card">
         <CardHeader className="flex flex-row items-center justify-between border-b border-white/[0.065] pb-4">
@@ -300,21 +316,38 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
   );
 
   const contentPanel = (
-    <Card className="admin-card">
-      <CardHeader className="border-b border-white/[0.065] pb-4">
-        <CardTitle className="text-sm">结构化产品内容</CardTitle>
-        <p className="text-xs text-zinc-600">统一管理图库排序、规格参数、卖点、应用场景和下载资料。</p>
-      </CardHeader>
-      <CardContent className="pt-1">
-        <ProductStructuredContentEditor
-          action={saveStructuredAction}
-          disabled={!databaseReady}
-          initial={{ media: product.media, features: product.features, specifications: product.specifications, applications: product.applications, downloads: product.downloads }}
-          mediaRoleOptions={mediaRoleOptions}
-          downloadKindOptions={downloadKindOptions}
-        />
-      </CardContent>
-    </Card>
+    <div className="space-y-5">
+      <Card className="admin-card">
+        <CardHeader className="border-b border-white/[0.065] pb-4">
+          <CardTitle className="text-sm">结构化产品内容</CardTitle>
+          <p className="text-xs text-zinc-600">统一管理全语言共用的结构、图库、排序和中文源内容。</p>
+        </CardHeader>
+        <CardContent className="pt-1">
+          <ProductStructuredContentEditor
+            action={saveStructuredAction}
+            disabled={!databaseReady}
+            initial={{ media: product.media, features: product.features, specifications: product.specifications, applications: product.applications, downloads: product.downloads }}
+            mediaRoleOptions={mediaRoleOptions}
+            downloadKindOptions={downloadKindOptions}
+          />
+        </CardContent>
+      </Card>
+      <Card className="admin-card">
+        <CardHeader className="border-b border-white/[0.065] pb-4">
+          <CardTitle className="text-sm">九语言内容</CardTitle>
+          <p className="text-xs text-zinc-600">分别维护图片 ALT、卖点、参数、应用场景和下载资料文字。</p>
+        </CardHeader>
+        <CardContent className="pt-1">
+          <ProductStructuredTranslationEditor
+            key={[...product.media, ...product.features, ...product.specifications, ...product.applications, ...product.downloads].map((item) => item.id).join(":")}
+            action={saveStructuredTranslationAction}
+            disabled={!databaseReady}
+            initialLocale={initialStructuredLocale}
+            initial={{ media: product.media, features: product.features, specifications: product.specifications, applications: product.applications, downloads: product.downloads }}
+          />
+        </CardContent>
+      </Card>
+    </div>
   );
 
   const languagesPanel = (
@@ -324,7 +357,7 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
         return (
           <Card key={translation.locale} className="admin-card">
             <CardHeader className="flex flex-row items-start justify-between border-b border-white/[0.065] pb-4">
-              <div><CardTitle className="flex items-center gap-2 text-sm"><span aria-hidden>{languageMarkers[translation.locale]}</span>{languageNames[translation.locale]}<span className="font-mono text-[9px] font-normal uppercase text-zinc-700">{translation.locale}</span></CardTitle><p className="mt-1 text-[11px] text-zinc-600">独立控制内容、索引状态和搜索摘要。</p></div>
+              <div><CardTitle className="flex items-center gap-2 text-sm"><span aria-hidden>{languageMarkers[translation.locale]}</span>{languageNames[translation.locale]}<span className="font-mono text-[9px] font-normal uppercase text-zinc-700">{translation.locale}</span></CardTitle><p className="mt-1 text-[11px] text-zinc-600">每种语言独立维护标题、摘要、SEO 和发布状态。</p></div>
               <div className="flex items-center gap-1.5"><Badge className={`border ${translationStatusClass[translation.status]}`}>{statusLabel[translation.status]}</Badge><span title={seoReady ? "SEO 已完整" : "SEO 待完善"} className={seoReady ? "grid size-5 place-items-center rounded border border-emerald-500/20 bg-emerald-500/10 text-emerald-400" : "grid size-5 place-items-center rounded border border-amber-500/20 bg-amber-500/10 text-amber-400"}>{seoReady ? <Check className="size-3" /> : <SearchCheck className="size-3" />}</span></div>
             </CardHeader>
             <CardContent className="pt-1">
@@ -333,10 +366,10 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
                 <div className="space-y-1.5"><Label htmlFor={`${translation.locale}-title`} className="admin-label">标题</Label><Input id={`${translation.locale}-title`} name="title" defaultValue={translation.title} minLength={3} maxLength={180} required disabled={!databaseReady} className="admin-field" /></div>
                 <div className="space-y-1.5"><Label htmlFor={`${translation.locale}-summary`} className="admin-label">摘要</Label><Textarea id={`${translation.locale}-summary`} name="summary" defaultValue={translation.summary} minLength={20} maxLength={800} required disabled={!databaseReady} className="admin-field min-h-24" /></div>
                 <div className="grid gap-4 sm:grid-cols-[1fr_150px]">
-                  <div className="space-y-1.5"><Label htmlFor={`${translation.locale}-seoTitle`} className="admin-label">SEO 标题</Label><Input id={`${translation.locale}-seoTitle`} name="seoTitle" defaultValue={translation.seoTitle} maxLength={220} disabled={!databaseReady} placeholder="为空时使用产品标题" className="admin-field" /></div>
+                  <div className="space-y-1.5"><Label htmlFor={`${translation.locale}-seoTitle`} className="admin-label">SEO 标题</Label><Input id={`${translation.locale}-seoTitle`} name="seoTitle" defaultValue={translation.seoTitle} maxLength={70} required disabled={!databaseReady} placeholder="使用当前语言填写，最多 70 个字符" className="admin-field" /><p className="text-[10px] text-zinc-700">建议包含产品类型、核心卖点和品牌，避免与其他产品重复。</p></div>
                   <div className="space-y-1.5"><Label htmlFor={`${translation.locale}-status`} className="admin-label">发布状态</Label><select id={`${translation.locale}-status`} name="status" defaultValue={translation.status} disabled={!databaseReady} className="admin-select h-8 w-full px-2.5 text-xs">{statuses.map((status) => <option key={status} value={status}>{statusLabel[status]}</option>)}</select></div>
                 </div>
-                <div className="space-y-1.5"><Label htmlFor={`${translation.locale}-seoDescription`} className="admin-label">SEO 描述</Label><Textarea id={`${translation.locale}-seoDescription`} name="seoDescription" defaultValue={translation.seoDescription} maxLength={360} disabled={!databaseReady} placeholder="为空时使用产品摘要" className="admin-field min-h-16" /></div>
+                <div className="space-y-1.5"><Label htmlFor={`${translation.locale}-seoDescription`} className="admin-label">SEO 描述</Label><Textarea id={`${translation.locale}-seoDescription`} name="seoDescription" defaultValue={translation.seoDescription} maxLength={180} required disabled={!databaseReady} placeholder="使用当前语言概括规格、应用和采购价值" className="admin-field min-h-16" /><p className="text-[10px] text-zinc-700">建议 80–180 个字符；后台批量补齐会使用本语言摘要生成基础版本。</p></div>
                 <div className="flex items-center justify-between border-t border-white/[0.065] pt-4"><span className={seoReady ? "flex items-center gap-1.5 text-[10px] text-emerald-400" : "flex items-center gap-1.5 text-[10px] text-amber-400"}>{seoReady ? <CheckCircle2 className="size-3" /> : <TriangleAlert className="size-3" />}{seoReady ? "SEO 字段已完整" : "SEO 标题或描述待补充"}</span><Button type="submit" size="sm" disabled={!databaseReady} className="bg-zinc-100 text-zinc-950 hover:bg-white"><Save />保存 {translation.locale.toUpperCase()}</Button></div>
               </form>
             </CardContent>

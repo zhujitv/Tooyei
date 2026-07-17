@@ -7,7 +7,13 @@ import { ContentStatus } from "@/generated/prisma/client";
 import { requireProductManagerSession } from "@/lib/admin-auth";
 import { isDatabaseConfigured } from "@/lib/db";
 import { safeWriteAuditLog } from "@/lib/repositories/audit-logs";
-import { batchUpdateProducts, createProduct, updateProductListSettings } from "@/lib/repositories/admin-products";
+import {
+  assignProductsToCategory,
+  batchUpdateProducts,
+  createProduct,
+  fillMissingProductSeo,
+  updateProductListSettings,
+} from "@/lib/repositories/admin-products";
 import { contentLocales, localizedPath } from "@/lib/site";
 
 const slugSchema = z
@@ -37,17 +43,23 @@ const quickSettingsSchema = z.object({
   sortOrder: z.coerce.number().int().min(0).max(999999),
 });
 
-const batchSchema = z.object({
-  slugs: z.array(slugSchema).min(1).max(200),
-  operation: z.enum(["PUBLISH", "DRAFT", "ARCHIVE", "FEATURE", "UNFEATURE"]),
+const quickCategorySchema = z.object({
+  slug: slugSchema,
+  categoryId: z.string().min(1),
 });
 
-const revalidateProductAdminPaths = (slug?: string) => {
+const batchSchema = z.object({
+  slugs: z.array(slugSchema).min(1).max(200),
+  operation: z.enum(["PUBLISH", "DRAFT", "ARCHIVE", "FEATURE", "UNFEATURE", "ASSIGN_CATEGORY", "FILL_SEO"]),
+  categoryId: z.string().optional(),
+});
+
+const revalidateProductAdminPaths = (slugs?: string | string[]) => {
   revalidatePath("/");
   revalidatePath("/products");
   revalidatePath("/admin/content");
   revalidatePath("/admin/products");
-  if (slug) {
+  for (const slug of typeof slugs === "string" ? [slugs] : slugs ?? []) {
     revalidatePath(`/products/${slug}`);
     revalidatePath(`/admin/products/${slug}`);
     for (const locale of contentLocales) {
@@ -55,6 +67,17 @@ const revalidateProductAdminPaths = (slug?: string) => {
       revalidatePath(localizedPath(locale, `/products/${slug}`));
     }
   }
+};
+
+const feedbackPath = (formData: FormData, kind: "saved" | "error", value: string) => {
+  const raw = formData.get("returnTo");
+  const target = typeof raw === "string" ? raw : "/admin/products";
+  const url = new URL(target, "https://admin.tooyei.local");
+  if (url.pathname !== "/admin/products") url.pathname = "/admin/products";
+  url.searchParams.delete("saved");
+  url.searchParams.delete("error");
+  url.searchParams.set(kind, value);
+  return `${url.pathname}${url.search}`;
 };
 
 export async function createProductAction(formData: FormData) {
@@ -111,7 +134,7 @@ export async function createProductAction(formData: FormData) {
 
 export async function updateProductListSettingsAction(formData: FormData) {
   const session = await requireProductManagerSession();
-  if (!isDatabaseConfigured()) redirect("/admin/products?error=database");
+  if (!isDatabaseConfigured()) redirect(feedbackPath(formData, "error", "database"));
 
   const parsed = quickSettingsSchema.safeParse({
     slug: formData.get("slug"),
@@ -119,7 +142,7 @@ export async function updateProductListSettingsAction(formData: FormData) {
     featured: formData.get("featured"),
     sortOrder: formData.get("sortOrder") || 0,
   });
-  if (!parsed.success) redirect("/admin/products?error=quick");
+  if (!parsed.success) redirect(feedbackPath(formData, "error", "quick"));
 
   try {
     const product = await updateProductListSettings({
@@ -140,37 +163,79 @@ export async function updateProductListSettingsAction(formData: FormData) {
     revalidateProductAdminPaths(product.slug);
   } catch (error) {
     console.error("Update product quick settings failed", error instanceof Error ? error.message : error);
-    redirect("/admin/products?error=quick");
+    redirect(feedbackPath(formData, "error", "quick"));
   }
 
-  redirect("/admin/products?saved=quick");
+  redirect(feedbackPath(formData, "saved", "quick"));
+}
+
+export async function assignProductCategoryAction(formData: FormData) {
+  const session = await requireProductManagerSession();
+  if (!isDatabaseConfigured()) redirect(feedbackPath(formData, "error", "database"));
+
+  const parsed = quickCategorySchema.safeParse({
+    slug: formData.get("slug"),
+    categoryId: formData.get("categoryId"),
+  });
+  if (!parsed.success) redirect(feedbackPath(formData, "error", "category"));
+
+  try {
+    const result = await assignProductsToCategory([parsed.data.slug], parsed.data.categoryId);
+    await safeWriteAuditLog({
+      actorEmail: session.email,
+      action: "product.category_assigned",
+      entityType: "Product",
+      entityId: parsed.data.slug,
+      metadata: result,
+    });
+    revalidateProductAdminPaths(parsed.data.slug);
+  } catch (error) {
+    console.error("Assign product category failed", error instanceof Error ? error.message : error);
+    redirect(feedbackPath(formData, "error", "category"));
+  }
+
+  redirect(feedbackPath(formData, "saved", "category"));
 }
 
 export async function batchUpdateProductsAction(formData: FormData) {
   const session = await requireProductManagerSession();
-  if (!isDatabaseConfigured()) redirect("/admin/products?error=database");
+  if (!isDatabaseConfigured()) redirect(feedbackPath(formData, "error", "database"));
 
   const parsed = batchSchema.safeParse({
     slugs: formData.getAll("slugs"),
     operation: formData.get("operation"),
+    categoryId: formData.get("categoryId") || undefined,
   });
-  if (!parsed.success) redirect("/admin/products?error=batch");
+  if (!parsed.success) redirect(feedbackPath(formData, "error", "batch"));
 
   try {
-    const result = await batchUpdateProducts(parsed.data.slugs, parsed.data.operation);
+    let result: { count: number };
+    if (parsed.data.operation === "ASSIGN_CATEGORY") {
+      if (!parsed.data.categoryId) throw new Error("Category is required for batch assignment.");
+      result = await assignProductsToCategory(parsed.data.slugs, parsed.data.categoryId);
+    } else if (parsed.data.operation === "FILL_SEO") {
+      result = await fillMissingProductSeo(parsed.data.slugs);
+    } else {
+      result = await batchUpdateProducts(parsed.data.slugs, parsed.data.operation);
+    }
     await safeWriteAuditLog({
       actorEmail: session.email,
       action: "product.batch_updated",
       entityType: "Product",
       entityId: parsed.data.slugs.join(","),
-      metadata: { operation: parsed.data.operation, requested: parsed.data.slugs.length, updated: result.count },
+      metadata: {
+        operation: parsed.data.operation,
+        categoryId: parsed.data.categoryId,
+        requested: parsed.data.slugs.length,
+        updated: result.count,
+      },
     });
 
-    for (const slug of parsed.data.slugs) revalidateProductAdminPaths(slug);
+    revalidateProductAdminPaths(parsed.data.slugs);
   } catch (error) {
     console.error("Batch update products failed", error instanceof Error ? error.message : error);
-    redirect("/admin/products?error=batch");
+    redirect(feedbackPath(formData, "error", "batch"));
   }
 
-  redirect("/admin/products?saved=batch");
+  redirect(feedbackPath(formData, "saved", "batch"));
 }

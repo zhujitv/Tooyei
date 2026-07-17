@@ -17,6 +17,7 @@ export type AdminProductSummary = {
   sku: string;
   category: string;
   categoryId: string | null;
+  isClassified: boolean;
   kind: ProductKind;
   status: ContentStatus;
   featured: boolean;
@@ -26,6 +27,7 @@ export type AdminProductSummary = {
   thumbnailAlt: string;
   updatedAt: Date | null;
   translationStates: Record<ContentLocale, TranslationStatus>;
+  seoStates: Record<ContentLocale, boolean>;
   publishedTranslations: number;
   missingTranslations: number;
   seoReadyTranslations: number;
@@ -48,7 +50,10 @@ export type AdminProductTranslation = {
   status: TranslationStatus;
 };
 
+export type AdminStructuredTranslationMap<T> = Record<ContentLocale, T>;
+
 export type AdminProductMediaItem = {
+  id: string;
   role: ProductMediaRole;
   kind: MediaKind;
   url: string;
@@ -56,41 +61,50 @@ export type AdminProductMediaItem = {
   caption: string;
   sortOrder: number;
   visible: boolean;
+  translations?: AdminStructuredTranslationMap<{ alt: string; caption: string }>;
 };
 
 export type AdminProductFeatureItem = {
+  id: string;
   title: string;
   description: string;
   icon: string;
   sortOrder: number;
   visible: boolean;
+  translations?: AdminStructuredTranslationMap<{ title: string; description: string }>;
 };
 
 export type AdminProductSpecificationItem = {
+  id: string;
   group: string;
   label: string;
   value: string;
   unit: string;
   sortOrder: number;
   visible: boolean;
+  translations?: AdminStructuredTranslationMap<{ group: string; label: string; displayValue: string }>;
 };
 
 export type AdminProductApplicationItem = {
+  id: string;
   title: string;
   description: string;
   imageUrl: string;
   imageAlt: string;
   sortOrder: number;
   visible: boolean;
+  translations?: AdminStructuredTranslationMap<{ title: string; description: string; imageAlt: string }>;
 };
 
 export type AdminProductDownloadItem = {
+  id: string;
   kind: ProductDownloadKind;
   title: string;
   description: string;
   url: string;
   sortOrder: number;
   visible: boolean;
+  translations?: AdminStructuredTranslationMap<{ title: string; description: string }>;
 };
 
 export type AdminEditableProduct = {
@@ -126,6 +140,20 @@ export type AdminProductFilters = {
   q?: string;
   status?: ContentStatus;
   kind?: ProductKind;
+  classification?: "CLASSIFIED" | "UNCLASSIFIED";
+  locale?: ContentLocale;
+  translationState?: "MISSING" | "NOT_PUBLISHED";
+  seoState?: "READY" | "MISSING";
+  page?: number;
+  pageSize?: number;
+};
+
+export type AdminProductPage = {
+  items: AdminProductSummary[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
 };
 
 export type AdminProductStats = {
@@ -136,6 +164,8 @@ export type AdminProductStats = {
   featured: number;
   needsReview: number;
   missing: number;
+  missingSeo: number;
+  unclassified: number;
 };
 
 export type CreateProductInput = {
@@ -159,7 +189,14 @@ export type UpdateProductListSettingsInput = {
   sortOrder: number;
 };
 
-export type BatchProductOperation = "PUBLISH" | "DRAFT" | "ARCHIVE" | "FEATURE" | "UNFEATURE";
+export type BatchProductOperation =
+  | "PUBLISH"
+  | "DRAFT"
+  | "ARCHIVE"
+  | "FEATURE"
+  | "UNFEATURE"
+  | "ASSIGN_CATEGORY"
+  | "FILL_SEO";
 
 export type UpdateProductCoreInput = {
   slug: string;
@@ -190,6 +227,16 @@ export type UpdateProductStructuredContentInput = {
   downloads: AdminProductDownloadItem[];
 };
 
+export type UpdateProductStructuredTranslationsInput = {
+  slug: string;
+  locale: ContentLocale;
+  media: Array<{ id: string; alt: string; caption: string }>;
+  features: Array<{ id: string; title: string; description: string }>;
+  specifications: Array<{ id: string; group: string; label: string; displayValue: string }>;
+  applications: Array<{ id: string; title: string; description: string; imageAlt: string }>;
+  downloads: Array<{ id: string; title: string; description: string }>;
+};
+
 export type AttachUploadedProductAssetInput = {
   slug: string;
   pathname: string;
@@ -216,6 +263,18 @@ const localeMap: Record<ContentLocale, DatabaseLocale> = {
   zh: DatabaseLocale.ZH,
 };
 
+const structuredTranslationMap = <T extends { locale: DatabaseLocale }, R>(
+  translations: T[],
+  read: (translation: T) => R,
+  empty: () => R,
+): AdminStructuredTranslationMap<R> =>
+  Object.fromEntries(
+    contentLocales.map((locale) => {
+      const translation = translations.find(({ locale: value }) => value === localeMap[locale]);
+      return [locale, translation ? read(translation) : empty()];
+    }),
+  ) as AdminStructuredTranslationMap<R>;
+
 const sampleDate = new Date(0);
 
 const mediaMimeType = (url: string, kind: MediaKind) => {
@@ -232,6 +291,17 @@ const mediaMimeType = (url: string, kind: MediaKind) => {
 };
 
 const normalizePathname = (url: string) => url.trim();
+
+const truncateSeoText = (value: string, maxLength: number) => {
+  const characters = Array.from(value.trim());
+  return characters.length <= maxLength ? characters.join("") : `${characters.slice(0, maxLength - 1).join("")}…`;
+};
+
+const seoTitleFor = (seoTitle: string | null | undefined, title: string) =>
+  truncateSeoText(seoTitle?.trim() || title, 70);
+
+const seoDescriptionFor = (seoDescription: string | null | undefined, summary: string) =>
+  truncateSeoText(seoDescription?.trim() || summary, 180);
 
 const isAllowedAssetUrl = (url: string) => {
   const value = url.trim();
@@ -272,6 +342,7 @@ const sampleEditableProduct = (slug: string): AdminEditableProduct | undefined =
     })),
     media: [
       {
+        id: "sample-primary",
         role: ProductMediaRole.PRIMARY,
         kind: MediaKind.IMAGE,
         url: product.image,
@@ -279,22 +350,40 @@ const sampleEditableProduct = (slug: string): AdminEditableProduct | undefined =
         caption: "",
         sortOrder: 0,
         visible: true,
+        translations: Object.fromEntries(
+          contentLocales.map((locale) => [locale, { alt: readLocalizedText(product.title, locale), caption: "" }]),
+        ) as AdminProductMediaItem["translations"],
       },
     ],
     features: product.features.map((feature, sortOrder) => ({
+      id: `sample-feature-${sortOrder}`,
       title: feature.zh,
       description: feature.description?.zh ?? "",
       icon: feature.icon ?? "",
       sortOrder,
       visible: true,
+      translations: Object.fromEntries(
+        contentLocales.map((locale) => [locale, {
+          title: readLocalizedText(feature, locale),
+          description: feature.description ? readLocalizedText(feature.description, locale) : "",
+        }]),
+      ) as AdminProductFeatureItem["translations"],
     })),
     specifications: product.specifications.map((specification, sortOrder) => ({
+      id: `sample-specification-${sortOrder}`,
       group: specification.group ?? "",
       label: specification.label.zh,
       value: specification.value,
       unit: specification.unit ?? "",
       sortOrder,
       visible: true,
+      translations: Object.fromEntries(
+        contentLocales.map((locale) => [locale, {
+          group: specification.group ?? "",
+          label: readLocalizedText(specification.label, locale),
+          displayValue: specification.value,
+        }]),
+      ) as AdminProductSpecificationItem["translations"],
     })),
     applications: [],
     downloads: [],
@@ -307,6 +396,7 @@ const sampleSummaries = (): AdminProductSummary[] =>
     sku: product.sku,
     category: product.category,
     categoryId: null,
+    isClassified: true,
     kind: ProductKind[product.category as keyof typeof ProductKind] ?? ProductKind.SPC,
     status: ContentStatus.PUBLISHED,
     featured: true,
@@ -318,6 +408,7 @@ const sampleSummaries = (): AdminProductSummary[] =>
     translationStates: Object.fromEntries(
       contentLocales.map((locale) => [locale, product.title[locale] ? TranslationStatus.PUBLISHED : TranslationStatus.MISSING]),
     ) as Record<ContentLocale, TranslationStatus>,
+    seoStates: Object.fromEntries(contentLocales.map((locale) => [locale, Boolean(product.title[locale])])) as Record<ContentLocale, boolean>,
     publishedTranslations: contentLocales.filter((locale) => Boolean(product.title[locale])).length,
     missingTranslations: contentLocales.filter((locale) => !product.title[locale]).length,
     seoReadyTranslations: contentLocales.filter((locale) => Boolean(product.title[locale])).length,
@@ -341,16 +432,34 @@ const categoryLabel = (category?: {
   category?.kind ??
   "—";
 
-const listProductInclude = {
+const listProductSelect = {
+  slug: true,
+  sku: true,
+  kind: true,
+  status: true,
+  featured: true,
+  sortOrder: true,
+  updatedAt: true,
+  categoryId: true,
   category: {
-    include: {
+    select: {
+      kind: true,
+      slug: true,
       translations: {
         where: { locale: DatabaseLocale.ZH },
         select: { name: true, locale: true },
       },
     },
   },
-  translations: true,
+  translations: {
+    select: {
+      locale: true,
+      status: true,
+      title: true,
+      seoTitle: true,
+      seoDescription: true,
+    },
+  },
   primaryImage: {
     select: { url: true, alt: true },
   },
@@ -361,12 +470,21 @@ const listProductInclude = {
       specifications: true,
       applications: true,
       downloads: true,
+      categoryAssignments: true,
     },
   },
-} satisfies Prisma.ProductInclude;
+} satisfies Prisma.ProductSelect;
 
 const editProductInclude = {
-  ...listProductInclude,
+  category: {
+    include: {
+      translations: {
+        where: { locale: DatabaseLocale.ZH },
+        select: { name: true, locale: true },
+      },
+    },
+  },
+  translations: true,
   primaryImage: true,
   categoryAssignments: {
     orderBy: { sortOrder: "asc" as const },
@@ -374,7 +492,7 @@ const editProductInclude = {
   },
   media: {
     orderBy: [{ role: "asc" as const }, { sortOrder: "asc" as const }],
-    include: { asset: true },
+    include: { asset: true, translations: true },
   },
   features: {
     orderBy: { sortOrder: "asc" as const },
@@ -394,14 +512,14 @@ const editProductInclude = {
   },
 } satisfies Prisma.ProductInclude;
 
-type AdminProductRecord = Prisma.ProductGetPayload<{ include: typeof listProductInclude }>;
+type AdminProductRecord = Prisma.ProductGetPayload<{ select: typeof listProductSelect }>;
 type AdminEditableProductRecord = Prisma.ProductGetPayload<{ include: typeof editProductInclude }>;
 
 const translationFor = (product: AdminProductRecord, locale: ContentLocale) =>
   product.translations.find((translation) => translation.locale === localeMap[locale]);
 
 const zhTranslation = <T extends { locale: DatabaseLocale }>(translations: T[]) =>
-  translations.find((translation) => translation.locale === DatabaseLocale.ZH) ?? translations[0];
+  translations.find((translation) => translation.locale === DatabaseLocale.ZH);
 
 const toSummary = (product: AdminProductRecord): AdminProductSummary => {
   const states = Object.fromEntries(
@@ -411,6 +529,12 @@ const toSummary = (product: AdminProductRecord): AdminProductSummary => {
     const translation = translationFor(product, locale);
     return Boolean(translation?.seoTitle?.trim() && translation.seoDescription?.trim());
   }).length;
+  const seoStates = Object.fromEntries(
+    contentLocales.map((locale) => {
+      const translation = translationFor(product, locale);
+      return [locale, Boolean(translation?.seoTitle?.trim() && translation.seoDescription?.trim())];
+    }),
+  ) as Record<ContentLocale, boolean>;
   const contentCounts = {
     media: product._count.media,
     features: product._count.features,
@@ -436,6 +560,7 @@ const toSummary = (product: AdminProductRecord): AdminProductSummary => {
     sku: product.sku,
     category: categoryLabel(product.category),
     categoryId: product.categoryId,
+    isClassified: product._count.categoryAssignments > 0,
     kind: product.kind,
     status: product.status,
     featured: product.featured,
@@ -445,6 +570,7 @@ const toSummary = (product: AdminProductRecord): AdminProductSummary => {
     thumbnailUrl: product.primaryImage?.url ?? "",
     thumbnailAlt: product.primaryImage?.alt ?? translationFor(product, "zh")?.title ?? product.sku,
     translationStates: states,
+    seoStates,
     publishedTranslations,
     missingTranslations: contentLocales.filter((locale) => states[locale] === TranslationStatus.MISSING).length,
     seoReadyTranslations,
@@ -454,19 +580,29 @@ const toSummary = (product: AdminProductRecord): AdminProductSummary => {
 };
 
 const toEditableProduct = (product: AdminEditableProductRecord): AdminEditableProduct => {
-  const media = product.media.map(({ asset, role, alt, caption, sortOrder, visible }) => ({
-    role,
-    kind: asset.kind,
-    url: asset.url,
-    alt: alt ?? asset.alt ?? "",
-    caption: caption ?? "",
-    sortOrder,
-    visible,
-  }));
+  const media = product.media.map(({ asset, role, alt, caption, sortOrder, translations, visible }) => {
+    const translation = zhTranslation(translations);
+    return {
+      id: asset.id,
+      role,
+      kind: asset.kind,
+      url: asset.url,
+      alt: translation?.alt ?? alt ?? asset.alt ?? "",
+      caption: translation?.caption ?? caption ?? "",
+      sortOrder,
+      visible,
+      translations: structuredTranslationMap(
+        translations,
+        (item) => ({ alt: item.alt, caption: item.caption ?? "" }),
+        () => ({ alt: "", caption: "" }),
+      ),
+    };
+  });
   const hasPrimary = product.primaryImage && media.some((item) => item.url === product.primaryImage?.url);
 
   if (product.primaryImage && !hasPrimary) {
     media.unshift({
+      id: product.primaryImage.id,
       role: ProductMediaRole.PRIMARY,
       kind: product.primaryImage.kind,
       url: product.primaryImage.url,
@@ -474,6 +610,7 @@ const toEditableProduct = (product: AdminEditableProductRecord): AdminEditablePr
       caption: "",
       sortOrder: 0,
       visible: true,
+      translations: structuredTranslationMap([], () => ({ alt: "", caption: "" }), () => ({ alt: "", caption: "" })),
     });
   }
 
@@ -500,47 +637,71 @@ const toEditableProduct = (product: AdminEditableProductRecord): AdminEditablePr
       };
     }),
     media,
-    features: product.features.map(({ icon, sortOrder, translations, visible }) => {
+    features: product.features.map(({ id, icon, sortOrder, translations, visible }) => {
       const translation = zhTranslation(translations);
       return {
+        id,
         title: translation?.value ?? "",
         description: translation?.description ?? "",
         icon: icon ?? "",
         sortOrder,
         visible,
+        translations: structuredTranslationMap(
+          translations,
+          (item) => ({ title: item.value, description: item.description ?? "" }),
+          () => ({ title: "", description: "" }),
+        ),
       };
     }),
-    specifications: product.specifications.map(({ group, sortOrder, translations, unit, value, visible }) => {
+    specifications: product.specifications.map(({ id, group, sortOrder, translations, unit, value, visible }) => {
       const translation = zhTranslation(translations);
       return {
-        group: group ?? "",
+        id,
+        group: translation?.group ?? group ?? "",
         label: translation?.label ?? "",
-        value,
+        value: translation?.displayValue ?? value,
         unit: unit ?? "",
         sortOrder,
         visible,
+        translations: structuredTranslationMap(
+          translations,
+          (item) => ({ group: item.group ?? "", label: item.label, displayValue: item.displayValue ?? "" }),
+          () => ({ group: "", label: "", displayValue: "" }),
+        ),
       };
     }),
-    applications: product.applications.map(({ imageAsset, sortOrder, translations, visible }) => {
+    applications: product.applications.map(({ id, imageAsset, sortOrder, translations, visible }) => {
       const translation = zhTranslation(translations);
       return {
+        id,
         title: translation?.title ?? "",
         description: translation?.description ?? "",
         imageUrl: imageAsset?.url ?? "",
-        imageAlt: imageAsset?.alt ?? "",
+        imageAlt: translation?.imageAlt ?? imageAsset?.alt ?? "",
         sortOrder,
         visible,
+        translations: structuredTranslationMap(
+          translations,
+          (item) => ({ title: item.title, description: item.description ?? "", imageAlt: item.imageAlt ?? "" }),
+          () => ({ title: "", description: "", imageAlt: "" }),
+        ),
       };
     }),
-    downloads: product.downloads.map(({ asset, kind, sortOrder, translations, visible }) => {
+    downloads: product.downloads.map(({ id, asset, kind, sortOrder, translations, visible }) => {
       const translation = zhTranslation(translations);
       return {
+        id,
         kind,
         title: translation?.title ?? "",
         description: translation?.description ?? "",
         url: asset.url,
         sortOrder,
         visible,
+        translations: structuredTranslationMap(
+          translations,
+          (item) => ({ title: item.title, description: item.description ?? "" }),
+          () => ({ title: "", description: "" }),
+        ),
       };
     }),
   };
@@ -554,9 +715,40 @@ const searchCondition = (query: string): Prisma.ProductWhereInput => {
       { sku: contains },
       { translations: { some: { OR: [{ title: contains }, { summary: contains }, { seoTitle: contains }, { seoDescription: contains }] } } },
       { category: { is: { OR: [{ slug: contains }, { translations: { some: { name: contains } } }] } } },
+      { categoryAssignments: { some: { category: { is: { OR: [{ slug: contains }, { translations: { some: { name: contains } } }] } } } } },
     ],
   };
 };
+
+const translationLocalesFor = (locale?: ContentLocale) => (locale ? [locale] : contentLocales);
+
+const hasUsableTranslation = (locale: ContentLocale, publishedOnly: boolean): Prisma.ProductWhereInput => ({
+  translations: {
+    some: {
+      locale: localeMap[locale],
+      status: publishedOnly ? TranslationStatus.PUBLISHED : { not: TranslationStatus.MISSING },
+    },
+  },
+});
+
+const hasSeoTranslation = (locale: ContentLocale): Prisma.ProductWhereInput => ({
+  translations: {
+    some: {
+      locale: localeMap[locale],
+      seoTitle: { not: null },
+      seoDescription: { not: null },
+      NOT: [{ seoTitle: "" }, { seoDescription: "" }],
+    },
+  },
+});
+
+const missingTranslationWhere = (locale?: ContentLocale, publishedOnly = false): Prisma.ProductWhereInput => ({
+  OR: translationLocalesFor(locale).map((item) => ({ NOT: hasUsableTranslation(item, publishedOnly) })),
+});
+
+const missingSeoWhere = (locale?: ContentLocale): Prisma.ProductWhereInput => ({
+  OR: translationLocalesFor(locale).map((item) => ({ NOT: hasSeoTranslation(item) })),
+});
 
 const buildWhere = (filters: AdminProductFilters = {}): Prisma.ProductWhereInput => {
   const clauses: Prisma.ProductWhereInput[] = [];
@@ -564,6 +756,15 @@ const buildWhere = (filters: AdminProductFilters = {}): Prisma.ProductWhereInput
 
   if (filters.status) clauses.push({ status: filters.status });
   if (filters.kind) clauses.push({ kind: filters.kind });
+  if (filters.classification === "CLASSIFIED") clauses.push({ categoryAssignments: { some: {} } });
+  if (filters.classification === "UNCLASSIFIED") clauses.push({ categoryAssignments: { none: {} } });
+  if (filters.translationState) {
+    clauses.push(missingTranslationWhere(filters.locale, filters.translationState === "NOT_PUBLISHED"));
+  }
+  if (filters.seoState === "MISSING") clauses.push(missingSeoWhere(filters.locale));
+  if (filters.seoState === "READY") {
+    clauses.push({ AND: translationLocalesFor(filters.locale).map((locale) => hasSeoTranslation(locale)) });
+  }
   if (query) clauses.push(searchCondition(query));
 
   return clauses.length ? { AND: clauses } : {};
@@ -574,6 +775,19 @@ const applySampleFilters = (products: AdminProductSummary[], filters: AdminProdu
   return products.filter((product) => {
     if (filters.status && product.status !== filters.status) return false;
     if (filters.kind && product.kind !== filters.kind) return false;
+    if (filters.classification === "CLASSIFIED" && !product.isClassified) return false;
+    if (filters.classification === "UNCLASSIFIED" && product.isClassified) return false;
+    const localesToCheck = translationLocalesFor(filters.locale);
+    if (
+      filters.translationState === "MISSING" &&
+      !localesToCheck.some((locale) => product.translationStates[locale] === TranslationStatus.MISSING)
+    ) return false;
+    if (
+      filters.translationState === "NOT_PUBLISHED" &&
+      !localesToCheck.some((locale) => product.translationStates[locale] !== TranslationStatus.PUBLISHED)
+    ) return false;
+    if (filters.seoState === "MISSING" && product.seoReadyTranslations === contentLocales.length) return false;
+    if (filters.seoState === "READY" && product.seoReadyTranslations !== contentLocales.length) return false;
     if (!query) return true;
     return [product.title, product.sku, product.slug, product.category]
       .filter(Boolean)
@@ -593,6 +807,8 @@ const statsFromProducts = (products: AdminProductSummary[]): AdminProductStats =
   missing: products.filter((product) =>
     contentLocales.some((locale) => product.translationStates[locale] === TranslationStatus.MISSING),
   ).length,
+  missingSeo: products.filter((product) => product.seoReadyTranslations < contentLocales.length).length,
+  unclassified: products.filter((product) => !product.isClassified).length,
 });
 
 const uniqueByUrl = <T extends { url: string }>(items: T[]) => {
@@ -628,19 +844,45 @@ const upsertAsset = async (
   });
 };
 
-export async function getAdminProducts(filters: AdminProductFilters = {}): Promise<AdminProductSummary[]> {
+export async function getAdminProducts(filters: AdminProductFilters = {}): Promise<AdminProductPage> {
+  const requestedPage = Math.max(1, Math.trunc(filters.page ?? 1));
+  const pageSize = Math.min(48, Math.max(12, Math.trunc(filters.pageSize ?? 24)));
+
   if (!isDatabaseConfigured()) {
-    return applySampleFilters(sampleSummaries(), filters);
+    const filtered = applySampleFilters(sampleSummaries(), filters);
+    const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+    const page = Math.min(requestedPage, totalPages);
+    return {
+      items: filtered.slice((page - 1) * pageSize, page * pageSize),
+      total: filtered.length,
+      page,
+      pageSize,
+      totalPages,
+    };
   }
 
-  const records = await getPrisma().product.findMany({
-    where: buildWhere(filters),
-    include: listProductInclude,
-    orderBy: [{ sortOrder: "asc" }, { updatedAt: "desc" }],
-    take: 200,
-  });
+  const prisma = getPrisma();
+  const where = buildWhere(filters);
+  const [records, total] = await Promise.all([
+    prisma.product.findMany({
+      where,
+      select: listProductSelect,
+      orderBy: [{ sortOrder: "asc" }, { updatedAt: "desc" }],
+      skip: (requestedPage - 1) * pageSize,
+      take: pageSize,
+    }),
+    prisma.product.count({ where }),
+  ]);
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  if (requestedPage > totalPages) return getAdminProducts({ ...filters, page: totalPages, pageSize });
 
-  return records.map(toSummary);
+  return {
+    items: records.map(toSummary),
+    total,
+    page: requestedPage,
+    pageSize,
+    totalPages,
+  };
 }
 
 export async function getAdminProduct(slug: string): Promise<AdminEditableProduct | undefined> {
@@ -658,8 +900,63 @@ export async function getAdminProduct(slug: string): Promise<AdminEditableProduc
 export async function getAdminProductStats(): Promise<AdminProductStats> {
   if (!isDatabaseConfigured()) return statsFromProducts(sampleSummaries());
 
-  const products = await getAdminProducts();
-  return statsFromProducts(products);
+  const [stats] = await getPrisma().$queryRaw<Array<{
+    total: number;
+    published: number;
+    draft: number;
+    archived: number;
+    featured: number;
+    needs_review: number;
+    missing: number;
+    missing_seo: number;
+    unclassified: number;
+  }>>(Prisma.sql`
+    SELECT
+      COUNT(*)::int AS total,
+      COUNT(*) FILTER (WHERE product."status" = 'PUBLISHED')::int AS published,
+      COUNT(*) FILTER (WHERE product."status" = 'DRAFT')::int AS draft,
+      COUNT(*) FILTER (WHERE product."status" = 'ARCHIVED')::int AS archived,
+      COUNT(*) FILTER (WHERE product."featured")::int AS featured,
+      COUNT(*) FILTER (WHERE EXISTS (
+        SELECT 1 FROM "ProductTranslation" translation
+        WHERE translation."productId" = product."id" AND translation."status" = 'NEEDS_REVIEW'
+      ))::int AS needs_review,
+      COUNT(*) FILTER (WHERE EXISTS (
+        SELECT 1 FROM unnest(ARRAY['EN','DE','FR','ES','RU','JA','IT','AR','ZH']::text[]) AS required(locale)
+        WHERE NOT EXISTS (
+          SELECT 1 FROM "ProductTranslation" translation
+          WHERE translation."productId" = product."id"
+            AND translation."locale"::text = required.locale
+            AND translation."status" <> 'MISSING'
+        )
+      ))::int AS missing,
+      COUNT(*) FILTER (WHERE EXISTS (
+        SELECT 1 FROM unnest(ARRAY['EN','DE','FR','ES','RU','JA','IT','AR','ZH']::text[]) AS required(locale)
+        WHERE NOT EXISTS (
+          SELECT 1 FROM "ProductTranslation" translation
+          WHERE translation."productId" = product."id"
+            AND translation."locale"::text = required.locale
+            AND BTRIM(COALESCE(translation."seoTitle", '')) <> ''
+            AND BTRIM(COALESCE(translation."seoDescription", '')) <> ''
+        )
+      ))::int AS missing_seo,
+      COUNT(*) FILTER (WHERE NOT EXISTS (
+        SELECT 1 FROM "ProductCategory" assignment WHERE assignment."productId" = product."id"
+      ))::int AS unclassified
+    FROM "Product" product
+  `);
+
+  return {
+    total: stats?.total ?? 0,
+    published: stats?.published ?? 0,
+    draft: stats?.draft ?? 0,
+    archived: stats?.archived ?? 0,
+    featured: stats?.featured ?? 0,
+    needsReview: stats?.needs_review ?? 0,
+    missing: stats?.missing ?? 0,
+    missingSeo: stats?.missing_seo ?? 0,
+    unclassified: stats?.unclassified ?? 0,
+  };
 }
 
 export async function getAdminProductCategoryOptions(): Promise<AdminProductCategoryOption[]> {
@@ -743,8 +1040,8 @@ export async function createProduct(input: CreateProductInput) {
           locale: DatabaseLocale.ZH,
           title: input.title,
           summary: input.summary,
-          seoTitle: input.seoTitle || null,
-          seoDescription: input.seoDescription || null,
+          seoTitle: seoTitleFor(input.seoTitle, input.title),
+          seoDescription: seoDescriptionFor(input.seoDescription, input.summary),
           status: input.status === ContentStatus.PUBLISHED ? TranslationStatus.PUBLISHED : TranslationStatus.NEEDS_REVIEW,
           publishedAt: input.status === ContentStatus.PUBLISHED ? new Date() : null,
         },
@@ -790,6 +1087,10 @@ export async function batchUpdateProducts(slugs: string[], operation: BatchProdu
     throw new Error("DATABASE_URL is required before products can be updated.");
   }
 
+  if (operation === "ASSIGN_CATEGORY" || operation === "FILL_SEO") {
+    throw new Error("This batch operation requires its dedicated handler.");
+  }
+
   const data: Prisma.ProductUpdateManyMutationInput =
     operation === "PUBLISH"
       ? { status: ContentStatus.PUBLISHED }
@@ -805,6 +1106,66 @@ export async function batchUpdateProducts(slugs: string[], operation: BatchProdu
     where: { slug: { in: slugs } },
     data,
   });
+}
+
+export async function assignProductsToCategory(slugs: string[], categoryId: string) {
+  if (!isDatabaseConfigured()) {
+    throw new Error("DATABASE_URL is required before products can be categorized.");
+  }
+
+  const prisma = getPrisma();
+  const category = await prisma.category.findFirst({
+    where: { id: categoryId, status: { not: ContentStatus.ARCHIVED } },
+    select: { id: true, kind: true },
+  });
+  if (!category) throw new Error("Product category does not exist or has been archived.");
+
+  return prisma.$transaction(async (tx) => {
+    const products = await tx.product.findMany({
+      where: { slug: { in: slugs } },
+      select: { id: true },
+    });
+    if (products.length !== new Set(slugs).size) throw new Error("One or more products do not exist.");
+
+    const updated = await tx.product.updateMany({
+      where: { id: { in: products.map(({ id }) => id) } },
+      data: { categoryId: category.id, kind: category.kind },
+    });
+    await tx.productCategory.createMany({
+      data: products.map(({ id: productId }) => ({ productId, categoryId: category.id, sortOrder: 0 })),
+      skipDuplicates: true,
+    });
+
+    return { count: updated.count, categoryId: category.id };
+  });
+}
+
+export async function fillMissingProductSeo(slugs: string[]) {
+  if (!isDatabaseConfigured()) {
+    throw new Error("DATABASE_URL is required before product SEO can be updated.");
+  }
+
+  const prisma = getPrisma();
+  const translations = await prisma.productTranslation.findMany({
+    where: {
+      product: { is: { slug: { in: slugs } } },
+      OR: [{ seoTitle: null }, { seoTitle: "" }, { seoDescription: null }, { seoDescription: "" }],
+    },
+    select: { id: true, title: true, summary: true, seoTitle: true, seoDescription: true },
+  });
+
+  if (!translations.length) return { count: 0 };
+  const updates = translations.map((translation) =>
+    prisma.productTranslation.update({
+      where: { id: translation.id },
+      data: {
+        seoTitle: seoTitleFor(translation.seoTitle, translation.title),
+        seoDescription: seoDescriptionFor(translation.seoDescription, translation.summary),
+      },
+    }),
+  );
+  await prisma.$transaction(updates);
+  return { count: updates.length };
 }
 
 export async function updateProductCore(input: UpdateProductCoreInput) {
@@ -860,8 +1221,8 @@ export async function updateProductTranslation(input: UpdateProductTranslationIn
     update: {
       title: input.title,
       summary: input.summary,
-      seoTitle: input.seoTitle || null,
-      seoDescription: input.seoDescription || null,
+      seoTitle: seoTitleFor(input.seoTitle, input.title),
+      seoDescription: seoDescriptionFor(input.seoDescription, input.summary),
       status: input.status,
       publishedAt: input.status === TranslationStatus.PUBLISHED ? new Date() : null,
     },
@@ -870,8 +1231,8 @@ export async function updateProductTranslation(input: UpdateProductTranslationIn
       locale,
       title: input.title,
       summary: input.summary,
-      seoTitle: input.seoTitle || null,
-      seoDescription: input.seoDescription || null,
+      seoTitle: seoTitleFor(input.seoTitle, input.title),
+      seoDescription: seoDescriptionFor(input.seoDescription, input.summary),
       status: input.status,
       publishedAt: input.status === TranslationStatus.PUBLISHED ? new Date() : null,
     },
@@ -886,23 +1247,54 @@ export async function replaceProductStructuredContent(input: UpdateProductStruct
   return getPrisma().$transaction(async (prisma) => {
     const product = await prisma.product.findUnique({
       where: { slug: input.slug },
-      select: { id: true },
+      select: {
+        id: true,
+        media: { select: { assetId: true } },
+        features: { select: { id: true } },
+        specifications: { select: { id: true } },
+        applications: { select: { id: true } },
+        downloads: { select: { id: true } },
+      },
     });
     if (!product) throw new Error("Product does not exist.");
 
-    await prisma.productMedia.deleteMany({ where: { productId: product.id } });
-    await prisma.productFeature.deleteMany({ where: { productId: product.id } });
-    await prisma.productSpecification.deleteMany({ where: { productId: product.id } });
-    await prisma.productApplication.deleteMany({ where: { productId: product.id } });
-    await prisma.productDownload.deleteMany({ where: { productId: product.id } });
+    const mediaIds = new Set(product.media.map(({ assetId }) => assetId));
+    const featureIds = new Set(product.features.map(({ id }) => id));
+    const specificationIds = new Set(product.specifications.map(({ id }) => id));
+    const applicationIds = new Set(product.applications.map(({ id }) => id));
+    const downloadIds = new Set(product.downloads.map(({ id }) => id));
+
+    const assertOwnedId = (id: string, owned: Set<string>, label: string) => {
+      if (id && !owned.has(id)) throw new Error(`${label} does not belong to this product.`);
+    };
+
+    input.media.forEach((item) => assertOwnedId(item.id, mediaIds, "Media"));
+    input.features.forEach((item) => assertOwnedId(item.id, featureIds, "Feature"));
+    input.specifications.forEach((item) => assertOwnedId(item.id, specificationIds, "Specification"));
+    input.applications.forEach((item) => assertOwnedId(item.id, applicationIds, "Application"));
+    input.downloads.forEach((item) => assertOwnedId(item.id, downloadIds, "Download"));
 
     let primaryImageId: string | null = null;
+    const keptMediaIds: string[] = [];
+    const keptFeatureIds: string[] = [];
+    const keptSpecificationIds: string[] = [];
+    const keptApplicationIds: string[] = [];
+    const keptDownloadIds: string[] = [];
 
     for (const item of uniqueByUrl(input.media).sort((a, b) => a.sortOrder - b.sortOrder)) {
       const kind = mediaKindForRole(item.role);
       const asset = await upsertAsset(prisma, { url: item.url, kind, alt: item.alt });
-      await prisma.productMedia.create({
-        data: {
+      keptMediaIds.push(asset.id);
+      await prisma.productMedia.upsert({
+        where: { productId_assetId: { productId: product.id, assetId: asset.id } },
+        update: {
+          role: item.role,
+          alt: item.alt || null,
+          caption: item.caption || null,
+          sortOrder: item.sortOrder,
+          visible: item.visible,
+        },
+        create: {
           productId: product.id,
           assetId: asset.id,
           role: item.role,
@@ -913,6 +1305,37 @@ export async function replaceProductStructuredContent(input: UpdateProductStruct
         },
       });
 
+      if (item.id && item.id !== asset.id) {
+        const previousTranslations = await prisma.productMediaTranslation.findMany({
+          where: { productId: product.id, assetId: item.id },
+        });
+        for (const translation of previousTranslations) {
+          await prisma.productMediaTranslation.upsert({
+            where: { productId_assetId_locale: { productId: product.id, assetId: asset.id, locale: translation.locale } },
+            update: { alt: translation.alt, caption: translation.caption },
+            create: {
+              productId: product.id,
+              assetId: asset.id,
+              locale: translation.locale,
+              alt: translation.alt,
+              caption: translation.caption,
+            },
+          });
+        }
+      }
+
+      await prisma.productMediaTranslation.upsert({
+        where: { productId_assetId_locale: { productId: product.id, assetId: asset.id, locale: DatabaseLocale.ZH } },
+        update: { alt: item.alt, caption: item.caption || null },
+        create: {
+          productId: product.id,
+          assetId: asset.id,
+          locale: DatabaseLocale.ZH,
+          alt: item.alt,
+          caption: item.caption || null,
+        },
+      });
+
       if (!primaryImageId && item.visible && item.role === ProductMediaRole.PRIMARY && kind === MediaKind.IMAGE) {
         primaryImageId = asset.id;
       }
@@ -920,88 +1343,105 @@ export async function replaceProductStructuredContent(input: UpdateProductStruct
         primaryImageId = asset.id;
       }
     }
+    await prisma.productMedia.deleteMany({
+      where: { productId: product.id, ...(keptMediaIds.length ? { assetId: { notIn: keptMediaIds } } : {}) },
+    });
 
     for (const item of input.features.sort((a, b) => a.sortOrder - b.sortOrder)) {
       if (!item.title.trim()) continue;
-      await prisma.productFeature.create({
-        data: {
-          productId: product.id,
-          icon: item.icon || null,
-          sortOrder: item.sortOrder,
-          visible: item.visible,
-          translations: {
-            create: {
-              locale: DatabaseLocale.ZH,
-              value: item.title,
-              description: item.description || null,
-            },
-          },
-        },
+      const feature = item.id
+        ? await prisma.productFeature.update({
+            where: { id: item.id },
+            data: { icon: item.icon || null, sortOrder: item.sortOrder, visible: item.visible },
+            select: { id: true },
+          })
+        : await prisma.productFeature.create({
+            data: { productId: product.id, icon: item.icon || null, sortOrder: item.sortOrder, visible: item.visible },
+            select: { id: true },
+          });
+      keptFeatureIds.push(feature.id);
+      await prisma.productFeatureTranslation.upsert({
+        where: { featureId_locale: { featureId: feature.id, locale: DatabaseLocale.ZH } },
+        update: { value: item.title, description: item.description || null },
+        create: { featureId: feature.id, locale: DatabaseLocale.ZH, value: item.title, description: item.description || null },
       });
     }
+    await prisma.productFeature.deleteMany({
+      where: { productId: product.id, ...(keptFeatureIds.length ? { id: { notIn: keptFeatureIds } } : {}) },
+    });
 
     for (const item of input.specifications.sort((a, b) => a.sortOrder - b.sortOrder)) {
       if (!item.label.trim() || !item.value.trim()) continue;
-      await prisma.productSpecification.create({
-        data: {
-          productId: product.id,
-          group: item.group || null,
-          value: item.value,
-          unit: item.unit || null,
-          sortOrder: item.sortOrder,
-          visible: item.visible,
-          translations: {
-            create: {
-              locale: DatabaseLocale.ZH,
-              label: item.label,
-            },
-          },
-        },
+      const specification = item.id
+        ? await prisma.productSpecification.update({
+            where: { id: item.id },
+            data: { group: item.group || null, value: item.value, unit: item.unit || null, sortOrder: item.sortOrder, visible: item.visible },
+            select: { id: true },
+          })
+        : await prisma.productSpecification.create({
+            data: { productId: product.id, group: item.group || null, value: item.value, unit: item.unit || null, sortOrder: item.sortOrder, visible: item.visible },
+            select: { id: true },
+          });
+      keptSpecificationIds.push(specification.id);
+      await prisma.productSpecificationTranslation.upsert({
+        where: { specificationId_locale: { specificationId: specification.id, locale: DatabaseLocale.ZH } },
+        update: { group: item.group || null, label: item.label, displayValue: item.value },
+        create: { specificationId: specification.id, locale: DatabaseLocale.ZH, group: item.group || null, label: item.label, displayValue: item.value },
       });
     }
+    await prisma.productSpecification.deleteMany({
+      where: { productId: product.id, ...(keptSpecificationIds.length ? { id: { notIn: keptSpecificationIds } } : {}) },
+    });
 
     for (const item of input.applications.sort((a, b) => a.sortOrder - b.sortOrder)) {
       if (!item.title.trim()) continue;
       const imageAsset = isAllowedAssetUrl(item.imageUrl)
         ? await upsertAsset(prisma, { url: item.imageUrl, kind: MediaKind.IMAGE, alt: item.imageAlt || item.title })
         : null;
-      await prisma.productApplication.create({
-        data: {
-          productId: product.id,
-          imageAssetId: imageAsset?.id ?? null,
-          sortOrder: item.sortOrder,
-          visible: item.visible,
-          translations: {
-            create: {
-              locale: DatabaseLocale.ZH,
-              title: item.title,
-              description: item.description || null,
-            },
-          },
-        },
+      const application = item.id
+        ? await prisma.productApplication.update({
+            where: { id: item.id },
+            data: { imageAssetId: imageAsset?.id ?? null, sortOrder: item.sortOrder, visible: item.visible },
+            select: { id: true },
+          })
+        : await prisma.productApplication.create({
+            data: { productId: product.id, imageAssetId: imageAsset?.id ?? null, sortOrder: item.sortOrder, visible: item.visible },
+            select: { id: true },
+          });
+      keptApplicationIds.push(application.id);
+      await prisma.productApplicationTranslation.upsert({
+        where: { applicationId_locale: { applicationId: application.id, locale: DatabaseLocale.ZH } },
+        update: { title: item.title, description: item.description || null, imageAlt: item.imageAlt || null },
+        create: { applicationId: application.id, locale: DatabaseLocale.ZH, title: item.title, description: item.description || null, imageAlt: item.imageAlt || null },
       });
     }
+    await prisma.productApplication.deleteMany({
+      where: { productId: product.id, ...(keptApplicationIds.length ? { id: { notIn: keptApplicationIds } } : {}) },
+    });
 
     for (const item of uniqueByUrl(input.downloads).sort((a, b) => a.sortOrder - b.sortOrder)) {
       if (!item.title.trim()) continue;
       const asset = await upsertAsset(prisma, { url: item.url, kind: MediaKind.DOCUMENT, alt: item.title });
-      await prisma.productDownload.create({
-        data: {
-          productId: product.id,
-          assetId: asset.id,
-          kind: item.kind,
-          sortOrder: item.sortOrder,
-          visible: item.visible,
-          translations: {
-            create: {
-              locale: DatabaseLocale.ZH,
-              title: item.title,
-              description: item.description || null,
-            },
-          },
-        },
+      const download = item.id
+        ? await prisma.productDownload.update({
+            where: { id: item.id },
+            data: { assetId: asset.id, kind: item.kind, sortOrder: item.sortOrder, visible: item.visible },
+            select: { id: true },
+          })
+        : await prisma.productDownload.create({
+            data: { productId: product.id, assetId: asset.id, kind: item.kind, sortOrder: item.sortOrder, visible: item.visible },
+            select: { id: true },
+          });
+      keptDownloadIds.push(download.id);
+      await prisma.productDownloadTranslation.upsert({
+        where: { downloadId_locale: { downloadId: download.id, locale: DatabaseLocale.ZH } },
+        update: { title: item.title, description: item.description || null },
+        create: { downloadId: download.id, locale: DatabaseLocale.ZH, title: item.title, description: item.description || null },
       });
     }
+    await prisma.productDownload.deleteMany({
+      where: { productId: product.id, ...(keptDownloadIds.length ? { id: { notIn: keptDownloadIds } } : {}) },
+    });
 
     await prisma.product.update({
       where: { id: product.id },
@@ -1010,11 +1450,115 @@ export async function replaceProductStructuredContent(input: UpdateProductStruct
 
     return {
       slug: input.slug,
-      media: input.media.length,
-      features: input.features.length,
-      specifications: input.specifications.length,
-      applications: input.applications.length,
-      downloads: input.downloads.length,
+      media: keptMediaIds.length,
+      features: keptFeatureIds.length,
+      specifications: keptSpecificationIds.length,
+      applications: keptApplicationIds.length,
+      downloads: keptDownloadIds.length,
+    };
+  });
+}
+
+export async function updateProductStructuredTranslations(input: UpdateProductStructuredTranslationsInput) {
+  if (!isDatabaseConfigured()) {
+    throw new Error("DATABASE_URL is required before structured translations can be updated.");
+  }
+
+  const locale = localeMap[input.locale];
+  return getPrisma().$transaction(async (prisma) => {
+    const product = await prisma.product.findUnique({
+      where: { slug: input.slug },
+      select: {
+        id: true,
+        media: { select: { assetId: true } },
+        features: { select: { id: true } },
+        specifications: { select: { id: true } },
+        applications: { select: { id: true } },
+        downloads: { select: { id: true } },
+      },
+    });
+    if (!product) throw new Error("Product does not exist.");
+
+    const owned = {
+      media: new Set(product.media.map(({ assetId }) => assetId)),
+      features: new Set(product.features.map(({ id }) => id)),
+      specifications: new Set(product.specifications.map(({ id }) => id)),
+      applications: new Set(product.applications.map(({ id }) => id)),
+      downloads: new Set(product.downloads.map(({ id }) => id)),
+    };
+    const assertOwned = (id: string, ids: Set<string>) => {
+      if (!ids.has(id)) throw new Error("Structured content item does not belong to this product.");
+    };
+
+    for (const item of input.media) {
+      assertOwned(item.id, owned.media);
+      if (!item.alt.trim() && !item.caption.trim()) {
+        await prisma.productMediaTranslation.deleteMany({ where: { productId: product.id, assetId: item.id, locale } });
+      } else {
+        await prisma.productMediaTranslation.upsert({
+          where: { productId_assetId_locale: { productId: product.id, assetId: item.id, locale } },
+          update: { alt: item.alt, caption: item.caption || null },
+          create: { productId: product.id, assetId: item.id, locale, alt: item.alt, caption: item.caption || null },
+        });
+      }
+    }
+
+    for (const item of input.features) {
+      assertOwned(item.id, owned.features);
+      if (!item.title.trim() && !item.description.trim()) {
+        await prisma.productFeatureTranslation.deleteMany({ where: { featureId: item.id, locale } });
+      } else {
+        await prisma.productFeatureTranslation.upsert({
+          where: { featureId_locale: { featureId: item.id, locale } },
+          update: { value: item.title, description: item.description || null },
+          create: { featureId: item.id, locale, value: item.title, description: item.description || null },
+        });
+      }
+    }
+
+    for (const item of input.specifications) {
+      assertOwned(item.id, owned.specifications);
+      if (!item.group.trim() && !item.label.trim() && !item.displayValue.trim()) {
+        await prisma.productSpecificationTranslation.deleteMany({ where: { specificationId: item.id, locale } });
+      } else {
+        await prisma.productSpecificationTranslation.upsert({
+          where: { specificationId_locale: { specificationId: item.id, locale } },
+          update: { group: item.group || null, label: item.label, displayValue: item.displayValue || null },
+          create: { specificationId: item.id, locale, group: item.group || null, label: item.label, displayValue: item.displayValue || null },
+        });
+      }
+    }
+
+    for (const item of input.applications) {
+      assertOwned(item.id, owned.applications);
+      if (!item.title.trim() && !item.description.trim() && !item.imageAlt.trim()) {
+        await prisma.productApplicationTranslation.deleteMany({ where: { applicationId: item.id, locale } });
+      } else {
+        await prisma.productApplicationTranslation.upsert({
+          where: { applicationId_locale: { applicationId: item.id, locale } },
+          update: { title: item.title, description: item.description || null, imageAlt: item.imageAlt || null },
+          create: { applicationId: item.id, locale, title: item.title, description: item.description || null, imageAlt: item.imageAlt || null },
+        });
+      }
+    }
+
+    for (const item of input.downloads) {
+      assertOwned(item.id, owned.downloads);
+      if (!item.title.trim() && !item.description.trim()) {
+        await prisma.productDownloadTranslation.deleteMany({ where: { downloadId: item.id, locale } });
+      } else {
+        await prisma.productDownloadTranslation.upsert({
+          where: { downloadId_locale: { downloadId: item.id, locale } },
+          update: { title: item.title, description: item.description || null },
+          create: { downloadId: item.id, locale, title: item.title, description: item.description || null },
+        });
+      }
+    }
+
+    return {
+      slug: input.slug,
+      locale: input.locale,
+      items: input.media.length + input.features.length + input.specifications.length + input.applications.length + input.downloads.length,
     };
   });
 }
@@ -1063,26 +1607,49 @@ export async function attachUploadedProductAsset(input: AttachUploadedProductAss
       },
     });
 
+    // The Blob completion callback and the browser finalizer can arrive together.
+    // Serialize attachment for one product/blob pair so downloads cannot be duplicated.
+    await prisma.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`${product.id}:${asset.id}`}, 0::bigint))`;
+
+    let created = false;
     if (input.kind === "download") {
-      const sortOrder = await prisma.productDownload.count({ where: { productId: product.id } });
-      await prisma.productDownload.create({
-        data: {
-          productId: product.id,
-          assetId: asset.id,
-          kind: input.downloadKind ?? ProductDownloadKind.OTHER,
-          sortOrder,
-          visible: true,
-          translations: {
-            create: {
-              locale: DatabaseLocale.ZH,
-              title: input.title?.trim() || input.pathname.split("/").pop() || "产品资料",
-            },
-          },
-        },
+      const existing = await prisma.productDownload.findFirst({
+        where: { productId: product.id, assetId: asset.id },
+        select: { id: true },
       });
+      const title = input.title?.trim() || input.pathname.split("/").pop() || "产品资料";
+
+      if (existing) {
+        await prisma.productDownload.update({
+          where: { id: existing.id },
+          data: { kind: input.downloadKind ?? ProductDownloadKind.OTHER, visible: true },
+        });
+        await prisma.productDownloadTranslation.upsert({
+          where: { downloadId_locale: { downloadId: existing.id, locale: DatabaseLocale.ZH } },
+          update: { title },
+          create: { downloadId: existing.id, locale: DatabaseLocale.ZH, title },
+        });
+      } else {
+        const sortOrder = await prisma.productDownload.count({ where: { productId: product.id } });
+        await prisma.productDownload.create({
+          data: {
+            productId: product.id,
+            assetId: asset.id,
+            kind: input.downloadKind ?? ProductDownloadKind.OTHER,
+            sortOrder,
+            visible: true,
+            translations: { create: { locale: DatabaseLocale.ZH, title } },
+          },
+        });
+        created = true;
+      }
     } else {
       const sortOrder = await prisma.productMedia.count({ where: { productId: product.id } });
       const role = mediaKind === MediaKind.VIDEO ? ProductMediaRole.VIDEO : input.role ?? ProductMediaRole.GALLERY;
+      const existing = await prisma.productMedia.findUnique({
+        where: { productId_assetId: { productId: product.id, assetId: asset.id } },
+        select: { assetId: true },
+      });
       await prisma.productMedia.upsert({
         where: { productId_assetId: { productId: product.id, assetId: asset.id } },
         update: {
@@ -1101,12 +1668,24 @@ export async function attachUploadedProductAsset(input: AttachUploadedProductAss
           visible: true,
         },
       });
+      await prisma.productMediaTranslation.upsert({
+        where: { productId_assetId_locale: { productId: product.id, assetId: asset.id, locale: DatabaseLocale.ZH } },
+        update: { alt: input.alt || input.title || "", caption: input.caption || null },
+        create: {
+          productId: product.id,
+          assetId: asset.id,
+          locale: DatabaseLocale.ZH,
+          alt: input.alt || input.title || "",
+          caption: input.caption || null,
+        },
+      });
+      created = !existing;
 
       if (role === ProductMediaRole.PRIMARY && mediaKind === MediaKind.IMAGE) {
         await prisma.product.update({ where: { id: product.id }, data: { primaryImageId: asset.id } });
       }
     }
 
-    return { assetId: asset.id, pathname: asset.pathname, kind: input.kind };
+    return { assetId: asset.id, pathname: asset.pathname, kind: input.kind, created };
   });
 }
