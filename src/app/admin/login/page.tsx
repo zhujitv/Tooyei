@@ -30,7 +30,7 @@ export default async function AdminLoginPage({
   const message = params.error ? messages[params.error] : undefined;
 
   return (
-    <main className="grid min-h-screen place-items-center bg-[#F6F8FB] px-5 py-12 text-[#172033] [color-scheme:light]">
+    <main className="admin-root grid min-h-screen place-items-center bg-[#F6F8FB] px-5 py-12 text-[#172033] [color-scheme:light]">
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_50%_-10%,rgba(37,52,79,0.07),transparent_30rem)]" />
       <Card className="relative w-full max-w-sm rounded-xl border border-[#E4E7EC] bg-white text-[#172033] shadow-[0_24px_70px_rgba(16,24,40,0.10)] ring-0">
         <CardHeader>

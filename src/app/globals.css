@@ -10,6 +10,10 @@
   --font-sans: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
   --font-heading: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.25rem;
+  --text-sm: 0.9375rem;
+  --text-sm--line-height: 1.5rem;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -131,11 +135,31 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+    font-size: 1rem;
+    line-height: 1.6;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
   }
   html {
     @apply font-sans;
     scroll-behavior: smooth;
   }
+}
+
+.font-mono {
+  font-family: var(--font-geist-mono), "SFMono-Regular", Consolas, "Liberation Mono", ui-monospace, monospace;
+}
+
+html[lang="zh-CN"] body {
+  font-family: var(--font-geist-sans), var(--font-noto-sans-sc), "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", ui-sans-serif, system-ui, sans-serif;
+  line-height: 1.68;
+}
+
+html[lang="zh-CN"] h1,
+html[lang="zh-CN"] h2,
+html[lang="zh-CN"] h3 {
+  letter-spacing: -0.025em;
 }
 
 ::selection { background: oklch(0.74 0.085 78); color: #0b1220; }
@@ -202,15 +226,15 @@
   }
 
   .admin-field {
-    @apply rounded-md border-[#D0D5DD] bg-white text-[#172033] placeholder:text-[#98A2B3] focus-visible:border-[#667085] focus-visible:ring-2 focus-visible:ring-[#25344F]/10;
+    @apply rounded-md border-[#D0D5DD] bg-white text-sm text-[#172033] placeholder:text-[#98A2B3] focus-visible:border-[#667085] focus-visible:ring-2 focus-visible:ring-[#25344F]/10;
   }
 
   .admin-select {
-    @apply rounded-md border border-[#D0D5DD] bg-white text-[#344054] outline-none transition-colors focus:border-[#667085] focus:ring-2 focus:ring-[#25344F]/10 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply rounded-md border border-[#D0D5DD] bg-white text-sm text-[#344054] outline-none transition-colors focus:border-[#667085] focus:ring-2 focus:ring-[#25344F]/10 disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   .admin-label {
-    @apply text-[11px] font-medium text-[#475467];
+    @apply text-xs font-medium text-[#475467];
   }
 
   .admin-checkbox {
@@ -326,6 +350,25 @@
   background: var(--gold);
 }
 
+/* Preserve compact visual hierarchy without dropping below a comfortable
+   reading size on public pages. */
+.site-shell [class~="text-[0.6rem]"],
+.site-shell [class~="text-[0.62rem]"],
+.site-shell [class~="text-[0.65rem]"],
+.site-shell [class~="text-[0.66rem]"],
+.site-shell [class~="text-[0.68rem]"] {
+  font-size: 0.75rem !important;
+  line-height: 1.125rem !important;
+}
+
+html[lang="zh-CN"] .site-shell [class~="text-[0.6rem]"],
+html[lang="zh-CN"] .site-shell [class~="text-[0.62rem]"],
+html[lang="zh-CN"] .site-shell [class~="text-[0.65rem]"],
+html[lang="zh-CN"] .site-shell [class~="text-[0.66rem]"],
+html[lang="zh-CN"] .site-shell [class~="text-[0.68rem]"] {
+  letter-spacing: 0.08em !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .brand-hero-image,
   .brand-fade-up {
@@ -344,6 +387,29 @@
 
 .admin-root {
   color-scheme: light;
+  line-height: 1.58;
+}
+
+.admin-root .admin-field,
+.admin-root .admin-select {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+.admin-root .admin-label {
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+}
+
+.admin-root [class~="text-[9px]"] {
+  font-size: 0.75rem !important;
+  line-height: 1rem !important;
+}
+
+.admin-root [class~="text-[10px]"],
+.admin-root [class~="text-[11px]"] {
+  font-size: 0.8125rem !important;
+  line-height: 1.25rem !important;
 }
 
 .admin-root .admin-card {

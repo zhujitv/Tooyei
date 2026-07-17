@@ -1,7 +1,29 @@
 import type { Metadata } from "next";
+import { Geist, Geist_Mono, Noto_Sans_SC } from "next/font/google";
 import { headers } from "next/headers";
 import "./globals.css";
 import { isLocale, localeDirection } from "@/lib/site";
+
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin", "cyrillic"],
+  display: "swap",
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin", "cyrillic"],
+  display: "swap",
+});
+
+const notoSansSC = Noto_Sans_SC({
+  variable: "--font-noto-sans-sc",
+  weight: "variable",
+  display: "swap",
+  preload: false,
+  adjustFontFallback: false,
+  fallback: ["PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", "sans-serif"],
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.tooyei.com"),
@@ -21,7 +43,12 @@ export default async function RootLayout({
   const locale = isLocale(requestedLocale) ? requestedLocale : "zh";
 
   return (
-    <html lang={locale === "zh" ? "zh-CN" : locale} dir={localeDirection(locale)} data-scroll-behavior="smooth" className="h-full antialiased">
+    <html
+      lang={locale === "zh" ? "zh-CN" : locale}
+      dir={localeDirection(locale)}
+      data-scroll-behavior="smooth"
+      className={`${geistSans.variable} ${geistMono.variable} ${notoSansSC.variable} h-full antialiased`}
+    >
       <body className="min-h-full flex flex-col antialiased">{children}</body>
     </html>
   );
