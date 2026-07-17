@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 
 import { CapabilityCards } from "@/components/capability-cards";
+import { CapabilityProofSystem } from "@/components/capability-proof-system";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { capabilitiesCopy, capabilityMedia } from "@/lib/capabilities";
@@ -41,11 +42,13 @@ export async function CapabilitiesPage({ locale }: { locale: Locale }) {
           </div>
         </section>
 
+        <CapabilityProofSystem locale={locale} />
+
         <section className="bg-[var(--paper)]">
           <div className="mx-auto max-w-[86rem] px-5 py-18 lg:px-10 lg:py-24">
             <div className="grid gap-6 lg:grid-cols-[0.92fr_1.08fr] lg:items-end">
               <div>
-                <p className="brand-eyebrow">01 · {labels.hub.eyebrow}</p>
+                <p className="brand-eyebrow">05 · {labels.hub.eyebrow}</p>
                 <h2 className="brand-h2 mt-4 max-w-3xl">{labels.hub.sectionTitle}</h2>
               </div>
               <p className="max-w-xl text-base leading-7 text-[var(--muted)] lg:justify-self-end">

@@ -94,13 +94,13 @@ export const capabilitiesCopy: Record<Locale, CapabilitiesCopy> = {
     home: "首页", capabilities: "制造与质量", viewDetails: "查看详情", gallery: "现场图集",
     galleryBody: "以下图片均来自本次提供的生产、验货与实验室素材，页面不使用视频。", contact: "咨询项目",
     hub: {
-      eyebrow: "制造与质量能力",
-      title: "让每一项地板项目背后的过程清晰可见。",
-      summary: "通过真实生产、出货验货和实验室图片，展示 TOOYEI 如何围绕产品要求协调制造与质量控制。",
-      sectionTitle: "从生产线到最终确认。",
-      sectionBody: "三个独立页面分别展示生产协作、出货前验货和实验室测试，帮助采购团队快速了解项目执行方式。",
-      ctaTitle: "需要针对您的规格制定质量方案？",
-      ctaBody: "告诉我们产品结构、数量和目标市场，我们会在打样与量产前确认对应的检查重点。",
+      eyebrow: "制造控制 · 质量证据",
+      title: "把制造能力，变成采购团队可以验证的交付确定性。",
+      summary: "从规格冻结、规模化生产到出货检验与测试文件，TOOYEI 用同一套控制逻辑贯穿每一批地板订单。",
+      sectionTitle: "三层能力，共同回答一个问题：这批货如何被稳定交付？",
+      sectionBody: "生产负责把规格做出来，验货负责发现偏差，实验室与文件负责为产品判断和出货放行提供依据。",
+      ctaTitle: "下一批订单，从一份可执行的质量计划开始。",
+      ctaBody: "告诉我们产品结构、数量、应用和目标市场，我们会把样品、量产、检验与文件要求整理成清晰的项目路径。",
       seoTitle: "制造、验货与实验室能力",
       seoDescription: "了解 TOOYEI 的地板生产协作、出货前质量检查和实验室测试能力。",
     },
@@ -157,13 +157,13 @@ export const capabilitiesCopy: Record<Locale, CapabilitiesCopy> = {
     home: "Home", capabilities: "Manufacturing & quality", viewDetails: "View details", gallery: "On-site gallery",
     galleryBody: "Every image comes from the supplied production, inspection and laboratory material. No video is used.", contact: "Discuss a project",
     hub: {
-      eyebrow: "Manufacturing and quality",
-      title: "A visible process behind every flooring programme.",
-      summary: "Real production, shipment inspection and laboratory images show how TOOYEI coordinates manufacturing and quality around the product brief.",
-      sectionTitle: "From the production line to final verification.",
-      sectionBody: "Three focused pages explain manufacturing coordination, pre-shipment inspection and laboratory testing for sourcing teams.",
-      ctaTitle: "Need a quality plan for your specification?",
-      ctaBody: "Share the construction, volume and target market so inspection priorities can be confirmed before sampling and production.",
+      eyebrow: "Manufacturing control · quality evidence",
+      title: "Turning manufacturing capability into delivery confidence you can verify.",
+      summary: "From specification freeze and scaled production to shipment inspection and test documentation, one control logic follows every flooring order.",
+      sectionTitle: "Three capability layers. One question: how will this order be delivered consistently?",
+      sectionBody: "Manufacturing builds the specification, inspection finds deviation, and testing with documentation supports the release decision.",
+      ctaTitle: "The next order starts with an actionable quality plan.",
+      ctaBody: "Share the construction, volume, application and target market. We will turn sampling, production, inspection and documentation into one clear project path.",
       seoTitle: "Manufacturing, inspection and laboratory capabilities",
       seoDescription: "Explore TOOYEI flooring manufacturing coordination, pre-shipment inspection and laboratory testing capabilities.",
     },
@@ -220,10 +220,10 @@ export const capabilitiesCopy: Record<Locale, CapabilitiesCopy> = {
     home: "Startseite", capabilities: "Fertigung & Qualität", viewDetails: "Details ansehen", gallery: "Bilder vor Ort",
     galleryBody: "Alle Bilder stammen aus den bereitgestellten Produktions-, Prüf- und Labormaterialien. Es werden keine Videos verwendet.", contact: "Projekt besprechen",
     hub: {
-      eyebrow: "Fertigung und Qualität", title: "Ein sichtbarer Prozess hinter jedem Bodenprogramm.",
-      summary: "Reale Bilder aus Produktion, Versandprüfung und Labor zeigen, wie TOOYEI Fertigung und Qualität am Produktbriefing ausrichtet.",
-      sectionTitle: "Von der Produktionslinie bis zur finalen Prüfung.", sectionBody: "Drei Seiten erläutern Fertigungskoordination, Vorversandkontrolle und Labortests für Einkaufsteams.",
-      ctaTitle: "Benötigen Sie einen Qualitätsplan für Ihre Spezifikation?", ctaBody: "Teilen Sie Aufbau, Menge und Zielmarkt mit, damit Prüfschwerpunkte vor Musterung und Produktion festgelegt werden.",
+      eyebrow: "Fertigungskontrolle · Qualitätsnachweis", title: "Fertigungskompetenz wird zu überprüfbarer Liefersicherheit.",
+      summary: "Von der Spezifikationsfreigabe und Serienfertigung bis zur Versandprüfung und Testdokumentation folgt jeder Auftrag derselben Kontrolllogik.",
+      sectionTitle: "Drei Kompetenzebenen. Eine Frage: Wie wird dieser Auftrag konstant geliefert?", sectionBody: "Die Fertigung setzt die Spezifikation um, die Inspektion erkennt Abweichungen und Tests sowie Dokumentation stützen die Freigabe.",
+      ctaTitle: "Der nächste Auftrag beginnt mit einem umsetzbaren Qualitätsplan.", ctaBody: "Teilen Sie Aufbau, Menge, Anwendung und Zielmarkt. Wir verbinden Muster, Produktion, Prüfung und Dokumentation zu einem klaren Projektweg.",
       seoTitle: "Fertigung, Inspektion und Labor", seoDescription: "Entdecken Sie TOOYEI Fertigungskoordination, Vorversandprüfung und Labortests für Bodenbeläge.",
     },
     pages: {
@@ -267,10 +267,10 @@ export const capabilitiesCopy: Record<Locale, CapabilitiesCopy> = {
     home: "Accueil", capabilities: "Fabrication et qualité", viewDetails: "Voir les détails", gallery: "Galerie sur site",
     galleryBody: "Toutes les images proviennent des supports de production, d’inspection et de laboratoire fournis. Aucune vidéo n’est utilisée.", contact: "Discuter d’un projet",
     hub: {
-      eyebrow: "Fabrication et qualité", title: "Un processus visible derrière chaque programme de sol.",
-      summary: "Des images réelles de production, d’inspection avant expédition et de laboratoire montrent comment TOOYEI coordonne fabrication et qualité.",
-      sectionTitle: "De la ligne de production à la vérification finale.", sectionBody: "Trois pages présentent la coordination de fabrication, le contrôle avant expédition et les essais en laboratoire.",
-      ctaTitle: "Besoin d’un plan qualité adapté à vos spécifications ?", ctaBody: "Indiquez la construction, le volume et le marché cible afin de définir les contrôles avant échantillonnage et production.",
+      eyebrow: "Maîtrise industrielle · preuves qualité", title: "Transformer la capacité industrielle en fiabilité de livraison vérifiable.",
+      summary: "Du gel des spécifications et de la production en série au contrôle avant expédition et aux documents d’essai, une même logique suit chaque commande.",
+      sectionTitle: "Trois niveaux de capacité. Une question : comment garantir une livraison constante ?", sectionBody: "La fabrication réalise la spécification, l’inspection détecte les écarts, et les essais avec la documentation appuient la décision de libération.",
+      ctaTitle: "La prochaine commande commence par un plan qualité opérationnel.", ctaBody: "Partagez structure, volume, application et marché cible. Nous relions échantillons, production, inspection et documents dans un parcours clair.",
       seoTitle: "Fabrication, inspection et laboratoire", seoDescription: "Découvrez les capacités TOOYEI en fabrication, inspection avant expédition et essais de sols.",
     },
     pages: {
@@ -314,10 +314,10 @@ export const capabilitiesCopy: Record<Locale, CapabilitiesCopy> = {
     home: "Inicio", capabilities: "Fabricación y calidad", viewDetails: "Ver detalles", gallery: "Galería en planta",
     galleryBody: "Todas las imágenes proceden del material de producción, inspección y laboratorio suministrado. No se utilizan vídeos.", contact: "Hablar de un proyecto",
     hub: {
-      eyebrow: "Fabricación y calidad", title: "Un proceso visible detrás de cada programa de suelo.",
-      summary: "Imágenes reales de producción, inspección previa al envío y laboratorio muestran cómo TOOYEI coordina fabricación y calidad.",
-      sectionTitle: "De la línea de producción a la verificación final.", sectionBody: "Tres páginas explican la coordinación de fabricación, la inspección previa al envío y las pruebas de laboratorio.",
-      ctaTitle: "¿Necesita un plan de calidad para su especificación?", ctaBody: "Comparta construcción, volumen y mercado para definir las prioridades de inspección antes de muestras y producción.",
+      eyebrow: "Control de fabricación · evidencia de calidad", title: "Convertimos capacidad productiva en confianza de entrega verificable.",
+      summary: "Desde el cierre de especificaciones y la producción en serie hasta la inspección y la documentación de ensayo, una misma lógica controla cada pedido.",
+      sectionTitle: "Tres capas de capacidad. Una pregunta: ¿cómo se entregará este pedido con consistencia?", sectionBody: "La fabricación ejecuta la especificación, la inspección detecta desviaciones y los ensayos con documentación respaldan la liberación.",
+      ctaTitle: "El próximo pedido empieza con un plan de calidad ejecutable.", ctaBody: "Comparta estructura, volumen, aplicación y mercado. Integramos muestras, producción, inspección y documentación en una ruta clara.",
       seoTitle: "Fabricación, inspección y laboratorio", seoDescription: "Conozca las capacidades de TOOYEI en fabricación, inspección previa al envío y pruebas de suelos.",
     },
     pages: {
@@ -361,10 +361,10 @@ export const capabilitiesCopy: Record<Locale, CapabilitiesCopy> = {
     home: "Главная", capabilities: "Производство и качество", viewDetails: "Подробнее", gallery: "Фотографии процессов",
     galleryBody: "Все изображения взяты из предоставленных материалов производства, инспекции и лаборатории. Видео не используется.", contact: "Обсудить проект",
     hub: {
-      eyebrow: "Производство и качество", title: "Понятный процесс за каждой программой напольных покрытий.",
-      summary: "Реальные фотографии производства, инспекции и лаборатории показывают, как TOOYEI координирует качество по техническому заданию.",
-      sectionTitle: "От производственной линии до финальной проверки.", sectionBody: "Три страницы раскрывают координацию производства, предпродажную инспекцию и лабораторные испытания.",
-      ctaTitle: "Нужен план качества под вашу спецификацию?", ctaBody: "Сообщите конструкцию, объём и рынок, чтобы определить приоритеты контроля до образцов и производства.",
+      eyebrow: "Контроль производства · доказательства качества", title: "Превращаем производственные возможности в проверяемую уверенность в поставке.",
+      summary: "От фиксации спецификации и серийного выпуска до инспекции и протоколов испытаний — каждый заказ проходит единую систему контроля.",
+      sectionTitle: "Три уровня возможностей. Один вопрос: как обеспечить стабильную поставку?", sectionBody: "Производство реализует спецификацию, инспекция выявляет отклонения, а испытания и документы поддерживают решение об отгрузке.",
+      ctaTitle: "Следующий заказ начинается с рабочего плана качества.", ctaBody: "Сообщите конструкцию, объём, применение и рынок. Мы объединим образцы, производство, инспекцию и документы в понятный маршрут.",
       seoTitle: "Производство, инспекция и лаборатория", seoDescription: "Возможности TOOYEI по производству, инспекции перед отгрузкой и испытаниям покрытий.",
     },
     pages: {
@@ -408,10 +408,10 @@ export const capabilitiesCopy: Record<Locale, CapabilitiesCopy> = {
     home: "ホーム", capabilities: "製造・品質", viewDetails: "詳細を見る", gallery: "現場ギャラリー",
     galleryBody: "すべての画像は提供された生産・検品・ラボ素材です。動画は使用していません。", contact: "プロジェクトを相談",
     hub: {
-      eyebrow: "製造と品質", title: "各フローリング計画の背景にある工程を見える化。",
-      summary: "実際の生産、出荷前検品、ラボ画像を通じて、TOOYEIが製品仕様に沿って製造と品質を調整する方法を紹介します。",
-      sectionTitle: "生産ラインから最終確認まで。", sectionBody: "製造調整、出荷前検品、ラボ試験を3つのページで分かりやすく紹介します。",
-      ctaTitle: "仕様に合った品質計画が必要ですか？", ctaBody: "構成、数量、対象市場を共有いただければ、サンプルと量産前に検査重点を確認します。",
+      eyebrow: "製造管理 · 品質エビデンス", title: "製造力を、検証できる納品の確実性へ。",
+      summary: "仕様確定と量産から出荷前検品、試験資料まで、すべての床材オーダーを一貫した管理ロジックでつなぎます。",
+      sectionTitle: "3つの能力層。答えるべき問いは一つ——この注文をどう安定して届けるか。", sectionBody: "製造が仕様を形にし、検品が偏差を見つけ、試験と文書が出荷判断を支えます。",
+      ctaTitle: "次の注文は、実行可能な品質計画から始まります。", ctaBody: "構造、数量、用途、対象市場を共有ください。サンプル、量産、検品、文書を一つの明確なプロジェクト経路に整理します。",
       seoTitle: "製造・検品・ラボ能力", seoDescription: "TOOYEIの床材製造、出荷前検品、ラボ試験能力をご覧ください。",
     },
     pages: {
@@ -455,10 +455,10 @@ export const capabilitiesCopy: Record<Locale, CapabilitiesCopy> = {
     home: "Home", capabilities: "Produzione e qualità", viewDetails: "Vedi dettagli", gallery: "Galleria operativa",
     galleryBody: "Tutte le immagini provengono dai materiali forniti di produzione, ispezione e laboratorio. Non sono usati video.", contact: "Parla del progetto",
     hub: {
-      eyebrow: "Produzione e qualità", title: "Un processo visibile dietro ogni programma di pavimentazione.",
-      summary: "Immagini reali di produzione, ispezione pre-spedizione e laboratorio mostrano come TOOYEI coordina produzione e qualità.",
-      sectionTitle: "Dalla linea alla verifica finale.", sectionBody: "Tre pagine spiegano coordinamento produttivo, controllo pre-spedizione e prove di laboratorio.",
-      ctaTitle: "Serve un piano qualità per la vostra specifica?", ctaBody: "Comunicate struttura, volume e mercato per definire i controlli prima di campioni e produzione.",
+      eyebrow: "Controllo produttivo · evidenza qualità", title: "Trasformiamo la capacità produttiva in affidabilità di consegna verificabile.",
+      summary: "Dal blocco delle specifiche e dalla produzione in serie all’ispezione e ai documenti di prova, ogni ordine segue un’unica logica di controllo.",
+      sectionTitle: "Tre livelli di capacità. Una domanda: come consegnare questo ordine con continuità?", sectionBody: "La produzione realizza la specifica, l’ispezione rileva gli scostamenti e test con documenti supportano il rilascio.",
+      ctaTitle: "Il prossimo ordine inizia con un piano qualità operativo.", ctaBody: "Condividete struttura, volume, applicazione e mercato. Uniamo campioni, produzione, ispezione e documenti in un percorso chiaro.",
       seoTitle: "Produzione, ispezione e laboratorio", seoDescription: "Scopri le capacità TOOYEI nella produzione, ispezione pre-spedizione e test dei pavimenti.",
     },
     pages: {
@@ -502,10 +502,10 @@ export const capabilitiesCopy: Record<Locale, CapabilitiesCopy> = {
     home: "الرئيسية", capabilities: "التصنيع والجودة", viewDetails: "عرض التفاصيل", gallery: "صور من الموقع",
     galleryBody: "جميع الصور من مواد الإنتاج والفحص والمختبر المقدمة، ولا يتم استخدام أي فيديو.", contact: "ناقش مشروعاً",
     hub: {
-      eyebrow: "التصنيع والجودة", title: "عملية واضحة خلف كل برنامج أرضيات.",
-      summary: "توضح صور حقيقية للإنتاج والفحص قبل الشحن والمختبر كيف تنسق TOOYEI التصنيع والجودة وفق مواصفات المنتج.",
-      sectionTitle: "من خط الإنتاج إلى التحقق النهائي.", sectionBody: "ثلاث صفحات تشرح تنسيق التصنيع والفحص قبل الشحن واختبارات المختبر.",
-      ctaTitle: "هل تحتاج إلى خطة جودة لمواصفاتك؟", ctaBody: "شارك البنية والكمية والسوق المستهدف لتحديد أولويات الفحص قبل العينات والإنتاج.",
+      eyebrow: "ضبط التصنيع · أدلة الجودة", title: "نحوّل القدرة التصنيعية إلى ثقة قابلة للتحقق في التسليم.",
+      summary: "من تثبيت المواصفات والإنتاج الكمي إلى فحص ما قبل الشحن ووثائق الاختبار، يتبع كل طلب نظام ضبط واحداً.",
+      sectionTitle: "ثلاث طبقات من القدرة وسؤال واحد: كيف نضمن تسليم هذا الطلب بثبات؟", sectionBody: "يحوّل التصنيع المواصفة إلى منتج، ويكشف الفحص الانحرافات، وتدعم الاختبارات والوثائق قرار الإفراج.",
+      ctaTitle: "يبدأ الطلب التالي بخطة جودة قابلة للتنفيذ.", ctaBody: "شارك البنية والكمية والاستخدام والسوق. نحول العينات والإنتاج والفحص والوثائق إلى مسار مشروع واضح.",
       seoTitle: "التصنيع والفحص والمختبر", seoDescription: "تعرف على قدرات TOOYEI في تصنيع الأرضيات والفحص قبل الشحن والاختبارات.",
     },
     pages: {
@@ -543,6 +543,472 @@ export const capabilitiesCopy: Record<Locale, CapabilitiesCopy> = {
         ], note: "لا تثبت الصور وحدها اعتماد المختبر أو المطابقة لمعيار محدد؛ يتم تأكيد الشهادات والتقارير بشكل منفصل.",
         seoTitle: "مختبر واختبارات الأرضيات", seoDescription: "اختبارات الثبات والميكانيكا والسطح والتآكل والمواد للأرضيات.",
       },
+    },
+  },
+};
+
+type CapabilityNarrativeItem = {
+  title: string;
+  description: string;
+};
+
+type CapabilityMetricCopy = {
+  label: string;
+  detail: string;
+};
+
+export type CapabilityNarrativeCopy = {
+  proof: {
+    eyebrow: string;
+    title: string;
+    body: string;
+    note: string;
+    metrics: CapabilityMetricCopy[];
+  };
+  risk: {
+    eyebrow: string;
+    title: string;
+    body: string;
+    commitments: CapabilityNarrativeItem[];
+  };
+  system: {
+    eyebrow: string;
+    title: string;
+    body: string;
+    stages: CapabilityNarrativeItem[];
+  };
+  deliverables: {
+    eyebrow: string;
+    title: string;
+    body: string;
+    items: CapabilityNarrativeItem[];
+  };
+};
+
+export const capabilityMetricValues = ["50,000 m²", "10+", "1.44M m²", "8"] as const;
+
+export const capabilitiesNarrativeCopy: Record<Locale, CapabilityNarrativeCopy> = {
+  zh: {
+    proof: {
+      eyebrow: "公开能力基线",
+      title: "规模不是口号，它必须能支撑稳定生产。",
+      body: "TOOYEI 原站公开的制造信息，构成这套能力叙事的事实起点。更重要的是，我们把规模落实到具体产品、生产环节和每一批订单的检查要求中。",
+      note: "规模数据来自 TOOYEI 当前公开的公司资料；具体产品范围、产线安排、产能与测试要求以订单确认文件为准。",
+      metrics: [
+        { label: "生产基础", detail: "公开的现代化生产基地面积" },
+        { label: "地板产线", detail: "覆盖 SPC、WPC、LVT 与强化地板" },
+        { label: "公开年产能", detail: "支持批量与持续补货项目" },
+        { label: "受控环节", detail: "从原料准备到包装装运" },
+      ],
+    },
+    risk: {
+      eyebrow: "采购风险，被拆成可管理的节点",
+      title: "我们不把质量留到最后一次验货。",
+      body: "可靠交付不是靠出货前补救，而是从产品定义开始，把容易产生偏差的结构、花色、表面、锁扣、底垫、包装和文件逐项锁定。",
+      commitments: [
+        { title: "先冻结规格", description: "在打样和量产前统一产品结构、视觉标准、包装与目标市场要求。" },
+        { title: "在过程里找偏差", description: "把尺寸、表面、拼接、包装和标识检查放进生产与出货节点。" },
+        { title: "用证据支持放行", description: "以现场记录、抽检结果和适用的测试文件支持采购团队作出判断。" },
+      ],
+    },
+    system: {
+      eyebrow: "一个订单控制系统",
+      title: "从需求到出货，五次关键交接。",
+      body: "每一次交接都明确下一阶段需要什么输入、检查什么风险、留下什么记录，减少口头沟通造成的信息损耗。",
+      stages: [
+        { title: "定义产品", description: "确认市场、应用、结构、花色、性能与合规方向。" },
+        { title: "工程转化", description: "把确认方案转化为样品、物料、工艺路线和包装要求。" },
+        { title: "过程控制", description: "围绕板材、表面、开槽、底垫和包装监控关键偏差。" },
+        { title: "批次验证", description: "通过出货前抽检与适用测试核对产品和订单要求。" },
+        { title: "放行交付", description: "确认包装、标签、托盘、文件与装运条件后完成放行。" },
+      ],
+    },
+    deliverables: {
+      eyebrow: "买家最终拿到什么",
+      title: "不只有货，还有支持内部决策和市场沟通的交付证据。",
+      body: "根据产品与项目范围，质量交付可以覆盖以下四类信息。",
+      items: [
+        { title: "已确认的产品基线", description: "规格、样品、外观和包装要求形成统一的执行依据。" },
+        { title: "批次质量记录", description: "关键尺寸、表面、拼接、包装与标识的检查记录。" },
+        { title: "测试与合规协调", description: "按目标市场和产品规格协调可用证书、报告或测试安排。" },
+        { title: "出货放行信息", description: "包装、托盘、装运和异常处理信息形成可追溯交付记录。" },
+      ],
+    },
+  },
+  en: {
+    proof: {
+      eyebrow: "Published capability baseline",
+      title: "Scale is only useful when it supports repeatable production.",
+      body: "The manufacturing information published on TOOYEI’s original site is the factual starting point. The real value comes from connecting that scale to product scope, process control and the inspection priorities of each order.",
+      note: "Scale figures are taken from TOOYEI’s current published company information. Product scope, line allocation, capacity and test requirements are confirmed in the order documentation.",
+      metrics: [
+        { label: "Production footprint", detail: "Published modern manufacturing base" },
+        { label: "Flooring lines", detail: "SPC, WPC, LVT and laminate coverage" },
+        { label: "Published annual capacity", detail: "Built for volume and repeat supply" },
+        { label: "Controlled stages", detail: "From raw material to packed shipment" },
+      ],
+    },
+    risk: {
+      eyebrow: "Sourcing risk, broken into controllable decisions",
+      title: "Quality is not left to one final inspection.",
+      body: "Reliable delivery starts with product definition. Construction, decor, surface, locking, backing, packing and documentation are aligned before they become expensive production deviations.",
+      commitments: [
+        { title: "Freeze the specification first", description: "Align construction, visual standard, packaging and target-market requirements before sampling and production." },
+        { title: "Find deviation in the process", description: "Place dimension, surface, joint, packing and marking checks inside production and shipment gates." },
+        { title: "Release with evidence", description: "Use on-site records, inspection results and applicable test documents to support the buyer’s decision." },
+      ],
+    },
+    system: {
+      eyebrow: "One order-control system",
+      title: "Five critical handovers from brief to shipment.",
+      body: "Each handover defines the input, the risk to check and the evidence to retain—reducing information loss between sales, production, quality and logistics.",
+      stages: [
+        { title: "Define the product", description: "Confirm market, application, construction, decor, performance and compliance direction." },
+        { title: "Engineer the programme", description: "Translate the approved direction into samples, materials, process routing and packaging." },
+        { title: "Control the process", description: "Monitor critical deviation across board, surface, profiling, backing and packing stages." },
+        { title: "Verify the batch", description: "Use pre-shipment inspection and applicable tests to check product and order requirements." },
+        { title: "Release and deliver", description: "Confirm packing, labels, pallets, documents and shipping conditions before release." },
+      ],
+    },
+    deliverables: {
+      eyebrow: "What the buyer receives",
+      title: "Not only goods, but evidence for internal decisions and market communication.",
+      body: "Depending on the product and project scope, quality delivery can cover four practical information sets.",
+      items: [
+        { title: "Approved product baseline", description: "Specification, sample, appearance and packing requirements form one execution reference." },
+        { title: "Batch quality records", description: "Records for critical dimensions, surfaces, joints, packing and identification." },
+        { title: "Test and compliance coordination", description: "Available certificates, reports or testing are aligned to product and destination market." },
+        { title: "Shipment release information", description: "Packing, pallet, loading and exception details create a traceable delivery record." },
+      ],
+    },
+  },
+  de: {
+    proof: {
+      eyebrow: "Veröffentlichte Leistungsbasis",
+      title: "Größe zählt nur, wenn sie wiederholbare Produktion ermöglicht.",
+      body: "Die auf der ursprünglichen TOOYEI-Website veröffentlichten Fertigungsdaten bilden den sachlichen Ausgangspunkt. Entscheidend ist die Verbindung von Größe, Produktspektrum, Prozesskontrolle und Auftragsprüfung.",
+      note: "Die Kennzahlen stammen aus den aktuell veröffentlichten Unternehmensangaben. Produktspektrum, Linienbelegung, Kapazität und Prüfanforderungen werden je Auftrag bestätigt.",
+      metrics: [
+        { label: "Produktionsfläche", detail: "Veröffentlichte moderne Fertigungsbasis" },
+        { label: "Bodenlinien", detail: "SPC, WPC, LVT und Laminat" },
+        { label: "Veröffentlichte Jahreskapazität", detail: "Für Volumen und Nachlieferungen" },
+        { label: "Kontrollstufen", detail: "Vom Rohstoff bis zum Versand" },
+      ],
+    },
+    risk: {
+      eyebrow: "Beschaffungsrisiken in steuerbare Entscheidungen zerlegt",
+      title: "Qualität wird nicht der letzten Prüfung überlassen.",
+      body: "Zuverlässige Lieferung beginnt mit der Produktdefinition. Aufbau, Dekor, Oberfläche, Klicksystem, Unterlage, Verpackung und Dokumentation werden vor der Serienfertigung abgestimmt.",
+      commitments: [
+        { title: "Spezifikation zuerst fixieren", description: "Aufbau, Optik, Verpackung und Zielmarkt vor Musterung und Produktion abstimmen." },
+        { title: "Abweichungen im Prozess finden", description: "Maß-, Oberflächen-, Fugen-, Verpackungs- und Kennzeichnungsprüfungen in den Ablauf integrieren." },
+        { title: "Mit Nachweisen freigeben", description: "Vor-Ort-Aufzeichnungen, Prüfergebnisse und relevante Testdokumente stützen die Entscheidung." },
+      ],
+    },
+    system: {
+      eyebrow: "Ein System zur Auftragskontrolle",
+      title: "Fünf entscheidende Übergaben vom Briefing bis zum Versand.",
+      body: "Jede Übergabe definiert Eingaben, Risiken und Nachweise und reduziert Informationsverluste zwischen Vertrieb, Produktion, Qualität und Logistik.",
+      stages: [
+        { title: "Produkt definieren", description: "Markt, Anwendung, Aufbau, Dekor, Leistung und Compliance-Richtung bestätigen." },
+        { title: "Programm ausarbeiten", description: "Freigaben in Muster, Material, Prozessroute und Verpackung übersetzen." },
+        { title: "Prozess kontrollieren", description: "Abweichungen bei Platte, Oberfläche, Profil, Unterlage und Verpackung überwachen." },
+        { title: "Charge verifizieren", description: "Produkt und Auftrag durch Vorversandprüfung und passende Tests abgleichen." },
+        { title: "Freigeben und liefern", description: "Verpackung, Etiketten, Paletten, Dokumente und Versandbedingungen bestätigen." },
+      ],
+    },
+    deliverables: {
+      eyebrow: "Was der Käufer erhält",
+      title: "Nicht nur Ware, sondern Nachweise für interne Entscheidungen und Marktkommunikation.",
+      body: "Je nach Produkt und Projekt kann die Qualitätslieferung vier Informationsbereiche abdecken.",
+      items: [
+        { title: "Freigegebene Produktbasis", description: "Spezifikation, Muster, Optik und Verpackung bilden eine gemeinsame Referenz." },
+        { title: "Qualitätsaufzeichnungen der Charge", description: "Dokumentation zu Maßen, Oberflächen, Fugen, Verpackung und Kennzeichnung." },
+        { title: "Test- und Compliance-Koordination", description: "Verfügbare Zertifikate, Berichte oder Tests werden auf Produkt und Markt abgestimmt." },
+        { title: "Versandfreigabe", description: "Verpackungs-, Paletten-, Lade- und Abweichungsdaten schaffen Rückverfolgbarkeit." },
+      ],
+    },
+  },
+  fr: {
+    proof: {
+      eyebrow: "Référentiel de capacité publié",
+      title: "L’échelle n’a de valeur que si elle permet une production reproductible.",
+      body: "Les données industrielles publiées sur le site historique de TOOYEI constituent le point de départ factuel. Leur valeur vient du lien entre capacité, produits, maîtrise des procédés et contrôles de chaque commande.",
+      note: "Les chiffres proviennent des informations d’entreprise actuellement publiées. Produits, affectation des lignes, capacité et essais sont confirmés dans les documents de commande.",
+      metrics: [
+        { label: "Empreinte industrielle", detail: "Base de production moderne publiée" },
+        { label: "Lignes de sols", detail: "SPC, WPC, LVT et stratifié" },
+        { label: "Capacité annuelle publiée", detail: "Volume et réassort régulier" },
+        { label: "Étapes maîtrisées", detail: "De la matière à l’expédition" },
+      ],
+    },
+    risk: {
+      eyebrow: "Le risque achat transformé en décisions maîtrisables",
+      title: "La qualité ne dépend pas d’un seul contrôle final.",
+      body: "La fiabilité commence avec la définition du produit. Structure, décor, surface, clic, sous-couche, emballage et documents sont alignés avant la production en série.",
+      commitments: [
+        { title: "Figer d’abord la spécification", description: "Aligner structure, standard visuel, emballage et marché avant les échantillons et la production." },
+        { title: "Détecter les écarts en cours de route", description: "Intégrer les contrôles dimensionnels, surface, assemblage, emballage et marquage aux jalons." },
+        { title: "Libérer avec des preuves", description: "S’appuyer sur les relevés terrain, résultats d’inspection et documents d’essai applicables." },
+      ],
+    },
+    system: {
+      eyebrow: "Un seul système de maîtrise de commande",
+      title: "Cinq passages clés du brief à l’expédition.",
+      body: "Chaque passage définit les données d’entrée, les risques et les preuves à conserver, en limitant les pertes d’information entre vente, production, qualité et logistique.",
+      stages: [
+        { title: "Définir le produit", description: "Confirmer marché, usage, structure, décor, performance et orientation conformité." },
+        { title: "Industrialiser le programme", description: "Transformer l’accord en échantillons, matières, gamme de fabrication et emballage." },
+        { title: "Maîtriser le procédé", description: "Surveiller les écarts sur panneau, surface, profilage, sous-couche et emballage." },
+        { title: "Vérifier le lot", description: "Contrôler produit et commande par inspection avant expédition et essais adaptés." },
+        { title: "Libérer et livrer", description: "Confirmer emballage, étiquettes, palettes, documents et conditions d’envoi." },
+      ],
+    },
+    deliverables: {
+      eyebrow: "Ce que reçoit l’acheteur",
+      title: "Pas seulement des marchandises, mais des preuves pour décider et communiquer.",
+      body: "Selon le produit et le projet, la livraison qualité peut couvrir quatre ensembles d’informations.",
+      items: [
+        { title: "Référentiel produit approuvé", description: "Spécification, échantillon, aspect et emballage forment une base unique." },
+        { title: "Relevés qualité du lot", description: "Données sur dimensions, surfaces, assemblages, emballage et identification." },
+        { title: "Coordination essais et conformité", description: "Certificats, rapports ou essais disponibles sont alignés sur produit et marché." },
+        { title: "Informations de libération", description: "Emballage, palettes, chargement et écarts créent une livraison traçable." },
+      ],
+    },
+  },
+  es: {
+    proof: {
+      eyebrow: "Base de capacidad publicada",
+      title: "La escala solo importa cuando permite una producción repetible.",
+      body: "Los datos de fabricación publicados en el sitio original de TOOYEI son el punto de partida. Su valor real está en conectar escala, gama de producto, control de proceso y prioridades de cada pedido.",
+      note: "Las cifras proceden de la información corporativa publicada. Producto, asignación de líneas, capacidad y ensayos se confirman en la documentación del pedido.",
+      metrics: [
+        { label: "Base productiva", detail: "Instalación moderna publicada" },
+        { label: "Líneas de suelo", detail: "SPC, WPC, LVT y laminado" },
+        { label: "Capacidad anual publicada", detail: "Volumen y suministro recurrente" },
+        { label: "Etapas controladas", detail: "De materia prima a expedición" },
+      ],
+    },
+    risk: {
+      eyebrow: "El riesgo de compra dividido en decisiones controlables",
+      title: "La calidad no se deja para una única inspección final.",
+      body: "La entrega fiable empieza al definir el producto. Estructura, diseño, superficie, clic, base, embalaje y documentos se alinean antes de convertirse en desviaciones costosas.",
+      commitments: [
+        { title: "Cerrar primero la especificación", description: "Alinear estructura, estándar visual, embalaje y mercado antes de muestras y producción." },
+        { title: "Detectar desviaciones en proceso", description: "Integrar controles de dimensiones, superficie, unión, embalaje y marcado en los hitos." },
+        { title: "Liberar con evidencia", description: "Apoyar la decisión con registros, resultados de inspección y documentos de ensayo aplicables." },
+      ],
+    },
+    system: {
+      eyebrow: "Un sistema de control del pedido",
+      title: "Cinco traspasos críticos desde el briefing hasta el envío.",
+      body: "Cada traspaso define entradas, riesgos y evidencias, reduciendo pérdidas de información entre ventas, producción, calidad y logística.",
+      stages: [
+        { title: "Definir el producto", description: "Confirmar mercado, uso, estructura, diseño, rendimiento y dirección normativa." },
+        { title: "Convertirlo en programa", description: "Traducir la aprobación en muestras, materiales, ruta de proceso y embalaje." },
+        { title: "Controlar el proceso", description: "Vigilar desviaciones en panel, superficie, perfilado, base y embalaje." },
+        { title: "Verificar el lote", description: "Comprobar producto y pedido mediante inspección y ensayos aplicables." },
+        { title: "Liberar y entregar", description: "Confirmar embalaje, etiquetas, palés, documentos y condiciones de envío." },
+      ],
+    },
+    deliverables: {
+      eyebrow: "Lo que recibe el comprador",
+      title: "No solo mercancía, también evidencia para decidir y comunicar al mercado.",
+      body: "Según el producto y el proyecto, la entrega de calidad puede cubrir cuatro grupos de información.",
+      items: [
+        { title: "Base de producto aprobada", description: "Especificación, muestra, apariencia y embalaje forman una referencia única." },
+        { title: "Registros de calidad del lote", description: "Datos de dimensiones, superficies, uniones, embalaje e identificación." },
+        { title: "Coordinación de ensayos y cumplimiento", description: "Certificados, informes o ensayos se alinean con producto y mercado." },
+        { title: "Información de liberación", description: "Embalaje, palés, carga e incidencias forman un registro trazable." },
+      ],
+    },
+  },
+  ru: {
+    proof: {
+      eyebrow: "Опубликованная база возможностей",
+      title: "Масштаб важен только тогда, когда обеспечивает повторяемое производство.",
+      body: "Производственные данные с исходного сайта TOOYEI — фактическая отправная точка. Их ценность раскрывается через связь масштаба, ассортимента, контроля процесса и требований каждого заказа.",
+      note: "Цифры взяты из опубликованных данных компании. Продукт, загрузка линий, мощность и испытания подтверждаются документами заказа.",
+      metrics: [
+        { label: "Производственная база", detail: "Опубликованная площадь площадки" },
+        { label: "Линии покрытий", detail: "SPC, WPC, LVT и ламинат" },
+        { label: "Опубликованная мощность", detail: "Объём и повторные поставки" },
+        { label: "Этапы контроля", detail: "От сырья до отгрузки" },
+      ],
+    },
+    risk: {
+      eyebrow: "Риски закупки разделены на управляемые решения",
+      title: "Качество не откладывается до последней инспекции.",
+      body: "Надёжность начинается с определения продукта. Конструкция, декор, поверхность, замок, подложка, упаковка и документы согласуются до серийного производства.",
+      commitments: [
+        { title: "Сначала зафиксировать спецификацию", description: "Согласовать конструкцию, внешний вид, упаковку и требования рынка до образцов." },
+        { title: "Находить отклонения в процессе", description: "Встроить проверки размеров, поверхности, соединений, упаковки и маркировки в этапы производства." },
+        { title: "Разрешать отгрузку по доказательствам", description: "Использовать записи, результаты инспекции и применимые протоколы испытаний." },
+      ],
+    },
+    system: {
+      eyebrow: "Единая система контроля заказа",
+      title: "Пять ключевых передач от задания до отгрузки.",
+      body: "Каждая передача определяет входные данные, риски и сохраняемые доказательства, снижая потери информации между продажами, производством, качеством и логистикой.",
+      stages: [
+        { title: "Определить продукт", description: "Подтвердить рынок, применение, конструкцию, декор, показатели и соответствие." },
+        { title: "Спроектировать программу", description: "Перевести согласование в образцы, материалы, маршрут и упаковку." },
+        { title: "Контролировать процесс", description: "Следить за плитой, поверхностью, профилем, подложкой и упаковкой." },
+        { title: "Проверить партию", description: "Сверить продукт и заказ инспекцией перед отгрузкой и нужными тестами." },
+        { title: "Разрешить и доставить", description: "Подтвердить упаковку, этикетки, палеты, документы и условия отправки." },
+      ],
+    },
+    deliverables: {
+      eyebrow: "Что получает покупатель",
+      title: "Не только товар, но и доказательства для решений и работы с рынком.",
+      body: "В зависимости от продукта и проекта пакет качества может включать четыре блока информации.",
+      items: [
+        { title: "Утверждённая база продукта", description: "Спецификация, образец, внешний вид и упаковка образуют единую основу." },
+        { title: "Записи качества партии", description: "Данные по размерам, поверхностям, соединениям, упаковке и маркировке." },
+        { title: "Координация испытаний", description: "Сертификаты, отчёты или тесты сопоставляются с продуктом и рынком." },
+        { title: "Информация о разрешении отгрузки", description: "Упаковка, палеты, погрузка и отклонения создают прослеживаемую запись." },
+      ],
+    },
+  },
+  ja: {
+    proof: {
+      eyebrow: "公開された能力基準",
+      title: "規模は、再現性のある生産を支えて初めて意味を持ちます。",
+      body: "旧TOOYEIサイトで公開された製造情報を事実の起点とし、その規模を製品範囲、工程管理、各注文の検査重点へ結び付けます。",
+      note: "数値は現在公開中の会社情報に基づきます。製品範囲、ライン配分、能力、試験要件は注文書類で個別に確認します。",
+      metrics: [
+        { label: "生産基盤", detail: "公開されている近代的な製造拠点" },
+        { label: "床材ライン", detail: "SPC・WPC・LVT・ラミネート" },
+        { label: "公開年間能力", detail: "量産と継続供給に対応" },
+        { label: "管理工程", detail: "原料から梱包・出荷まで" },
+      ],
+    },
+    risk: {
+      eyebrow: "調達リスクを管理可能な判断へ分解",
+      title: "品質を最後の検品一回に委ねません。",
+      body: "安定した納品は製品定義から始まります。構造、柄、表面、クリック、裏材、梱包、文書を量産前にそろえます。",
+      commitments: [
+        { title: "まず仕様を固定", description: "サンプルと量産前に構造、外観基準、梱包、市場要件を統一します。" },
+        { title: "工程内で偏差を発見", description: "寸法、表面、接合、梱包、表示の確認を生産と出荷の節目に組み込みます。" },
+        { title: "証拠に基づき出荷判断", description: "現場記録、検品結果、適用可能な試験文書で購買判断を支えます。" },
+      ],
+    },
+    system: {
+      eyebrow: "一つの注文管理システム",
+      title: "要件から出荷まで、5つの重要な引き継ぎ。",
+      body: "各引き継ぎで入力、確認リスク、保存する証拠を定め、営業・生産・品質・物流間の情報ロスを減らします。",
+      stages: [
+        { title: "製品を定義", description: "市場、用途、構造、柄、性能、適合方針を確認します。" },
+        { title: "製造計画へ変換", description: "承認内容をサンプル、材料、工程ルート、梱包へ落とし込みます。" },
+        { title: "工程を管理", description: "板材、表面、加工、裏材、梱包の重要な偏差を監視します。" },
+        { title: "ロットを検証", description: "出荷前検品と必要な試験で製品と注文要件を照合します。" },
+        { title: "出荷を承認", description: "梱包、ラベル、パレット、文書、輸送条件を確認します。" },
+      ],
+    },
+    deliverables: {
+      eyebrow: "バイヤーが受け取るもの",
+      title: "商品だけでなく、社内判断と市場説明を支える証拠も届けます。",
+      body: "製品と案件範囲に応じて、品質納品は次の4つの情報を含みます。",
+      items: [
+        { title: "承認済み製品基準", description: "仕様、サンプル、外観、梱包を一つの実行基準にします。" },
+        { title: "ロット品質記録", description: "主要寸法、表面、接合、梱包、表示に関する記録です。" },
+        { title: "試験・適合の調整", description: "利用可能な証明書、報告書、試験を製品と市場に合わせます。" },
+        { title: "出荷承認情報", description: "梱包、パレット、積載、例外情報で追跡可能な記録を作ります。" },
+      ],
+    },
+  },
+  it: {
+    proof: {
+      eyebrow: "Base di capacità pubblicata",
+      title: "La scala conta solo quando sostiene una produzione ripetibile.",
+      body: "I dati produttivi pubblicati sul sito storico TOOYEI sono il punto di partenza. Il valore nasce collegando scala, gamma, controllo del processo e priorità di ogni ordine.",
+      note: "I dati derivano dalle informazioni aziendali pubblicate. Gamma, assegnazione linee, capacità e test sono confermati nei documenti d’ordine.",
+      metrics: [
+        { label: "Base produttiva", detail: "Sito produttivo moderno pubblicato" },
+        { label: "Linee pavimenti", detail: "SPC, WPC, LVT e laminato" },
+        { label: "Capacità annua pubblicata", detail: "Volumi e forniture ricorrenti" },
+        { label: "Fasi controllate", detail: "Dalla materia alla spedizione" },
+      ],
+    },
+    risk: {
+      eyebrow: "Rischio di acquisto diviso in decisioni controllabili",
+      title: "La qualità non è affidata a un solo controllo finale.",
+      body: "La consegna affidabile parte dalla definizione del prodotto. Struttura, decoro, superficie, incastro, supporto, imballo e documenti vengono allineati prima della serie.",
+      commitments: [
+        { title: "Bloccare prima la specifica", description: "Allineare struttura, standard visivo, imballo e mercato prima di campioni e produzione." },
+        { title: "Trovare gli scostamenti nel processo", description: "Integrare controlli di dimensione, superficie, giunti, imballo e marcatura nei passaggi chiave." },
+        { title: "Rilasciare con evidenze", description: "Usare registrazioni, risultati di ispezione e documenti di prova applicabili." },
+      ],
+    },
+    system: {
+      eyebrow: "Un sistema di controllo ordine",
+      title: "Cinque passaggi critici dal brief alla spedizione.",
+      body: "Ogni passaggio definisce input, rischi ed evidenze, riducendo perdite di informazione tra vendite, produzione, qualità e logistica.",
+      stages: [
+        { title: "Definire il prodotto", description: "Confermare mercato, uso, struttura, decoro, prestazioni e conformità." },
+        { title: "Progettare il programma", description: "Tradurre l’approvazione in campioni, materiali, percorso e imballo." },
+        { title: "Controllare il processo", description: "Monitorare pannello, superficie, profilatura, supporto e imballo." },
+        { title: "Verificare il lotto", description: "Confrontare prodotto e ordine con ispezione e test applicabili." },
+        { title: "Rilasciare e consegnare", description: "Confermare imballo, etichette, pallet, documenti e condizioni di spedizione." },
+      ],
+    },
+    deliverables: {
+      eyebrow: "Cosa riceve l’acquirente",
+      title: "Non solo merce, ma evidenze per decisioni interne e comunicazione al mercato.",
+      body: "Secondo prodotto e progetto, la consegna qualità può coprire quattro gruppi di informazioni.",
+      items: [
+        { title: "Base prodotto approvata", description: "Specifica, campione, aspetto e imballo formano un unico riferimento." },
+        { title: "Registri qualità del lotto", description: "Dati su dimensioni, superfici, giunti, imballo e identificazione." },
+        { title: "Coordinamento test e conformità", description: "Certificati, report o test disponibili sono allineati a prodotto e mercato." },
+        { title: "Informazioni di rilascio", description: "Imballo, pallet, carico e anomalie creano una registrazione tracciabile." },
+      ],
+    },
+  },
+  ar: {
+    proof: {
+      eyebrow: "خط أساس معلن للقدرات",
+      title: "لا قيمة للحجم ما لم يدعم إنتاجاً قابلاً للتكرار.",
+      body: "تمثل بيانات التصنيع المنشورة في موقع TOOYEI الأصلي نقطة البداية الواقعية. وتأتي القيمة من ربط الحجم بنطاق المنتجات وضبط العمليات وأولويات فحص كل طلب.",
+      note: "الأرقام مأخوذة من معلومات الشركة المنشورة حالياً. يتم تأكيد نطاق المنتج وتخصيص الخطوط والطاقة ومتطلبات الاختبار في مستندات الطلب.",
+      metrics: [
+        { label: "قاعدة الإنتاج", detail: "منشأة تصنيع حديثة معلنة" },
+        { label: "خطوط الأرضيات", detail: "SPC وWPC وLVT واللامينيت" },
+        { label: "الطاقة السنوية المعلنة", detail: "للكميات والتوريد المتكرر" },
+        { label: "مراحل مضبوطة", detail: "من المواد الخام إلى الشحن" },
+      ],
+    },
+    risk: {
+      eyebrow: "مخاطر التوريد مقسمة إلى قرارات قابلة للضبط",
+      title: "لا نترك الجودة لفحص نهائي واحد.",
+      body: "يبدأ التسليم الموثوق بتعريف المنتج. تتم مواءمة البنية والزخرفة والسطح والقفل والطبقة الخلفية والتغليف والوثائق قبل الإنتاج الكمي.",
+      commitments: [
+        { title: "تثبيت المواصفة أولاً", description: "مواءمة البنية والمعيار البصري والتغليف والسوق قبل العينات والإنتاج." },
+        { title: "اكتشاف الانحراف أثناء العملية", description: "إدخال فحوص الأبعاد والسطح والوصلات والتغليف والعلامات في مراحل الإنتاج والشحن." },
+        { title: "الإفراج بناءً على الأدلة", description: "استخدام سجلات الموقع ونتائج الفحص ووثائق الاختبار المناسبة لدعم القرار." },
+      ],
+    },
+    system: {
+      eyebrow: "نظام واحد لضبط الطلب",
+      title: "خمس عمليات تسليم رئيسية من المتطلبات إلى الشحن.",
+      body: "تحدد كل عملية المدخلات والمخاطر والأدلة المطلوبة، وتقلل فقدان المعلومات بين المبيعات والإنتاج والجودة والخدمات اللوجستية.",
+      stages: [
+        { title: "تعريف المنتج", description: "تأكيد السوق والاستخدام والبنية والزخرفة والأداء واتجاه المطابقة." },
+        { title: "تحويله إلى برنامج", description: "تحويل الاعتماد إلى عينات ومواد ومسار إنتاج ومتطلبات تغليف." },
+        { title: "ضبط العملية", description: "مراقبة الانحراف في اللوح والسطح والتشكيل والطبقة الخلفية والتغليف." },
+        { title: "التحقق من الدفعة", description: "مطابقة المنتج والطلب بالفحص قبل الشحن والاختبارات المناسبة." },
+        { title: "الإفراج والتسليم", description: "تأكيد التغليف والملصقات والمنصات والوثائق وشروط الشحن." },
+      ],
+    },
+    deliverables: {
+      eyebrow: "ما الذي يستلمه المشتري",
+      title: "ليس البضاعة فقط، بل أدلة تدعم القرار الداخلي والتواصل مع السوق.",
+      body: "بحسب المنتج ونطاق المشروع، يمكن أن تشمل حزمة الجودة أربع مجموعات معلومات.",
+      items: [
+        { title: "خط أساس معتمد للمنتج", description: "تشكل المواصفة والعينة والمظهر والتغليف مرجعاً تنفيذياً واحداً." },
+        { title: "سجلات جودة الدفعة", description: "بيانات الأبعاد والأسطح والوصلات والتغليف والتعريف." },
+        { title: "تنسيق الاختبارات والمطابقة", description: "مواءمة الشهادات أو التقارير أو الاختبارات المتاحة مع المنتج والسوق." },
+        { title: "معلومات الإفراج عن الشحنة", description: "ينشئ التغليف والمنصات والتحميل والاستثناءات سجلاً قابلاً للتتبع." },
+      ],
     },
   },
 };
