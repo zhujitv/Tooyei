@@ -172,8 +172,8 @@ const serializeDownloads = (rows: DownloadRow[]) =>
     )
     .join("\n");
 
-const metricClass = "rounded-2xl border border-white/10 bg-white/[0.045] px-4 py-3";
-const rowClass = "rounded-2xl border border-white/10 bg-[#0b1220]/35 p-4 shadow-[0_14px_38px_rgba(0,0,0,0.14)]";
+const metricClass = "rounded-lg border border-white/[0.07] bg-white/[0.025] px-4 py-3";
+const rowClass = "rounded-lg border border-white/[0.07] bg-[#0a0a0b] p-3";
 
 function SectionHeader({
   icon: Icon,
@@ -187,17 +187,17 @@ function SectionHeader({
   count: number;
 }) {
   return (
-    <div className="flex flex-col justify-between gap-3 border-b border-white/10 pb-4 sm:flex-row sm:items-start">
+    <div className="flex flex-col justify-between gap-3 border-b border-white/[0.07] pb-4 sm:flex-row sm:items-start">
       <div className="flex items-start gap-3">
-        <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-[#b68a4c]/15 text-[#d6b36a]">
+        <span className="grid size-10 shrink-0 place-items-center rounded-md border border-white/[0.08] bg-white/[0.035] text-zinc-400">
           <Icon className="size-5" />
         </span>
         <div>
-          <h3 className="font-semibold text-white">{title}</h3>
-          <p className="mt-1 text-sm leading-6 text-white/40">{description}</p>
+          <h3 className="font-semibold text-zinc-100">{title}</h3>
+          <p className="mt-1 text-sm leading-6 text-zinc-600">{description}</p>
         </div>
       </div>
-      <Badge variant="outline" className="w-fit border-white/15 text-white/55">
+      <Badge variant="outline" className="w-fit border-white/[0.1] text-zinc-500">
         {count} 项
       </Badge>
     </div>
@@ -214,13 +214,13 @@ function VisibilityControl({
   onChange: (value: boolean) => void;
 }) {
   return (
-    <label className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.045] px-3 text-sm text-white/65">
+    <label className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-white/[0.07] bg-white/[0.025] px-3 text-sm text-zinc-400">
       <input
         type="checkbox"
         checked={checked}
         disabled={disabled}
         onChange={(event) => onChange(event.target.checked)}
-        className="size-4 accent-[#b68a4c] disabled:opacity-60"
+        className="size-4 accent-violet-400 disabled:opacity-60"
       />
       显示
     </label>
@@ -271,32 +271,32 @@ export function ProductStructuredContentEditor({
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <div className={metricClass}>
-          <p className="text-xs text-white/35">图片 / 视频</p>
-          <p className="mt-1 font-mono text-2xl text-white">{media.filter((row) => row.url.trim()).length}</p>
+          <p className="text-xs text-zinc-700">图片 / 视频</p>
+          <p className="mt-1 font-mono text-2xl text-zinc-100">{media.filter((row) => row.url.trim()).length}</p>
         </div>
         <div className={metricClass}>
-          <p className="text-xs text-white/35">卖点模块</p>
-          <p className="mt-1 font-mono text-2xl text-white">{features.filter((row) => row.title.trim()).length}</p>
+          <p className="text-xs text-zinc-700">卖点模块</p>
+          <p className="mt-1 font-mono text-2xl text-zinc-100">{features.filter((row) => row.title.trim()).length}</p>
         </div>
         <div className={metricClass}>
-          <p className="text-xs text-white/35">参数行</p>
-          <p className="mt-1 font-mono text-2xl text-white">
+          <p className="text-xs text-zinc-700">参数行</p>
+          <p className="mt-1 font-mono text-2xl text-zinc-100">
             {specifications.filter((row) => row.label.trim() && row.value.trim()).length}
           </p>
         </div>
         <div className={metricClass}>
-          <p className="text-xs text-white/35">应用场景</p>
-          <p className="mt-1 font-mono text-2xl text-white">{applications.filter((row) => row.title.trim()).length}</p>
+          <p className="text-xs text-zinc-700">应用场景</p>
+          <p className="mt-1 font-mono text-2xl text-zinc-100">{applications.filter((row) => row.title.trim()).length}</p>
         </div>
         <div className={metricClass}>
-          <p className="text-xs text-white/35">下载资料</p>
-          <p className="mt-1 font-mono text-2xl text-white">
+          <p className="text-xs text-zinc-700">下载资料</p>
+          <p className="mt-1 font-mono text-2xl text-zinc-100">
             {downloads.filter((row) => row.title.trim() && row.url.trim()).length}
           </p>
         </div>
       </div>
 
-      <section className="space-y-4 rounded-3xl border border-white/10 bg-white/[0.035] p-5">
+      <section className="space-y-4 rounded-lg border border-white/[0.07] bg-[#0d0d0f] p-4">
         <SectionHeader
           icon={ImageIcon}
           title="产品图片 / 图库"
@@ -389,7 +389,7 @@ export function ProductStructuredContentEditor({
                   disabled={disabled || media.length <= 1}
                   onClick={() => setMedia((rows) => rows.filter((item) => item.id !== row.id))}
                   aria-label={`删除第 ${index + 1} 张媒体`}
-                  className="text-white/45 hover:bg-rose-500/15 hover:text-rose-200"
+                  className="text-zinc-500 hover:bg-rose-500/15 hover:text-rose-200"
                 >
                   <Trash2 />
                 </Button>
@@ -402,14 +402,14 @@ export function ProductStructuredContentEditor({
           variant="outline"
           disabled={disabled}
           onClick={() => setMedia((rows) => [...rows, { ...emptyMediaRow(rows.length), id: nextId("media", rows.length) }])}
-          className="border-white/15 bg-white/[0.04] text-white hover:bg-white/10"
+          className="border-white/[0.1] bg-white/[0.04] text-zinc-100 hover:bg-white/10"
         >
           <Plus />
           添加媒体
         </Button>
       </section>
 
-      <section className="space-y-4 rounded-3xl border border-white/10 bg-white/[0.035] p-5">
+      <section className="space-y-4 rounded-lg border border-white/[0.07] bg-[#0d0d0f] p-4">
         <SectionHeader icon={Layers3} title="卖点模块" description="用于产品详情页的核心优势卡片，建议 3-6 条。" count={features.length} />
         <div className="grid gap-3 lg:grid-cols-2">
           {features.map((row, index) => (
@@ -481,7 +481,7 @@ export function ProductStructuredContentEditor({
                     size="sm"
                     disabled={disabled || features.length <= 1}
                     onClick={() => setFeatures((rows) => rows.filter((item) => item.id !== row.id))}
-                    className="text-white/45 hover:bg-rose-500/15 hover:text-rose-200"
+                    className="text-zinc-500 hover:bg-rose-500/15 hover:text-rose-200"
                   >
                     <Trash2 />
                     删除
@@ -496,14 +496,14 @@ export function ProductStructuredContentEditor({
           variant="outline"
           disabled={disabled}
           onClick={() => setFeatures((rows) => [...rows, { ...emptyFeatureRow(rows.length), id: nextId("feature", rows.length) }])}
-          className="border-white/15 bg-white/[0.04] text-white hover:bg-white/10"
+          className="border-white/[0.1] bg-white/[0.04] text-zinc-100 hover:bg-white/10"
         >
           <Plus />
           添加卖点
         </Button>
       </section>
 
-      <section className="space-y-4 rounded-3xl border border-white/10 bg-white/[0.035] p-5">
+      <section className="space-y-4 rounded-lg border border-white/[0.07] bg-[#0d0d0f] p-4">
         <SectionHeader icon={Grid2X2} title="产品参数表" description="结构化保存厚度、尺寸、耐磨层、包装等参数。" count={specifications.length} />
         <div className="space-y-3">
           {specifications.map((row, index) => (
@@ -582,7 +582,7 @@ export function ProductStructuredContentEditor({
                   disabled={disabled || specifications.length <= 1}
                   onClick={() => setSpecifications((rows) => rows.filter((item) => item.id !== row.id))}
                   aria-label={`删除第 ${index + 1} 条参数`}
-                  className="text-white/45 hover:bg-rose-500/15 hover:text-rose-200"
+                  className="text-zinc-500 hover:bg-rose-500/15 hover:text-rose-200"
                 >
                   <Trash2 />
                 </Button>
@@ -597,14 +597,14 @@ export function ProductStructuredContentEditor({
           onClick={() =>
             setSpecifications((rows) => [...rows, { ...emptySpecificationRow(rows.length), id: nextId("spec", rows.length) }])
           }
-          className="border-white/15 bg-white/[0.04] text-white hover:bg-white/10"
+          className="border-white/[0.1] bg-white/[0.04] text-zinc-100 hover:bg-white/10"
         >
           <Plus />
           添加参数
         </Button>
       </section>
 
-      <section className="space-y-4 rounded-3xl border border-white/10 bg-white/[0.035] p-5">
+      <section className="space-y-4 rounded-lg border border-white/[0.07] bg-[#0d0d0f] p-4">
         <SectionHeader icon={ListPlus} title="应用场景" description="用于工程、住宅、商业等场景化内容展示。" count={applications.length} />
         <div className="grid gap-3 lg:grid-cols-2">
           {applications.map((row, index) => (
@@ -687,7 +687,7 @@ export function ProductStructuredContentEditor({
                     size="sm"
                     disabled={disabled || applications.length <= 1}
                     onClick={() => setApplications((rows) => rows.filter((item) => item.id !== row.id))}
-                    className="text-white/45 hover:bg-rose-500/15 hover:text-rose-200"
+                    className="text-zinc-500 hover:bg-rose-500/15 hover:text-rose-200"
                   >
                     <Trash2 />
                     删除
@@ -704,14 +704,14 @@ export function ProductStructuredContentEditor({
           onClick={() =>
             setApplications((rows) => [...rows, { ...emptyApplicationRow(rows.length), id: nextId("application", rows.length) }])
           }
-          className="border-white/15 bg-white/[0.04] text-white hover:bg-white/10"
+          className="border-white/[0.1] bg-white/[0.04] text-zinc-100 hover:bg-white/10"
         >
           <Plus />
           添加场景
         </Button>
       </section>
 
-      <section className="space-y-4 rounded-3xl border border-white/10 bg-white/[0.035] p-5">
+      <section className="space-y-4 rounded-lg border border-white/[0.07] bg-[#0d0d0f] p-4">
         <SectionHeader icon={FileText} title="下载资料" description="上传或填写产品目录、规格表、安装指南、质保和证书。" count={downloads.length} />
         <div className="space-y-3">
           {downloads.map((row, index) => (
@@ -789,7 +789,7 @@ export function ProductStructuredContentEditor({
                   disabled={disabled || downloads.length <= 1}
                   onClick={() => setDownloads((rows) => rows.filter((item) => item.id !== row.id))}
                   aria-label={`删除第 ${index + 1} 条资料`}
-                  className="text-white/45 hover:bg-rose-500/15 hover:text-rose-200"
+                  className="text-zinc-500 hover:bg-rose-500/15 hover:text-rose-200"
                 >
                   <Trash2 />
                 </Button>
@@ -802,16 +802,16 @@ export function ProductStructuredContentEditor({
           variant="outline"
           disabled={disabled}
           onClick={() => setDownloads((rows) => [...rows, { ...emptyDownloadRow(rows.length), id: nextId("download", rows.length) }])}
-          className="border-white/15 bg-white/[0.04] text-white hover:bg-white/10"
+          className="border-white/[0.1] bg-white/[0.04] text-zinc-100 hover:bg-white/10"
         >
           <Plus />
           添加资料
         </Button>
       </section>
 
-      <div className="sticky bottom-4 z-10 flex flex-col gap-3 rounded-3xl border border-white/10 bg-[#070b14]/90 p-4 shadow-[0_24px_80px_rgba(0,0,0,0.38)] backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-white/45">保存后会刷新产品列表、公开产品页和多语言产品页缓存。</p>
-        <Button type="submit" disabled={disabled} className="h-11 bg-[#b68a4c] px-5 text-[#0b1220] hover:bg-[#c59b5c]">
+      <div className="sticky bottom-4 z-10 flex flex-col gap-3 rounded-xl border border-white/[0.07] bg-[#151517]/95 p-4 shadow-[0_24px_80px_rgba(0,0,0,0.38)] backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-zinc-500">保存后会刷新产品列表、公开产品页和多语言产品页缓存。</p>
+        <Button type="submit" disabled={disabled} className="h-10 bg-zinc-100 px-5 text-zinc-950 hover:bg-white">
           <Save />
           保存结构化内容
         </Button>

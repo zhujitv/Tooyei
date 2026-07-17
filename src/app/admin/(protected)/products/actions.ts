@@ -7,7 +7,7 @@ import { ContentStatus } from "@/generated/prisma/client";
 import { requireAdminSession } from "@/lib/admin-auth";
 import { isDatabaseConfigured } from "@/lib/db";
 import { safeWriteAuditLog } from "@/lib/repositories/audit-logs";
-import { createProduct, updateProductListSettings } from "@/lib/repositories/admin-products";
+import { batchUpdateProducts, createProduct, updateProductListSettings } from "@/lib/repositories/admin-products";
 
 const slugSchema = z
   .string()
@@ -34,6 +34,11 @@ const quickSettingsSchema = z.object({
   status: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]),
   featured: z.preprocess((value) => value === "on", z.boolean()),
   sortOrder: z.coerce.number().int().min(0).max(999999),
+});
+
+const batchSchema = z.object({
+  slugs: z.array(slugSchema).min(1).max(200),
+  operation: z.enum(["PUBLISH", "DRAFT", "ARCHIVE", "FEATURE", "UNFEATURE"]),
 });
 
 const revalidateProductAdminPaths = (slug?: string) => {
@@ -137,4 +142,33 @@ export async function updateProductListSettingsAction(formData: FormData) {
   }
 
   redirect("/admin/products?saved=quick");
+}
+
+export async function batchUpdateProductsAction(formData: FormData) {
+  const session = await requireAdminSession();
+  if (!isDatabaseConfigured()) redirect("/admin/products?error=database");
+
+  const parsed = batchSchema.safeParse({
+    slugs: formData.getAll("slugs"),
+    operation: formData.get("operation"),
+  });
+  if (!parsed.success) redirect("/admin/products?error=batch");
+
+  try {
+    const result = await batchUpdateProducts(parsed.data.slugs, parsed.data.operation);
+    await safeWriteAuditLog({
+      actorEmail: session.email,
+      action: "product.batch_updated",
+      entityType: "Product",
+      entityId: parsed.data.slugs.join(","),
+      metadata: { operation: parsed.data.operation, requested: parsed.data.slugs.length, updated: result.count },
+    });
+
+    for (const slug of parsed.data.slugs) revalidateProductAdminPaths(slug);
+  } catch (error) {
+    console.error("Batch update products failed", error instanceof Error ? error.message : error);
+    redirect("/admin/products?error=batch");
+  }
+
+  redirect("/admin/products?saved=batch");
 }

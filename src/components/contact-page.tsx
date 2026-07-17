@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
+import { socialLinks } from "@/config/social";
 import type { Product } from "@/lib/content";
 import { copy } from "@/lib/content";
 import { localizedPath, siteConfig, type Locale } from "@/lib/site";
@@ -111,6 +112,7 @@ export function ContactPage({ locale, products, selectedProductSlug, feedback }:
   const selectedProduct = products.find((product) => product.slug === selectedProductSlug);
   const contactPath = localizedPath(locale, "/contact");
   const sourcePath = selectedProduct ? `${contactPath}?product=${selectedProduct.slug}` : contactPath;
+  const whatsapp = socialLinks.find(({ key }) => key === "whatsapp");
 
   return (
     <div className="site-shell">
@@ -234,14 +236,14 @@ export function ContactPage({ locale, products, selectedProductSlug, feedback }:
                 </Button>
               </CardContent>
             </Card>
-            <Card className="site-card rounded-3xl">
+            {whatsapp?.href ? <Card className="site-card rounded-3xl">
               <CardHeader><CardTitle>WhatsApp</CardTitle></CardHeader>
               <CardContent>
                 <p className="mb-6 text-sm leading-6 text-muted-foreground">
                   {locale === "zh" ? t.whatsappHelp : "Best for quick product questions, sample coordination and response updates."}
                 </p>
                 <Button asChild variant="outline">
-                  <a href={siteConfig.whatsapp} target="_blank" rel="noreferrer">
+                  <a href={whatsapp.href} target="_blank" rel="noopener noreferrer">
                     <MessageCircle /> {locale === "zh" ? t.startConversation : "Start conversation"}
                   </a>
                 </Button>
@@ -249,7 +251,7 @@ export function ContactPage({ locale, products, selectedProductSlug, feedback }:
                   <Phone className="size-4" /> {siteConfig.phone}
                 </p>
               </CardContent>
-            </Card>
+            </Card> : null}
           </div>
         </section>
       </main>

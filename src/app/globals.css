@@ -30,7 +30,7 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
+  --color-muted: var(--surface-muted);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
@@ -49,6 +49,14 @@
 }
 
 :root {
+  --navy: #08111f;
+  --navy-soft: #111b2b;
+  --ivory: #f4f1ea;
+  --paper: #faf9f6;
+  --gold: #b9975b;
+  --gold-hover: #c7a66b;
+  --text: #111827;
+  --muted: #667085;
   --background: oklch(0.975 0.008 92);
   --foreground: oklch(0.19 0.035 255);
   --card: oklch(1 0 0);
@@ -59,12 +67,12 @@
   --primary-foreground: oklch(0.985 0.006 95);
   --secondary: oklch(0.94 0.015 95);
   --secondary-foreground: oklch(0.24 0.04 255);
-  --muted: oklch(0.94 0.012 95);
+  --surface-muted: oklch(0.94 0.012 95);
   --muted-foreground: oklch(0.48 0.025 255);
   --accent: oklch(0.74 0.085 78);
   --accent-foreground: oklch(0.17 0.035 255);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.88 0.012 95);
+  --border: #e5e2dc;
   --input: oklch(0.88 0.012 95);
   --ring: oklch(0.58 0.08 78);
   --chart-1: oklch(0.74 0.085 78);
@@ -94,7 +102,7 @@
   --primary-foreground: oklch(0.205 0 0);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
+  --surface-muted: oklch(0.269 0 0);
   --muted-foreground: oklch(0.708 0 0);
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
@@ -138,11 +146,35 @@
   }
 
   .brand-eyebrow {
-    @apply text-xs font-bold uppercase tracking-[0.22em] text-[#b68a4c];
+    @apply text-[0.68rem] font-bold uppercase tracking-[0.22em] text-[var(--gold)];
+  }
+
+  .brand-eyebrow-light {
+    @apply flex items-center gap-3 text-[0.68rem] font-bold uppercase tracking-[0.22em] text-[var(--gold)];
+  }
+
+  .brand-eyebrow-light > span {
+    @apply h-px w-9 bg-[var(--gold)];
+  }
+
+  .brand-h2 {
+    @apply text-[clamp(2.6rem,4.5vw,3.25rem)] font-medium leading-[1.08] tracking-[-0.05em] text-[var(--navy)];
+  }
+
+  .brand-text-link {
+    @apply inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-[var(--navy)] transition-colors hover:text-[var(--gold)];
+  }
+
+  .brand-text-link > svg {
+    @apply size-4 transition-transform duration-300;
+  }
+
+  .brand-text-link:hover > svg {
+    @apply translate-x-1;
   }
 
   .site-shell {
-    @apply min-h-screen bg-[#f6f4ef] text-[#111827];
+    @apply min-h-screen overflow-x-clip bg-[var(--paper)] text-[var(--text)];
   }
 
   .site-card {
@@ -162,14 +194,104 @@
   }
 
   .admin-page {
-    @apply mx-auto max-w-7xl px-5 py-10 lg:px-8 lg:py-14;
+    @apply mx-auto w-full max-w-[1500px] px-4 py-6 sm:px-6 lg:px-8 lg:py-7;
   }
 
   .admin-card {
-    @apply border-white/10 bg-white/[0.055] text-white shadow-[0_24px_70px_rgba(0,0,0,0.18)] backdrop-blur;
+    @apply rounded-xl border border-white/[0.075] bg-[#111113] text-zinc-100 shadow-none ring-0;
   }
 
   .admin-field {
-    @apply border-white/10 bg-white/[0.055] text-white placeholder:text-white/30;
+    @apply rounded-md border-white/[0.09] bg-[#0d0d0f] text-zinc-200 placeholder:text-zinc-700 focus-visible:border-zinc-500 focus-visible:ring-2 focus-visible:ring-white/[0.06];
   }
+
+  .admin-select {
+    @apply rounded-md border border-white/[0.09] bg-[#0d0d0f] text-zinc-300 outline-none transition-colors focus:border-zinc-500 focus:ring-2 focus:ring-white/[0.06] disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .admin-label {
+    @apply text-[11px] font-medium text-zinc-500;
+  }
+
+  .admin-checkbox {
+    @apply size-3.5 rounded border-white/15 bg-[#0d0d0f] accent-violet-400;
+  }
+}
+
+@keyframes brand-hero-zoom {
+  from { transform: scale(1); }
+  to { transform: scale(1.03); }
+}
+
+@keyframes brand-fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.brand-hero-image {
+  animation: brand-hero-zoom 18s ease-out both;
+}
+
+.brand-fade-up {
+  animation: brand-fade-up 650ms ease-out both;
+}
+
+.brand-horizontal-scroll {
+  scrollbar-color: var(--gold) var(--border);
+  scrollbar-width: thin;
+}
+
+.brand-horizontal-scroll::-webkit-scrollbar {
+  height: 3px;
+}
+
+.brand-horizontal-scroll::-webkit-scrollbar-track {
+  background: var(--border);
+}
+
+.brand-horizontal-scroll::-webkit-scrollbar-thumb {
+  background: var(--gold);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand-hero-image,
+  .brand-fade-up {
+    animation: none;
+  }
+
+  .site-shell *,
+  .site-shell *::before,
+  .site-shell *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+.admin-root {
+  color-scheme: dark;
+  background-image: radial-gradient(circle at 70% -20%, rgba(139, 92, 246, 0.055), transparent 32rem);
+}
+
+.admin-root .admin-card {
+  color: #f4f4f5;
+  background-color: #111113;
+  border-color: rgba(255, 255, 255, 0.075);
+  box-shadow: none;
+}
+
+.admin-root .admin-field {
+  color: #e4e4e7;
+  background-color: #0d0d0f;
+  border-color: rgba(255, 255, 255, 0.09);
+}
+
+.admin-root select option {
+  background: #151517;
+  color: #e4e4e7;
+}
+
+.admin-root details > summary::-webkit-details-marker {
+  display: none;
 }

@@ -6,7 +6,7 @@ export const siteConfig = {
   url: process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.tooyei.com",
   email: "kitty@tooyei.com",
   phone: "+86 180 1505 7611",
-  whatsapp: "https://api.whatsapp.com/send?phone=8618015007771",
+  whatsappDisplay: "+86 180 1500 7771",
 } as const;
 
 export const locales = ["zh", "en", "es", "de"] as const;

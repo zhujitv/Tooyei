@@ -22,10 +22,21 @@ export type AdminProductSummary = {
   featured: boolean;
   sortOrder: number;
   title: string;
+  thumbnailUrl: string;
+  thumbnailAlt: string;
   updatedAt: Date | null;
   translationStates: Record<Locale, TranslationStatus>;
   publishedTranslations: number;
   missingTranslations: number;
+  seoReadyTranslations: number;
+  contentCounts: {
+    media: number;
+    features: number;
+    specifications: number;
+    applications: number;
+    downloads: number;
+  };
+  completion: number;
 };
 
 export type AdminProductTranslation = {
@@ -142,6 +153,8 @@ export type UpdateProductListSettingsInput = {
   featured: boolean;
   sortOrder: number;
 };
+
+export type BatchProductOperation = "PUBLISH" | "DRAFT" | "ARCHIVE" | "FEATURE" | "UNFEATURE";
 
 export type UpdateProductCoreInput = {
   slug: string;
@@ -288,6 +301,8 @@ const sampleSummaries = (): AdminProductSummary[] =>
     sortOrder: index,
     updatedAt: sampleDate,
     title: product.title.zh,
+    thumbnailUrl: product.image,
+    thumbnailAlt: product.title.zh,
     translationStates: {
       zh: TranslationStatus.PUBLISHED,
       en: TranslationStatus.PUBLISHED,
@@ -296,6 +311,15 @@ const sampleSummaries = (): AdminProductSummary[] =>
     },
     publishedTranslations: locales.length,
     missingTranslations: 0,
+    seoReadyTranslations: locales.length,
+    contentCounts: {
+      media: 1,
+      features: product.features.length,
+      specifications: product.specifications.length,
+      applications: 0,
+      downloads: 0,
+    },
+    completion: 90,
   }));
 
 const categoryLabel = (category?: {
@@ -318,6 +342,18 @@ const listProductInclude = {
     },
   },
   translations: true,
+  primaryImage: {
+    select: { url: true, alt: true },
+  },
+  _count: {
+    select: {
+      media: true,
+      features: true,
+      specifications: true,
+      applications: true,
+      downloads: true,
+    },
+  },
 } satisfies Prisma.ProductInclude;
 
 const editProductInclude = {
@@ -358,6 +394,29 @@ const toSummary = (product: AdminProductRecord): AdminProductSummary => {
   const states = Object.fromEntries(
     locales.map((locale) => [locale, translationFor(product, locale)?.status ?? TranslationStatus.MISSING]),
   ) as Record<Locale, TranslationStatus>;
+  const seoReadyTranslations = locales.filter((locale) => {
+    const translation = translationFor(product, locale);
+    return Boolean(translation?.seoTitle?.trim() && translation.seoDescription?.trim());
+  }).length;
+  const contentCounts = {
+    media: product._count.media,
+    features: product._count.features,
+    specifications: product._count.specifications,
+    applications: product._count.applications,
+    downloads: product._count.downloads,
+  };
+  const publishedTranslations = locales.filter((locale) => states[locale] === TranslationStatus.PUBLISHED).length;
+  const completion = Math.min(
+    100,
+    15 +
+      (product.primaryImage || contentCounts.media ? 20 : 0) +
+      (contentCounts.features ? 10 : 0) +
+      (contentCounts.specifications ? 15 : 0) +
+      (contentCounts.applications ? 5 : 0) +
+      (contentCounts.downloads ? 5 : 0) +
+      Math.round((publishedTranslations / locales.length) * 20) +
+      Math.round((seoReadyTranslations / locales.length) * 10),
+  );
 
   return {
     slug: product.slug,
@@ -370,9 +429,14 @@ const toSummary = (product: AdminProductRecord): AdminProductSummary => {
     sortOrder: product.sortOrder,
     updatedAt: product.updatedAt,
     title: translationFor(product, "zh")?.title ?? translationFor(product, "en")?.title ?? product.sku,
+    thumbnailUrl: product.primaryImage?.url ?? "",
+    thumbnailAlt: product.primaryImage?.alt ?? translationFor(product, "zh")?.title ?? product.sku,
     translationStates: states,
-    publishedTranslations: locales.filter((locale) => states[locale] === TranslationStatus.PUBLISHED).length,
+    publishedTranslations,
     missingTranslations: locales.filter((locale) => states[locale] === TranslationStatus.MISSING).length,
+    seoReadyTranslations,
+    contentCounts,
+    completion,
   };
 };
 
@@ -679,6 +743,28 @@ export async function updateProductListSettings(input: UpdateProductListSettings
       featured: true,
       sortOrder: true,
     },
+  });
+}
+
+export async function batchUpdateProducts(slugs: string[], operation: BatchProductOperation) {
+  if (!isDatabaseConfigured()) {
+    throw new Error("DATABASE_URL is required before products can be updated.");
+  }
+
+  const data: Prisma.ProductUpdateManyMutationInput =
+    operation === "PUBLISH"
+      ? { status: ContentStatus.PUBLISHED }
+      : operation === "DRAFT"
+        ? { status: ContentStatus.DRAFT }
+        : operation === "ARCHIVE"
+          ? { status: ContentStatus.ARCHIVED }
+          : operation === "FEATURE"
+            ? { featured: true }
+            : { featured: false };
+
+  return getPrisma().product.updateMany({
+    where: { slug: { in: slugs } },
+    data,
   });
 }
 

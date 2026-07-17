@@ -9,109 +9,77 @@ import { getContentOperationsSummary } from "@/lib/repositories/content-operatio
 import { languageNames } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
-
-export const metadata: Metadata = {
-  title: "内容运营总览",
-  robots: { index: false, follow: false },
-};
+export const metadata: Metadata = { title: "内容运营总览", robots: { index: false, follow: false } };
 
 export default async function ContentOperationsPage() {
   const summary = await getContentOperationsSummary();
   const metrics = [
-    { label: "产品", value: summary.products, icon: Package },
-    { label: "文章", value: summary.articles, icon: BookOpen },
-    { label: "常见问题", value: summary.faqs, icon: CircleHelp },
-    { label: "新询盘", value: summary.newInquiries, icon: MessageSquare },
+    { label: "产品", value: summary.products, icon: Package, detail: "产品目录" },
+    { label: "文章", value: summary.articles, icon: BookOpen, detail: "内容资产" },
+    { label: "常见问题", value: summary.faqs, icon: CircleHelp, detail: "客户支持" },
+    { label: "新询盘", value: summary.newInquiries, icon: MessageSquare, detail: "待跟进线索" },
   ];
 
   return (
-    <main className="px-5 py-10 lg:px-8 lg:py-14">
-      <div className="mx-auto max-w-7xl">
-        <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
-          <div>
-            <div className="flex items-center gap-3">
-              <span className="brand-mark size-9 text-sm">TY</span>
-              <Badge variant="outline" className="border-white/15 text-white/65">后台管理</Badge>
-            </div>
-            <h1 className="mt-8 text-4xl font-semibold tracking-[-0.04em] sm:text-5xl">内容运营总览</h1>
-            <p className="mt-4 max-w-2xl text-sm leading-6 text-white/50">
-              查看产品目录规模、翻译发布进度和最新询盘需求。
-            </p>
-          </div>
-          <Badge className={summary.source === "database" ? "bg-emerald-600" : "bg-amber-600"}>
-            <Database className="size-3.5" /> {summary.source === "database" ? "PostgreSQL 已连接" : "示例数据"}
-          </Badge>
+    <main className="admin-page">
+      <header className="flex flex-col gap-4 border-b border-white/[0.07] pb-6 md:flex-row md:items-end md:justify-between">
+        <div>
+          <p className="text-[11px] font-medium text-zinc-600">工作空间 / 总览</p>
+          <h1 className="mt-3 text-2xl font-semibold tracking-[-0.035em] text-zinc-50">运营工作台</h1>
+          <p className="mt-1.5 text-sm text-zinc-500">产品、内容、多语言发布与销售线索的统一视图。</p>
         </div>
+        <Badge className={summary.source === "database" ? "border border-emerald-500/20 bg-emerald-500/10 text-emerald-300" : "border border-amber-500/20 bg-amber-500/10 text-amber-300"}>
+          <Database className="size-3" /> {summary.source === "database" ? "PostgreSQL 已连接" : "示例数据"}
+        </Badge>
+      </header>
 
-        {summary.source === "sample" && (
-          <Alert className="mt-10 border-amber-500/30 bg-amber-500/8 text-amber-100">
-            <Database className="size-4" />
-            <AlertTitle>数据库连接未配置</AlertTitle>
-            <AlertDescription className="text-amber-100/65">
-              当前公开站和后台正在使用迁移示例数据。配置 DATABASE_URL、部署数据库结构并执行种子数据后，将切换为 PostgreSQL 数据。
-            </AlertDescription>
-          </Alert>
-        )}
+      {summary.source === "sample" ? (
+        <Alert className="mt-5 border-amber-500/20 bg-amber-500/[0.07] text-amber-200">
+          <Database className="size-4" />
+          <AlertTitle>数据库连接未配置</AlertTitle>
+          <AlertDescription className="text-amber-200/60">当前公开站和后台正在使用迁移示例数据。配置 DATABASE_URL 后将自动切换为 PostgreSQL 数据。</AlertDescription>
+        </Alert>
+      ) : null}
 
-        <section className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {metrics.map(({ label, value, icon: Icon }) => (
-            <Card key={label} className="admin-card rounded-3xl">
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-sm font-medium text-white/55">{label}</CardTitle>
-                <Icon className="size-4 text-[#d6b36a]" />
-              </CardHeader>
-              <CardContent><p className="font-mono text-4xl font-semibold">{value}</p></CardContent>
-            </Card>
-          ))}
-        </section>
+      <section className="mt-5 grid gap-px overflow-hidden rounded-xl border border-white/[0.07] bg-white/[0.07] sm:grid-cols-2 xl:grid-cols-4">
+        {metrics.map(({ label, value, icon: Icon, detail }) => (
+          <div key={label} className="bg-[#111113] p-4">
+            <div className="flex items-center justify-between"><span className="text-[11px] text-zinc-600">{label}</span><Icon className="size-3.5 text-zinc-700" /></div>
+            <p className="mt-3 font-mono text-2xl font-medium tracking-[-0.04em] text-zinc-100">{value}</p>
+            <p className="mt-1 text-[10px] text-zinc-700">{detail}</p>
+          </div>
+        ))}
+      </section>
 
-        <Card className="mt-8 admin-card rounded-3xl">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <Languages className="size-5 text-[#d6b36a]" />
-              <div>
-                <CardTitle>翻译发布流程</CardTitle>
-                <p className="mt-1 text-sm text-white/45">只有已发布的翻译会生成可索引页面和 hreflang 多语言入口。</p>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow className="border-white/10 hover:bg-transparent">
-                  <TableHead className="text-white/45">语言</TableHead>
-                  <TableHead className="text-white/45">已发布</TableHead>
-                  <TableHead className="text-white/45">待审核</TableHead>
-                  <TableHead className="text-white/45">机器草稿</TableHead>
-                  <TableHead className="text-white/45">缺失</TableHead>
-                  <TableHead className="min-w-48 text-white/45">完成度</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {summary.translations.map((translation) => {
-                  const total = translation.published + translation.review + translation.machineDraft + translation.missing;
-                  const readiness = total ? Math.round((translation.published / total) * 100) : 0;
-                  return (
-                    <TableRow key={translation.locale} className="border-white/10 hover:bg-white/[0.03]">
-                      <TableCell className="font-medium">{languageNames[translation.locale]}</TableCell>
-                      <TableCell className="font-mono text-emerald-400">{translation.published}</TableCell>
-                      <TableCell className="font-mono text-amber-300">{translation.review}</TableCell>
-                      <TableCell className="font-mono text-sky-300">{translation.machineDraft}</TableCell>
-                      <TableCell className="font-mono text-white/40">{translation.missing}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <Progress value={readiness} className="h-2 bg-white/10 [&_[data-slot=progress-indicator]]:bg-[#b68a4c]" />
-                          <span className="w-10 text-right font-mono text-xs text-white/55">{readiness}%</span>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </div>
+      <Card className="admin-card mt-5">
+        <CardHeader className="border-b border-white/[0.065] pb-4">
+          <div className="flex items-start gap-3">
+            <span className="grid size-8 place-items-center rounded-md border border-white/[0.08] bg-white/[0.03] text-zinc-500"><Languages className="size-4" /></span>
+            <div><CardTitle className="text-sm">多语言发布进度</CardTitle><p className="mt-1 text-xs text-zinc-600">只有已发布的翻译会生成可索引页面和 hreflang 入口。</p></div>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-1">
+          <Table>
+            <TableHeader><TableRow className="border-white/[0.07] hover:bg-transparent"><TableHead className="text-zinc-600">语言</TableHead><TableHead className="text-zinc-600">已发布</TableHead><TableHead className="text-zinc-600">待审核</TableHead><TableHead className="text-zinc-600">机器草稿</TableHead><TableHead className="text-zinc-600">缺失</TableHead><TableHead className="min-w-48 text-zinc-600">完成度</TableHead></TableRow></TableHeader>
+            <TableBody>
+              {summary.translations.map((translation) => {
+                const total = translation.published + translation.review + translation.machineDraft + translation.missing;
+                const readiness = total ? Math.round((translation.published / total) * 100) : 0;
+                return (
+                  <TableRow key={translation.locale} className="border-white/[0.065] hover:bg-white/[0.025]">
+                    <TableCell className="font-medium text-zinc-300">{languageNames[translation.locale]}</TableCell>
+                    <TableCell className="font-mono text-emerald-400">{translation.published}</TableCell>
+                    <TableCell className="font-mono text-amber-300">{translation.review}</TableCell>
+                    <TableCell className="font-mono text-violet-300">{translation.machineDraft}</TableCell>
+                    <TableCell className="font-mono text-zinc-600">{translation.missing}</TableCell>
+                    <TableCell><div className="flex items-center gap-3"><Progress value={readiness} className="h-1 bg-white/[0.06] [&_[data-slot=progress-indicator]]:bg-zinc-300" /><span className="w-10 text-right font-mono text-[10px] text-zinc-500">{readiness}%</span></div></TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </main>
   );
 }

@@ -81,19 +81,16 @@ export default async function AdminUsersPage({
   const feedback = params.error ? errorMessageMap[params.error] : params.saved ? savedMessageMap[params.saved] : undefined;
 
   return (
-    <main className="mx-auto max-w-7xl px-5 py-10 lg:px-8 lg:py-14">
-      <div className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
+    <main className="admin-page">
+      <div className="flex flex-col justify-between gap-5 border-b border-white/[0.07] pb-6 md:flex-row md:items-end">
         <div>
-          <div className="flex items-center gap-3">
-            <span className="brand-mark size-9 text-sm">TY</span>
-            <Badge variant="outline" className="border-white/15 text-white/65">后台设置</Badge>
-          </div>
-          <h1 className="mt-8 text-4xl font-semibold tracking-[-0.04em] sm:text-5xl">用户管理</h1>
-          <p className="mt-4 max-w-2xl text-sm leading-6 text-white/50">
+          <p className="text-[11px] font-medium text-zinc-600">系统 / 团队与权限</p>
+          <h1 className="mt-3 text-2xl font-semibold tracking-[-0.035em] text-zinc-50">用户管理</h1>
+          <p className="mt-1.5 max-w-2xl text-sm leading-6 text-zinc-500">
             管理后台账号、角色、启用状态和登录密码。只有所有者可以创建账号或修改他人账号。
           </p>
         </div>
-        <Badge className={databaseReady ? "bg-emerald-600" : "bg-amber-600"}>
+        <Badge className={databaseReady ? "border border-emerald-500/20 bg-emerald-500/10 text-emerald-300" : "border border-amber-500/20 bg-amber-500/10 text-amber-300"}>
           <Database className="size-3.5" />
           {databaseReady ? "PostgreSQL 已连接" : "只读环境变量账号"}
         </Badge>
@@ -125,26 +122,26 @@ export default async function AdminUsersPage({
         </Alert>
       ) : null}
 
-      <section className="mt-8 grid gap-6 lg:grid-cols-[1fr_380px]">
-        <Card className="admin-card rounded-3xl">
+      <section className="mt-5 grid gap-5 lg:grid-cols-[1fr_360px]">
+        <Card className="admin-card rounded-xl">
           <CardHeader>
             <div className="flex items-center gap-3">
-              <Users className="size-5 text-[#d6b36a]" />
+              <Users className="size-5 text-zinc-500" />
               <div>
                 <CardTitle>后台用户</CardTitle>
-                <p className="mt-1 text-sm text-white/40">当前登录：{session.email}</p>
+                <p className="mt-1 text-sm text-zinc-600">当前登录：{session.email}</p>
               </div>
             </div>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
-                <TableRow className="border-white/10 hover:bg-transparent">
-                  <TableHead className="text-white/45">用户</TableHead>
-                  <TableHead className="text-white/45">角色 / 状态</TableHead>
-                  <TableHead className="text-white/45">更新时间</TableHead>
-                  <TableHead className="min-w-[320px] text-white/45">修改资料</TableHead>
-                  <TableHead className="min-w-[300px] text-white/45">重置密码</TableHead>
+                <TableRow className="border-white/[0.07] hover:bg-transparent">
+                  <TableHead className="text-zinc-500">用户</TableHead>
+                  <TableHead className="text-zinc-500">角色 / 状态</TableHead>
+                  <TableHead className="text-zinc-500">更新时间</TableHead>
+                  <TableHead className="min-w-[320px] text-zinc-500">修改资料</TableHead>
+                  <TableHead className="min-w-[300px] text-zinc-500">重置密码</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -153,25 +150,25 @@ export default async function AdminUsersPage({
                   const saveProfileAction = updateAdminUserProfileAction.bind(null, user.id);
                   const savePasswordAction = updateAdminUserPasswordAction.bind(null, user.id);
                   return (
-                    <TableRow key={user.id} className="align-top border-white/10 hover:bg-white/[0.03]">
+                    <TableRow key={user.id} className="align-top border-white/[0.07] hover:bg-white/[0.03]">
                       <TableCell>
                         <div className="font-medium">{user.name}</div>
-                        <div className="mt-1 font-mono text-xs text-white/45">{user.email}</div>
+                        <div className="mt-1 font-mono text-xs text-zinc-500">{user.email}</div>
                         {user.isBootstrapAdmin ? (
-                          <Badge className="mt-3 bg-[#b68a4c] text-[#0b1220]">
+                          <Badge className="mt-3 border border-violet-500/20 bg-violet-500/10 text-violet-300">
                             <ShieldCheck className="size-3.5" />
                             Bootstrap Owner
                           </Badge>
                         ) : null}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="border-white/15 text-white/65">{roleLabel[user.role]}</Badge>
-                        <p className="mt-2 max-w-44 text-xs leading-5 text-white/35">{roleHelp[user.role]}</p>
-                        <p className={user.active ? "mt-2 text-xs text-emerald-300" : "mt-2 text-xs text-white/35"}>
+                        <Badge variant="outline" className="border-white/[0.1] text-zinc-400">{roleLabel[user.role]}</Badge>
+                        <p className="mt-2 max-w-44 text-xs leading-5 text-zinc-700">{roleHelp[user.role]}</p>
+                        <p className={user.active ? "mt-2 text-xs text-emerald-300" : "mt-2 text-xs text-zinc-700"}>
                           {user.active ? "已启用" : "已停用"}
                         </p>
                       </TableCell>
-                      <TableCell className="font-mono text-xs text-white/45">
+                      <TableCell className="font-mono text-xs text-zinc-500">
                         <p>创建：{formatDate(user.createdAt)}</p>
                         <p className="mt-2">更新：{formatDate(user.updatedAt)}</p>
                       </TableCell>
@@ -198,20 +195,20 @@ export default async function AdminUsersPage({
                               defaultValue={user.role}
                               aria-label={`${user.email} 的角色`}
                               disabled={!canManageUsers || user.isBootstrapAdmin}
-                              className="h-9 rounded-lg admin-field px-3 text-sm disabled:opacity-60"
+                              className="h-9 rounded-md admin-field px-3 text-sm disabled:opacity-60"
                             >
                               {Object.values(AdminRole).map((role) => (
                                 <option key={role} value={role}>{roleLabel[role]}</option>
                               ))}
                             </select>
-                            <label className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.05] px-3 text-sm text-white/65">
+                            <label className="inline-flex items-center gap-2 rounded-lg border border-white/[0.07] bg-white/[0.05] px-3 text-sm text-zinc-400">
                               <input
                                 type="checkbox"
                                 name="active"
                                 aria-label={`${user.email} 的启用状态`}
                                 defaultChecked={user.active}
                                 disabled={!canManageUsers || user.isBootstrapAdmin}
-                                className="size-4 accent-[#b68a4c] disabled:opacity-60"
+                                className="admin-checkbox disabled:opacity-60"
                               />
                               启用
                             </label>
@@ -220,7 +217,7 @@ export default async function AdminUsersPage({
                             type="submit"
                             size="sm"
                             disabled={!canManageUsers}
-                            className="bg-[#b68a4c] text-[#0b1220] hover:bg-[#c59b5c]"
+                            className="bg-zinc-100 text-zinc-950 hover:bg-white"
                           >
                             保存资料
                           </Button>
@@ -237,7 +234,7 @@ export default async function AdminUsersPage({
                             autoComplete="new-password"
                             placeholder="新密码，至少 12 位"
                             disabled={!canChangePassword}
-                            className="admin-field placeholder:text-white/25 disabled:opacity-60"
+                            className="admin-field placeholder:text-zinc-100/25 disabled:opacity-60"
                           />
                           <Input
                             name="confirmPassword"
@@ -248,19 +245,19 @@ export default async function AdminUsersPage({
                             autoComplete="new-password"
                             placeholder="再次输入新密码"
                             disabled={!canChangePassword}
-                            className="admin-field placeholder:text-white/25 disabled:opacity-60"
+                            className="admin-field placeholder:text-zinc-100/25 disabled:opacity-60"
                           />
                           <Button
                             type="submit"
                             size="sm"
                             disabled={!canChangePassword}
-                            className="bg-[#b68a4c] text-[#0b1220] hover:bg-[#c59b5c]"
+                            className="bg-zinc-100 text-zinc-950 hover:bg-white"
                           >
                             <KeyRound />
                             修改密码
                           </Button>
                           {!canChangePassword ? (
-                            <p className="text-xs text-white/30">只有所有者或账号本人可以修改密码。</p>
+                            <p className="text-xs text-zinc-100/30">只有所有者或账号本人可以修改密码。</p>
                           ) : null}
                         </form>
                       </TableCell>
@@ -272,13 +269,13 @@ export default async function AdminUsersPage({
           </CardContent>
         </Card>
 
-        <Card className="h-fit admin-card rounded-3xl">
+        <Card className="h-fit admin-card rounded-xl">
           <CardHeader>
             <div className="flex items-center gap-3">
-              <UserPlus className="size-5 text-[#d6b36a]" />
+              <UserPlus className="size-5 text-zinc-500" />
               <div>
                 <CardTitle>新增用户</CardTitle>
-                <p className="mt-1 text-sm text-white/40">创建后用户即可用邮箱和密码登录后台。</p>
+                <p className="mt-1 text-sm text-zinc-600">创建后用户即可用邮箱和密码登录后台。</p>
               </div>
             </div>
           </CardHeader>
@@ -315,7 +312,7 @@ export default async function AdminUsersPage({
                   name="role"
                   defaultValue={AdminRole.EDITOR}
                   disabled={!canManageUsers}
-                  className="h-9 w-full rounded-lg admin-field px-3 text-sm disabled:opacity-60"
+                  className="h-9 w-full rounded-md admin-field px-3 text-sm disabled:opacity-60"
                 >
                   {Object.values(AdminRole).map((role) => (
                     <option key={role} value={role}>{roleLabel[role]}</option>
@@ -353,13 +350,13 @@ export default async function AdminUsersPage({
               <Button
                 type="submit"
                 disabled={!canManageUsers}
-                className="w-full bg-[#b68a4c] text-[#0b1220] hover:bg-[#c59b5c]"
+                className="w-full bg-zinc-100 text-zinc-950 hover:bg-white"
               >
                 <UserPlus />
                 创建用户
               </Button>
               {!canManageUsers ? (
-                <p className="text-xs leading-5 text-white/35">只有所有者账号可以新增后台用户。</p>
+                <p className="text-xs leading-5 text-zinc-700">只有所有者账号可以新增后台用户。</p>
               ) : null}
             </form>
           </CardContent>

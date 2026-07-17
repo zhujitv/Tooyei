@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import { redirect } from "next/navigation";
 import { LockKeyhole } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -29,12 +30,15 @@ export default async function AdminLoginPage({
   const message = params.error ? messages[params.error] : undefined;
 
   return (
-    <main className="grid min-h-screen place-items-center bg-[radial-gradient(circle_at_top_left,rgba(182,138,76,0.18),transparent_34%),linear-gradient(135deg,#070b14,#0b1020_52%,#111827)] px-5 py-12 text-white">
-      <Card className="w-full max-w-md rounded-3xl border-white/10 bg-white/[0.07] text-white shadow-[0_30px_90px_rgba(0,0,0,0.35)] backdrop-blur">
+    <main className="grid min-h-screen place-items-center bg-[#0a0a0b] px-5 py-12 text-white [color-scheme:dark]">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_50%_-10%,rgba(139,92,246,0.08),transparent_28rem)]" />
+      <Card className="relative w-full max-w-sm rounded-xl border border-white/[0.08] bg-[#111113] text-white shadow-[0_30px_100px_rgba(0,0,0,0.4)] ring-0">
         <CardHeader>
-          <span className="brand-mark mb-5 size-11 text-sm">TY</span>
-          <CardTitle className="text-2xl tracking-[-0.03em]">Tooyei 后台管理</CardTitle>
-          <CardDescription className="text-white/50">登录后可管理产品、翻译、发布状态、询盘和用户权限。</CardDescription>
+          <span className="mb-5 grid size-9 place-items-center overflow-hidden rounded-md bg-[#df2029]">
+            <Image src="/brand/tooyei-symbol.png" width={28} height={29} alt="" className="h-auto brightness-0 invert" priority />
+          </span>
+          <CardTitle className="text-xl tracking-[-0.03em] text-zinc-50">登录 Tooyei</CardTitle>
+          <CardDescription className="text-zinc-600">进入内容与销售运营工作区。</CardDescription>
         </CardHeader>
         <CardContent>
           {message && (
@@ -46,15 +50,15 @@ export default async function AdminLoginPage({
           )}
           <form action={loginAction} className="space-y-5">
             <input type="hidden" name="returnTo" value={params.returnTo ?? ""} />
-            <div className="space-y-2">
-              <Label htmlFor="email">邮箱</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="email" className="admin-label">邮箱</Label>
               <Input id="email" name="email" type="email" autoComplete="username" required className="admin-field" />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">密码</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="password" className="admin-label">密码</Label>
               <Input id="password" name="password" type="password" minLength={12} autoComplete="current-password" required className="admin-field" />
             </div>
-            <Button type="submit" className="w-full bg-[#b68a4c] text-[#0b1220] hover:bg-[#c59b5c]">登录</Button>
+            <Button type="submit" className="w-full bg-zinc-100 text-zinc-950 hover:bg-white">登录</Button>
           </form>
         </CardContent>
       </Card>

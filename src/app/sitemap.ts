@@ -5,5 +5,12 @@ export const dynamic = "force-dynamic";
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const productSlugs = await getPublishedProductSlugs();
   const paths=["/","/products","/contact",...productSlugs.map((slug)=>`/products/${slug}`)];
-  return locales.flatMap((locale)=>paths.map((path)=>({url:new URL(localizedPath(locale,path),siteConfig.url).toString(),lastModified:new Date(),changeFrequency:path.includes("/products/")?"weekly":"monthly",priority:path==="/"?1:path==="/products"?0.9:0.7})));
+  const localizedEntries = locales.flatMap((locale)=>paths.map((path)=>({url:new URL(localizedPath(locale,path),siteConfig.url).toString(),lastModified:new Date(),changeFrequency:path.includes("/products/")?"weekly" as const:"monthly" as const,priority:path==="/"?1:path==="/products"?0.9:0.7})));
+  const policyEntries = ["/privacy", "/terms", "/cookies"].map((path) => ({
+    url: new URL(path, siteConfig.url).toString(),
+    lastModified: new Date(),
+    changeFrequency: "yearly" as const,
+    priority: 0.3,
+  }));
+  return [...localizedEntries, ...policyEntries];
 }
