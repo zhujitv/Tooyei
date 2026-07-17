@@ -19,11 +19,13 @@ import {
   Workflow,
 } from "lucide-react";
 import { NewsletterForm } from "@/components/newsletter-form";
+import { CapabilityCards } from "@/components/capability-cards";
 import { ProductCard } from "@/components/product-card";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { SocialLinks } from "@/components/social-links";
 import { Button } from "@/components/ui/button";
+import { capabilitiesCopy } from "@/lib/capabilities";
 import { getPublicCategoryTree } from "@/lib/repositories/categories";
 import { getPublishedProducts } from "@/lib/repositories/products";
 import { localizedPath, siteConfig, toContentLocale, type ContentLocale, type Locale } from "@/lib/site";
@@ -290,6 +292,7 @@ export async function HomePage({ locale }: { locale: Locale }) {
   const contentLocale = toContentLocale(locale);
   const t = homeCopy[contentLocale];
   const auxiliary = homeAuxCopy[contentLocale];
+  const capabilityLabels = capabilitiesCopy[locale];
   const [products, categories] = await Promise.all([getPublishedProducts(), getPublicCategoryTree(locale)]);
 
   return (
@@ -491,6 +494,26 @@ export async function HomePage({ locale }: { locale: Locale }) {
               <Button asChild size="lg" className="h-12 rounded-sm bg-[var(--navy)] px-6 text-white shadow-none hover:bg-[var(--navy-soft)]">
                 <Link href={localizedPath(locale, "/contact")}>{t.oem.action}<ArrowUpRight className="size-4" /></Link>
               </Button>
+            </div>
+          </div>
+        </section>
+
+        <section className="border-y border-[var(--border)] bg-[var(--ivory)]">
+          <div className="mx-auto max-w-[86rem] px-5 py-18 lg:px-10 lg:py-24">
+            <div className="grid gap-6 lg:grid-cols-[0.92fr_1.08fr] lg:items-end">
+              <div>
+                <p className="brand-eyebrow">TOOYEI · {capabilityLabels.hub.eyebrow}</p>
+                <h2 className="brand-h2 mt-4 max-w-3xl">{capabilityLabels.hub.sectionTitle}</h2>
+              </div>
+              <div className="lg:justify-self-end">
+                <p className="max-w-xl text-base leading-7 text-[var(--muted)]">{capabilityLabels.hub.sectionBody}</p>
+                <Link href={localizedPath(locale, "/capabilities")} className="brand-text-link mt-4">
+                  {capabilityLabels.viewDetails}<ArrowRight />
+                </Link>
+              </div>
+            </div>
+            <div className="mt-10">
+              <CapabilityCards locale={locale} compact />
             </div>
           </div>
         </section>
