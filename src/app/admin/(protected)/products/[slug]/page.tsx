@@ -27,7 +27,7 @@ import { ProductAssetUpload } from "@/components/product-asset-upload";
 import { ProductStructuredContentEditor } from "@/components/product-structured-content-editor";
 import { isDatabaseConfigured } from "@/lib/db";
 import { getAdminProduct, getAdminProductCategoryOptions } from "@/lib/repositories/admin-products";
-import { languageNames } from "@/lib/site";
+import { languageMarkers, languageNames } from "@/lib/site";
 import {
   updateProductCoreAction,
   updateProductStructuredContentAction,
@@ -178,11 +178,12 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
                 <Input id="sku" name="sku" defaultValue={product.sku} minLength={1} maxLength={80} required disabled={!databaseReady} className="admin-field" />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="categoryId" className="admin-label">产品分类</Label>
+                <Label htmlFor="categoryId" className="admin-label">主栏目</Label>
                 <select id="categoryId" name="categoryId" defaultValue={product.categoryId ?? ""} required disabled={!databaseReady} className="admin-select h-8 w-full px-2.5 text-xs">
                   <option value="" disabled>请选择分类</option>
-                  {categories.map((category) => <option key={category.id} value={category.id}>{category.label} · {kindLabel[category.kind]}</option>)}
+                  {categories.map((category) => <option key={category.id} value={category.id}>{category.depth ? "↳ " : ""}{category.label}{category.isActive ? "" : "（已停用）"}</option>)}
                 </select>
+                <p className="text-[10px] text-zinc-700">面包屑和产品默认归类优先使用主栏目，建议优先选择二级栏目。</p>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="status" className="admin-label">产品状态</Label>
@@ -198,6 +199,26 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
                 <Label className="admin-label">产品类型</Label>
                 <div className="flex h-8 items-center rounded-md border border-white/[0.08] bg-white/[0.025] px-2.5 text-xs text-zinc-500">{kindLabel[product.kind]}</div>
               </div>
+              <fieldset className="space-y-2 sm:col-span-2">
+                <legend className="admin-label">关联栏目（可多选）</legend>
+                <div className="grid gap-2 rounded-lg border border-white/[0.07] bg-white/[0.025] p-3 sm:grid-cols-2">
+                  {categories.map((category) => (
+                    <label key={category.id} className="flex min-h-9 items-center gap-2 rounded-md px-2 text-xs text-zinc-500 hover:bg-white/[0.04]">
+                      <input
+                        type="checkbox"
+                        name="categoryIds"
+                        value={category.id}
+                        defaultChecked={product.categoryIds.includes(category.id) || product.categoryId === category.id}
+                        disabled={!databaseReady}
+                        className="admin-checkbox"
+                      />
+                      <span className="truncate">{category.depth ? "↳ " : ""}{category.label}</span>
+                      {!category.isActive ? <span className="ml-auto rounded bg-amber-500/10 px-1.5 py-0.5 text-[9px] text-amber-500">已停用</span> : null}
+                    </label>
+                  ))}
+                </div>
+                <p className="text-[10px] text-zinc-700">停用栏目仍保留并可在后台重新归类，前台不会显示该栏目。</p>
+              </fieldset>
             </div>
             <label className="flex items-start gap-3 rounded-lg border border-white/[0.07] bg-white/[0.025] p-3 text-xs text-zinc-400">
               <input type="checkbox" name="featured" defaultChecked={product.featured} disabled={!databaseReady} className="admin-checkbox mt-0.5" />
@@ -303,7 +324,7 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
         return (
           <Card key={translation.locale} className="admin-card">
             <CardHeader className="flex flex-row items-start justify-between border-b border-white/[0.065] pb-4">
-              <div><CardTitle className="flex items-center gap-2 text-sm">{languageNames[translation.locale]}<span className="font-mono text-[9px] font-normal uppercase text-zinc-700">{translation.locale}</span></CardTitle><p className="mt-1 text-[11px] text-zinc-600">独立控制内容、索引状态和搜索摘要。</p></div>
+              <div><CardTitle className="flex items-center gap-2 text-sm"><span aria-hidden>{languageMarkers[translation.locale]}</span>{languageNames[translation.locale]}<span className="font-mono text-[9px] font-normal uppercase text-zinc-700">{translation.locale}</span></CardTitle><p className="mt-1 text-[11px] text-zinc-600">独立控制内容、索引状态和搜索摘要。</p></div>
               <div className="flex items-center gap-1.5"><Badge className={`border ${translationStatusClass[translation.status]}`}>{statusLabel[translation.status]}</Badge><span title={seoReady ? "SEO 已完整" : "SEO 待完善"} className={seoReady ? "grid size-5 place-items-center rounded border border-emerald-500/20 bg-emerald-500/10 text-emerald-400" : "grid size-5 place-items-center rounded border border-amber-500/20 bg-amber-500/10 text-amber-400"}>{seoReady ? <Check className="size-3" /> : <SearchCheck className="size-3" />}</span></div>
             </CardHeader>
             <CardContent className="pt-1">

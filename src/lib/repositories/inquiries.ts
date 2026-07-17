@@ -98,10 +98,15 @@ export type AdminInquiryFilters = {
 };
 
 const localeMap: Record<Locale, DatabaseLocale> = {
-  zh: DatabaseLocale.ZH,
   en: DatabaseLocale.EN,
-  es: DatabaseLocale.ES,
   de: DatabaseLocale.DE,
+  fr: DatabaseLocale.FR,
+  es: DatabaseLocale.ES,
+  ru: DatabaseLocale.RU,
+  ja: DatabaseLocale.JA,
+  it: DatabaseLocale.IT,
+  ar: DatabaseLocale.AR,
+  zh: DatabaseLocale.ZH,
 };
 
 const productLabel = ({ product }: InquiryWithProducts["products"][number]) =>

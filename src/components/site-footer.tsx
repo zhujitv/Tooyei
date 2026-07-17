@@ -3,7 +3,8 @@ import Link from "next/link";
 import { Mail, MapPin, MessageCircle, Phone } from "lucide-react";
 import { SocialLinks } from "@/components/social-links";
 import { socialLinks } from "@/config/social";
-import { localizedPath, siteConfig, type Locale } from "@/lib/site";
+import { getPublicCategoryTree } from "@/lib/repositories/categories";
+import { localizedPath, siteConfig, toContentLocale, type ContentLocale, type Locale } from "@/lib/site";
 
 type FooterCopy = {
   description: string;
@@ -11,7 +12,6 @@ type FooterCopy = {
   services: string;
   company: string;
   contact: string;
-  productLinks: string[];
   serviceLinks: Array<[string, string]>;
   companyLinks: Array<[string, string]>;
   location: string;
@@ -20,14 +20,13 @@ type FooterCopy = {
   cookies: string;
 };
 
-const footerCopy: Record<Locale, FooterCopy> = {
+const footerCopy: Record<ContentLocale, FooterCopy> = {
   zh: {
     description: "为全球批发、工程与自有品牌客户提供清晰的地板产品体系、灵活定制与出口协作支持。",
     products: "产品系列",
     services: "服务",
     company: "公司",
     contact: "联系方式",
-    productLinks: ["SPC Flooring", "WPC Flooring", "LVT Flooring", "Laminate Flooring"],
     serviceLinks: [["OEM / ODM", "/#oem"], ["样品支持", "/#support"], ["技术资料", "/#support"], ["项目咨询", "/contact"]],
     companyLinks: [["公司介绍", "/#about"], ["联系我们", "/contact"], ["隐私政策", "/privacy"], ["使用条款", "/terms"]],
     location: "中国江苏常州",
@@ -41,7 +40,6 @@ const footerCopy: Record<Locale, FooterCopy> = {
     services: "Services",
     company: "Company",
     contact: "Contact",
-    productLinks: ["SPC Flooring", "WPC Flooring", "LVT Flooring", "Laminate Flooring"],
     serviceLinks: [["OEM / ODM", "/#oem"], ["Sample support", "/#support"], ["Technical information", "/#support"], ["Project enquiry", "/contact"]],
     companyLinks: [["About", "/#about"], ["Contact", "/contact"], ["Privacy policy", "/privacy"], ["Terms of use", "/terms"]],
     location: "Changzhou, Jiangsu, China",
@@ -49,13 +47,26 @@ const footerCopy: Record<Locale, FooterCopy> = {
     terms: "Terms of Use",
     cookies: "Cookies",
   },
+  de: {
+    description: "Klare Bodensysteme, flexible Anpassung und Exportunterstützung für Großhandel, Projekte und Eigenmarken.",
+    products: "Produkte", services: "Services", company: "Unternehmen", contact: "Kontakt",
+    serviceLinks: [["OEM / ODM", "/#oem"], ["Mustersupport", "/#support"], ["Technische Daten", "/#support"], ["Projektanfrage", "/contact"]],
+    companyLinks: [["Unternehmen", "/#about"], ["Kontakt", "/contact"], ["Datenschutz", "/privacy"], ["Nutzungsbedingungen", "/terms"]],
+    location: "Changzhou, Jiangsu, China", privacy: "Datenschutz", terms: "Nutzungsbedingungen", cookies: "Cookies",
+  },
+  fr: {
+    description: "Des systèmes de sol clairs, une personnalisation flexible et un accompagnement export pour les grossistes, projets et marques privées.",
+    products: "Produits", services: "Services", company: "Entreprise", contact: "Contact",
+    serviceLinks: [["OEM / ODM", "/#oem"], ["Aide aux échantillons", "/#support"], ["Informations techniques", "/#support"], ["Demande de projet", "/contact"]],
+    companyLinks: [["Entreprise", "/#about"], ["Contact", "/contact"], ["Confidentialité", "/privacy"], ["Conditions d’utilisation", "/terms"]],
+    location: "Changzhou, Jiangsu, Chine", privacy: "Confidentialité", terms: "Conditions d’utilisation", cookies: "Cookies",
+  },
   es: {
     description: "Sistemas de suelo, personalización flexible y colaboración de exportación para mayoristas, proyectos y marcas privadas.",
     products: "Productos",
     services: "Servicios",
     company: "Empresa",
     contact: "Contacto",
-    productLinks: ["SPC Flooring", "WPC Flooring", "LVT Flooring", "Laminate Flooring"],
     serviceLinks: [["OEM / ODM", "/#oem"], ["Muestras", "/#support"], ["Información técnica", "/#support"], ["Consulta de proyecto", "/contact"]],
     companyLinks: [["Empresa", "/#about"], ["Contacto", "/contact"], ["Privacidad", "/privacy"], ["Términos de uso", "/terms"]],
     location: "Changzhou, Jiangsu, China",
@@ -63,27 +74,42 @@ const footerCopy: Record<Locale, FooterCopy> = {
     terms: "Términos de uso",
     cookies: "Cookies",
   },
-  de: {
-    description: "Klare Bodensysteme, flexible Anpassung und Exportunterstützung für Großhandel, Projekte und Eigenmarken.",
-    products: "Produkte",
-    services: "Services",
-    company: "Unternehmen",
-    contact: "Kontakt",
-    productLinks: ["SPC Flooring", "WPC Flooring", "LVT Flooring", "Laminate Flooring"],
-    serviceLinks: [["OEM / ODM", "/#oem"], ["Mustersupport", "/#support"], ["Technische Daten", "/#support"], ["Projektanfrage", "/contact"]],
-    companyLinks: [["Unternehmen", "/#about"], ["Kontakt", "/contact"], ["Datenschutz", "/privacy"], ["Nutzungsbedingungen", "/terms"]],
-    location: "Changzhou, Jiangsu, China",
-    privacy: "Datenschutz",
-    terms: "Nutzungsbedingungen",
-    cookies: "Cookies",
+  ru: {
+    description: "Понятные системы покрытий, гибкая кастомизация и экспортное сопровождение для опта, проектов и частных марок.",
+    products: "Продукция", services: "Услуги", company: "Компания", contact: "Контакты",
+    serviceLinks: [["OEM / ODM", "/#oem"], ["Поддержка образцов", "/#support"], ["Технические материалы", "/#support"], ["Запрос по проекту", "/contact"]],
+    companyLinks: [["О компании", "/#about"], ["Контакты", "/contact"], ["Конфиденциальность", "/privacy"], ["Условия использования", "/terms"]],
+    location: "Чанчжоу, Цзянсу, Китай", privacy: "Конфиденциальность", terms: "Условия использования", cookies: "Cookies",
+  },
+  ja: {
+    description: "卸売、プロジェクト、プライベートブランド向けに、明確な床材体系、柔軟なカスタマイズ、輸出支援を提供します。",
+    products: "製品", services: "サービス", company: "会社", contact: "お問い合わせ",
+    serviceLinks: [["OEM / ODM", "/#oem"], ["サンプル支援", "/#support"], ["技術資料", "/#support"], ["プロジェクト相談", "/contact"]],
+    companyLinks: [["会社情報", "/#about"], ["お問い合わせ", "/contact"], ["プライバシー", "/privacy"], ["利用規約", "/terms"]],
+    location: "中国 江蘇省 常州市", privacy: "プライバシーポリシー", terms: "利用規約", cookies: "Cookies",
+  },
+  it: {
+    description: "Sistemi di pavimentazione chiari, personalizzazione flessibile e supporto export per grossisti, progetti e marchi privati.",
+    products: "Prodotti", services: "Servizi", company: "Azienda", contact: "Contatti",
+    serviceLinks: [["OEM / ODM", "/#oem"], ["Supporto campioni", "/#support"], ["Informazioni tecniche", "/#support"], ["Richiesta progetto", "/contact"]],
+    companyLinks: [["Azienda", "/#about"], ["Contatti", "/contact"], ["Privacy", "/privacy"], ["Condizioni d’uso", "/terms"]],
+    location: "Changzhou, Jiangsu, Cina", privacy: "Privacy", terms: "Condizioni d’uso", cookies: "Cookies",
+  },
+  ar: {
+    description: "أنظمة أرضيات واضحة وتخصيص مرن ودعم تصدير لتجار الجملة والمشاريع والعلامات الخاصة حول العالم.",
+    products: "المنتجات", services: "الخدمات", company: "الشركة", contact: "الاتصال",
+    serviceLinks: [["OEM / ODM", "/#oem"], ["دعم العينات", "/#support"], ["المعلومات الفنية", "/#support"], ["استفسار مشروع", "/contact"]],
+    companyLinks: [["عن الشركة", "/#about"], ["اتصل بنا", "/contact"], ["الخصوصية", "/privacy"], ["شروط الاستخدام", "/terms"]],
+    location: "تشانغتشو، جيانغسو، الصين", privacy: "سياسة الخصوصية", terms: "شروط الاستخدام", cookies: "ملفات تعريف الارتباط",
   },
 };
 
 const footerLinkClass = "inline-flex min-h-11 items-center text-sm text-white/55 transition-colors hover:text-white";
 
-export function SiteFooter({ locale }: { locale: Locale }) {
-  const labels = footerCopy[locale];
+export async function SiteFooter({ locale }: { locale: Locale }) {
+  const labels = footerCopy[toContentLocale(locale)];
   const whatsapp = socialLinks.find(({ key }) => key === "whatsapp");
+  const categories = await getPublicCategoryTree(locale);
 
   return (
     <footer className="bg-[#050c16] text-white">
@@ -100,7 +126,18 @@ export function SiteFooter({ locale }: { locale: Locale }) {
           <div>
             <FooterHeading>{labels.products}</FooterHeading>
             <div className="mt-5 flex flex-col">
-              {labels.productLinks.map((label) => <Link key={label} href={localizedPath(locale, "/products")} className={footerLinkClass}>{label}</Link>)}
+              {categories.map((category) => (
+                <div key={category.id}>
+                  <Link href={localizedPath(locale, `/products/${category.slug}`)} className={`${footerLinkClass} font-medium text-white/70`}>
+                    {category.name}
+                  </Link>
+                  {category.children.map((child) => (
+                    <Link key={child.id} href={localizedPath(locale, `/products/${child.slug}`)} className={`${footerLinkClass} pl-3 text-white/45`}>
+                      {child.name}
+                    </Link>
+                  ))}
+                </div>
+              ))}
             </div>
           </div>
 

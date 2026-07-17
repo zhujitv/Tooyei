@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowDownToLine, ArrowLeft, ArrowRight, Check, Layers, MapPin } from "lucide-react";
+import { ArrowDownToLine, ArrowLeft, ArrowRight, Check, ChevronRight, Layers, MapPin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,25 +9,28 @@ import { Separator } from "@/components/ui/separator";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import type { Product, ProductMediaItem } from "@/lib/content";
-import { copy } from "@/lib/content";
-import { localizedPath, type Locale } from "@/lib/site";
+import { copy, readLocalizedText } from "@/lib/content";
+import { getPublicCategoryTree } from "@/lib/repositories/categories";
+import { localizedPath, toContentLocale, type ContentLocale, type Locale } from "@/lib/site";
 
-const downloadKindLabel: Record<string, Record<Locale, string>> = {
-  CATALOG: { zh: "产品目录", en: "Catalogue", es: "Catálogo", de: "Katalog" },
-  SPEC_SHEET: { zh: "规格表", en: "Spec sheet", es: "Ficha técnica", de: "Datenblatt" },
-  INSTALLATION_GUIDE: { zh: "安装指南", en: "Installation guide", es: "Guía de instalación", de: "Verlegeanleitung" },
-  WARRANTY: { zh: "质保文件", en: "Warranty", es: "Garantía", de: "Garantie" },
-  CERTIFICATE: { zh: "认证证书", en: "Certificate", es: "Certificado", de: "Zertifikat" },
-  OTHER: { zh: "资料", en: "Download", es: "Descarga", de: "Download" },
+const downloadKindLabel: Record<string, Record<ContentLocale, string>> = {
+  CATALOG: { en: "Catalogue", de: "Katalog", fr: "Catalogue", es: "Catálogo", ru: "Каталог", ja: "カタログ", it: "Catalogo", ar: "الكتالوج", zh: "产品目录" },
+  SPEC_SHEET: { en: "Spec sheet", de: "Datenblatt", fr: "Fiche technique", es: "Ficha técnica", ru: "Спецификация", ja: "仕様書", it: "Scheda tecnica", ar: "ورقة المواصفات", zh: "规格表" },
+  INSTALLATION_GUIDE: { en: "Installation guide", de: "Verlegeanleitung", fr: "Guide d’installation", es: "Guía de instalación", ru: "Инструкция по монтажу", ja: "施工ガイド", it: "Guida all’installazione", ar: "دليل التركيب", zh: "安装指南" },
+  WARRANTY: { en: "Warranty", de: "Garantie", fr: "Garantie", es: "Garantía", ru: "Гарантия", ja: "保証書", it: "Garanzia", ar: "الضمان", zh: "质保文件" },
+  CERTIFICATE: { en: "Certificate", de: "Zertifikat", fr: "Certificat", es: "Certificado", ru: "Сертификат", ja: "認証書", it: "Certificato", ar: "الشهادة", zh: "认证证书" },
+  OTHER: { en: "Download", de: "Download", fr: "Téléchargement", es: "Descarga", ru: "Материал", ja: "資料", it: "Download", ar: "تنزيل", zh: "资料" },
 };
 
-const sectionCopy: Record<Locale, Record<string, string>> = {
+const sectionCopy: Record<ContentLocale, Record<string, string>> = {
   zh: {
     advantages: "核心卖点",
     specs: "产品参数",
     applications: "应用场景",
     downloads: "下载资料",
     gallery: "产品图库",
+    breadcrumb: "面包屑",
+    home: "首页",
   },
   en: {
     advantages: "Key advantages",
@@ -35,13 +38,8 @@ const sectionCopy: Record<Locale, Record<string, string>> = {
     applications: "Applications",
     downloads: "Downloads",
     gallery: "Product gallery",
-  },
-  es: {
-    advantages: "Ventajas clave",
-    specs: "Especificaciones",
-    applications: "Aplicaciones",
-    downloads: "Descargas",
-    gallery: "Galería de producto",
+    breadcrumb: "Breadcrumb",
+    home: "Home",
   },
   de: {
     advantages: "Vorteile",
@@ -49,6 +47,62 @@ const sectionCopy: Record<Locale, Record<string, string>> = {
     applications: "Anwendungen",
     downloads: "Downloads",
     gallery: "Produktgalerie",
+    breadcrumb: "Brotkrümelnavigation",
+    home: "Startseite",
+  },
+  fr: {
+    advantages: "Avantages clés",
+    specs: "Spécifications",
+    applications: "Applications",
+    downloads: "Téléchargements",
+    gallery: "Galerie produit",
+    breadcrumb: "Fil d’Ariane",
+    home: "Accueil",
+  },
+  es: {
+    advantages: "Ventajas clave",
+    specs: "Especificaciones",
+    applications: "Aplicaciones",
+    downloads: "Descargas",
+    gallery: "Galería de producto",
+    breadcrumb: "Migas de pan",
+    home: "Inicio",
+  },
+  ru: {
+    advantages: "Ключевые преимущества",
+    specs: "Характеристики",
+    applications: "Применение",
+    downloads: "Материалы",
+    gallery: "Галерея продукта",
+    breadcrumb: "Навигационная цепочка",
+    home: "Главная",
+  },
+  ja: {
+    advantages: "主な特長",
+    specs: "製品仕様",
+    applications: "用途",
+    downloads: "ダウンロード",
+    gallery: "製品ギャラリー",
+    breadcrumb: "パンくずリスト",
+    home: "ホーム",
+  },
+  it: {
+    advantages: "Vantaggi principali",
+    specs: "Specifiche",
+    applications: "Applicazioni",
+    downloads: "Download",
+    gallery: "Galleria prodotto",
+    breadcrumb: "Percorso di navigazione",
+    home: "Home",
+  },
+  ar: {
+    advantages: "المزايا الرئيسية",
+    specs: "المواصفات",
+    applications: "التطبيقات",
+    downloads: "التنزيلات",
+    gallery: "معرض المنتج",
+    breadcrumb: "مسار التنقل",
+    home: "الرئيسية",
   },
 };
 
@@ -69,25 +123,46 @@ function ProductVisual({ media, priority = false }: { media: ProductMediaItem; p
   return <img src={media.url} alt={media.alt} className="size-full object-cover" loading={priority ? "eager" : "lazy"} />;
 }
 
-export function ProductPage({ product, locale }: { product: Product; locale: Locale }) {
-  const t = copy[locale];
-  const labels = sectionCopy[locale];
+export async function ProductPage({ product, locale }: { product: Product; locale: Locale }) {
+  const contentLocale = toContentLocale(locale);
+  const t = copy[contentLocale];
+  const labels = sectionCopy[contentLocale];
+  const categories = await getPublicCategoryTree(locale);
   const contactHref = `${localizedPath(locale, "/contact")}?product=${encodeURIComponent(product.slug)}`;
+  const productTitle = readLocalizedText(product.title, locale);
+  const productSummary = readLocalizedText(product.summary, locale);
   const fallbackMedia: ProductMediaItem = {
     url: product.image,
-    alt: `${product.sku} ${product.title[locale]}`,
+    alt: `${product.sku} ${productTitle}`,
     role: "PRIMARY",
   };
   const media = product.media?.length ? product.media : [fallbackMedia];
   const primaryMedia = media.find((item) => item.role === "PRIMARY") ?? media[0] ?? fallbackMedia;
   const gallery = media.filter((item) => item.url !== primaryMedia.url).slice(0, 6);
-  const hasFeatureDescriptions = product.features.some((feature) => feature.description?.[locale]);
+  const hasFeatureDescriptions = product.features.some((feature) => feature.description && readLocalizedText(feature.description, locale));
 
   return (
     <div className="site-shell">
-      <SiteHeader locale={locale} />
+      <SiteHeader locale={locale} initialCategories={categories} />
       <main>
         <section className="mx-auto max-w-7xl px-5 py-10 lg:px-8 lg:py-16">
+          <nav aria-label={labels.breadcrumb} className="mb-5 flex flex-wrap items-center gap-1.5 text-xs text-[var(--muted)]">
+            <Link href={localizedPath(locale)}>{labels.home}</Link>
+            <ChevronRight className="size-3" />
+            <Link href={localizedPath(locale, "/products")}>{t.products}</Link>
+            {product.primaryCategory ? (
+              <>
+                <ChevronRight className="size-3" />
+                {product.primaryCategory.parent ? (
+                  <>
+                    <Link href={localizedPath(locale, `/products/${product.primaryCategory.parent.slug}`)}>{readLocalizedText(product.primaryCategory.parent.name, locale)}</Link>
+                    <ChevronRight className="size-3" />
+                  </>
+                ) : null}
+                <Link href={localizedPath(locale, `/products/${product.primaryCategory.slug}`)} aria-current="page" className="font-medium text-[var(--text)]">{readLocalizedText(product.primaryCategory.name, locale)}</Link>
+              </>
+            ) : null}
+          </nav>
           <Button asChild variant="ghost" className="-ml-3 mb-7">
             <Link href={localizedPath(locale, "/products")}>
               <ArrowLeft />
@@ -116,11 +191,11 @@ export function ProductPage({ product, locale }: { product: Product; locale: Loc
 
             <div className="lg:pt-8">
               <div className="flex items-center gap-3">
-                <Badge>{product.category}</Badge>
+                <Badge>{product.primaryCategory ? readLocalizedText(product.primaryCategory.name, locale) : product.category}</Badge>
                 <span className="brand-eyebrow">{product.sku}</span>
               </div>
-              <h1 className="mt-6 text-4xl font-semibold tracking-[-0.04em] sm:text-5xl">{product.title[locale]}</h1>
-              <p className="mt-6 text-lg leading-8 text-muted-foreground">{product.summary[locale]}</p>
+              <h1 className="mt-6 text-4xl font-semibold tracking-[-0.04em] sm:text-5xl">{productTitle}</h1>
+              <p className="mt-6 text-lg leading-8 text-muted-foreground">{productSummary}</p>
 
               {product.features.length ? (
                 <section className="mt-8">
@@ -139,10 +214,10 @@ export function ProductPage({ product, locale }: { product: Product; locale: Loc
                           <span className="grid size-6 shrink-0 place-items-center rounded-full bg-[#b68a4c]/15 text-[#8a6530]">
                             <Check className="size-3.5" />
                           </span>
-                          {feature[locale]}
+                          {readLocalizedText(feature, locale)}
                         </div>
-                        {feature.description?.[locale] ? (
-                          <p className="mt-2 pl-8 text-sm leading-6 text-muted-foreground">{feature.description[locale]}</p>
+                        {feature.description && readLocalizedText(feature.description, locale) ? (
+                          <p className="mt-2 pl-8 text-sm leading-6 text-muted-foreground">{readLocalizedText(feature.description, locale)}</p>
                         ) : null}
                       </div>
                     ))}
@@ -162,7 +237,7 @@ export function ProductPage({ product, locale }: { product: Product; locale: Loc
                     <div key={`${item.group}-${item.label.zh}-${item.value}`} className="grid gap-2 py-4 text-sm sm:grid-cols-[180px_1fr]">
                       <dt>
                         {item.group ? <p className="mb-1 text-xs uppercase tracking-[0.12em] text-muted-foreground">{item.group}</p> : null}
-                        <span className="text-muted-foreground">{item.label[locale]}</span>
+                        <span className="text-muted-foreground">{readLocalizedText(item.label, locale)}</span>
                       </dt>
                       <dd className="font-medium">
                         {item.value}
@@ -198,15 +273,15 @@ export function ProductPage({ product, locale }: { product: Product; locale: Loc
                         <ProductVisual
                           media={{
                             url: application.image,
-                            alt: application.imageAlt || application.title[locale],
+                            alt: application.imageAlt || readLocalizedText(application.title, locale),
                             role: "APPLICATION",
                           }}
                         />
                       </div>
                     ) : null}
                     <CardContent className="p-5">
-                      <h3 className="text-lg font-semibold">{application.title[locale]}</h3>
-                      <p className="mt-3 text-sm leading-6 text-muted-foreground">{application.description[locale]}</p>
+                      <h3 className="text-lg font-semibold">{readLocalizedText(application.title, locale)}</h3>
+                      <p className="mt-3 text-sm leading-6 text-muted-foreground">{readLocalizedText(application.description, locale)}</p>
                     </CardContent>
                   </Card>
                 ))}
@@ -229,13 +304,13 @@ export function ProductPage({ product, locale }: { product: Product; locale: Loc
                     className="rounded-2xl border border-white/10 bg-white/5 p-5 transition hover:border-[#d6b36a]/50 hover:bg-white/10"
                   >
                     <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#d6b36a]">
-                      {downloadKindLabel[download.kind]?.[locale] ?? downloadKindLabel.OTHER[locale]}
+                      {downloadKindLabel[download.kind]?.[contentLocale] ?? downloadKindLabel.OTHER[contentLocale]}
                     </p>
                     <div className="mt-3 flex items-start justify-between gap-4">
                       <div>
-                        <h3 className="font-semibold">{download.title[locale]}</h3>
-                        {download.description?.[locale] ? (
-                          <p className="mt-2 text-sm leading-6 text-white/55">{download.description[locale]}</p>
+                        <h3 className="font-semibold">{readLocalizedText(download.title, locale)}</h3>
+                        {download.description && readLocalizedText(download.description, locale) ? (
+                          <p className="mt-2 text-sm leading-6 text-white/55">{readLocalizedText(download.description, locale)}</p>
                         ) : null}
                       </div>
                       <ArrowDownToLine className="size-5 shrink-0 text-white/45" />

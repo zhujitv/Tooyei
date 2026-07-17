@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ProductPage } from "@/components/product-page";
+import { ProductsPage } from "@/components/products-page";
+import { readLocalizedText } from "@/lib/content";
+import { getPublicCategoryBySlug } from "@/lib/repositories/categories";
 import { getPublishedProduct } from "@/lib/repositories/products";
-import { isLocale } from "@/lib/site";
+import { isLocale, localizedAlternates, localizedPath } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 
@@ -12,22 +15,28 @@ export async function generateMetadata({
   params: Promise<{ locale: string; slug: string }>;
 }): Promise<Metadata> {
   const { locale, slug } = await params;
-  if (!isLocale(locale) || locale === "zh") return {};
-  const product = await getPublishedProduct(slug);
+  if (!isLocale(locale)) return {};
+  const [category, product] = await Promise.all([getPublicCategoryBySlug(slug, locale), getPublishedProduct(slug)]);
+  if (category) {
+    return {
+      title: category.seoTitle || category.name,
+      description: category.seoDescription || category.description,
+      alternates: {
+        canonical: localizedPath(locale, `/products/${slug}`),
+        languages: localizedAlternates(`/products/${slug}`),
+      },
+    };
+  }
   if (!product) return {};
+  const productTitle = readLocalizedText(product.title, locale);
+  const categoryName = product.primaryCategory ? readLocalizedText(product.primaryCategory.name, locale) : "";
 
   return {
-    title: product.seoTitle?.[locale] || `${product.sku} ${product.title[locale]}`,
-    description: product.seoDescription?.[locale] || product.summary[locale],
+    title: (product.seoTitle && readLocalizedText(product.seoTitle, locale)) || `${productTitle}${categoryName ? ` | ${categoryName}` : ""}`,
+    description: (product.seoDescription && readLocalizedText(product.seoDescription, locale)) || readLocalizedText(product.summary, locale),
     alternates: {
-      canonical: `/${locale}/products/${slug}`,
-      languages: {
-        zh: `/products/${slug}`,
-        en: `/en/products/${slug}`,
-        es: `/es/products/${slug}`,
-        de: `/de/products/${slug}`,
-        "x-default": `/products/${slug}`,
-      },
+      canonical: localizedPath(locale, `/products/${slug}`),
+      languages: localizedAlternates(`/products/${slug}`),
     },
   };
 }
@@ -38,8 +47,9 @@ export default async function Page({
   params: Promise<{ locale: string; slug: string }>;
 }) {
   const { locale, slug } = await params;
-  if (!isLocale(locale) || locale === "zh") notFound();
-  const product = await getPublishedProduct(slug);
+  if (!isLocale(locale)) notFound();
+  const [category, product] = await Promise.all([getPublicCategoryBySlug(slug, locale), getPublishedProduct(slug)]);
+  if (category) return <ProductsPage locale={locale} categorySlug={slug} />;
   if (!product) notFound();
   return <ProductPage product={product} locale={locale} />;
 }

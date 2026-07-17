@@ -198,23 +198,96 @@
   }
 
   .admin-card {
-    @apply rounded-xl border border-white/[0.075] bg-[#111113] text-zinc-100 shadow-none ring-0;
+    @apply rounded-xl border border-[#E4E7EC] bg-white text-[#172033] shadow-[0_1px_2px_rgba(16,24,40,0.04)] ring-0;
   }
 
   .admin-field {
-    @apply rounded-md border-white/[0.09] bg-[#0d0d0f] text-zinc-200 placeholder:text-zinc-700 focus-visible:border-zinc-500 focus-visible:ring-2 focus-visible:ring-white/[0.06];
+    @apply rounded-md border-[#D0D5DD] bg-white text-[#172033] placeholder:text-[#98A2B3] focus-visible:border-[#667085] focus-visible:ring-2 focus-visible:ring-[#25344F]/10;
   }
 
   .admin-select {
-    @apply rounded-md border border-white/[0.09] bg-[#0d0d0f] text-zinc-300 outline-none transition-colors focus:border-zinc-500 focus:ring-2 focus:ring-white/[0.06] disabled:cursor-not-allowed disabled:opacity-50;
+    @apply rounded-md border border-[#D0D5DD] bg-white text-[#344054] outline-none transition-colors focus:border-[#667085] focus:ring-2 focus:ring-[#25344F]/10 disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   .admin-label {
-    @apply text-[11px] font-medium text-zinc-500;
+    @apply text-[11px] font-medium text-[#475467];
   }
 
   .admin-checkbox {
-    @apply size-3.5 rounded border-white/15 bg-[#0d0d0f] accent-violet-400;
+    @apply size-3.5 rounded border-[#D0D5DD] bg-white accent-[#25344F];
+  }
+
+  /* Keep the existing product-management component structure while giving the
+     whole admin workspace one coherent light enterprise theme. */
+  .admin-content [class~="bg-[#0a0a0b]"],
+  .admin-content [class~="bg-[#0d0d0f]"],
+  .admin-content [class~="bg-[#101012]"],
+  .admin-content [class~="bg-[#111113]"],
+  .admin-content [class~="bg-[#151517]"],
+  .admin-content [class~="bg-[#1a1a1d]"] {
+    background-color: #ffffff !important;
+  }
+
+  .admin-content [class~="bg-white/[0.02]"],
+  .admin-content [class~="bg-white/[0.025]"],
+  .admin-content [class~="bg-white/[0.03]"],
+  .admin-content [class~="bg-white/[0.035]"],
+  .admin-content [class~="bg-white/[0.04]"],
+  .admin-content [class~="bg-white/[0.05]"],
+  .admin-content [class~="bg-white/[0.055]"],
+  .admin-content [class~="bg-white/[0.06]"],
+  .admin-content [class~="bg-white/[0.07]"],
+  .admin-content [class~="bg-white/[0.08]"] {
+    background-color: #f9fafb !important;
+  }
+
+  .admin-content [class~="border-white/10"],
+  .admin-content [class~="border-white/15"],
+  .admin-content [class~="border-white/[0.06]"],
+  .admin-content [class~="border-white/[0.065]"],
+  .admin-content [class~="border-white/[0.07]"],
+  .admin-content [class~="border-white/[0.075]"],
+  .admin-content [class~="border-white/[0.08]"],
+  .admin-content [class~="border-white/[0.09]"],
+  .admin-content [class~="border-white/[0.1]"],
+  .admin-content [class~="border-white/[0.12]"],
+  .admin-content [class~="border-white/[0.14]"] {
+    border-color: #e4e7ec !important;
+  }
+
+  .admin-content [class~="text-zinc-50"],
+  .admin-content [class~="text-zinc-100"],
+  .admin-content [class~="text-zinc-200"],
+  .admin-content [class~="text-zinc-300"] {
+    color: #172033 !important;
+  }
+
+  .admin-content [class~="text-zinc-400"],
+  .admin-content [class~="text-zinc-500"],
+  .admin-content [class~="text-zinc-600"],
+  .admin-content [class~="text-zinc-700"],
+  .admin-content [class~="text-zinc-800"] {
+    color: #667085 !important;
+  }
+
+  .admin-content [class~="bg-zinc-100"] {
+    background-color: #25344f !important;
+    color: #ffffff !important;
+  }
+
+  .admin-content [class~="hover:bg-white"]:hover,
+  .admin-content [class~="hover:bg-white/10"]:hover,
+  .admin-content [class~="hover:bg-white/[0.025]"]:hover,
+  .admin-content [class~="hover:bg-white/[0.04]"]:hover,
+  .admin-content [class~="hover:bg-white/[0.06]"]:hover,
+  .admin-content [class~="hover:bg-white/[0.08]"]:hover {
+    background-color: #f2f4f7 !important;
+    color: #172033 !important;
+  }
+
+  .admin-content [class~="bg-zinc-100"]:hover {
+    background-color: #1d293f !important;
+    color: #ffffff !important;
   }
 }
 
@@ -270,26 +343,53 @@
 }
 
 .admin-root {
-  color-scheme: dark;
-  background-image: radial-gradient(circle at 70% -20%, rgba(139, 92, 246, 0.055), transparent 32rem);
+  color-scheme: light;
 }
 
 .admin-root .admin-card {
-  color: #f4f4f5;
-  background-color: #111113;
-  border-color: rgba(255, 255, 255, 0.075);
-  box-shadow: none;
+  color: #172033;
+  background-color: #fff;
+  border-color: #e4e7ec;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
 }
 
 .admin-root .admin-field {
-  color: #e4e4e7;
-  background-color: #0d0d0f;
-  border-color: rgba(255, 255, 255, 0.09);
+  color: #172033;
+  background-color: #fff;
+  border-color: #d0d5dd;
 }
 
 .admin-root select option {
-  background: #151517;
-  color: #e4e4e7;
+  background: #fff;
+  color: #172033;
+}
+
+/* Keep legacy admin screens visually consistent while their domain components
+   retain their existing utility class names. Scoped to content so the muted
+   brand sidebar is unaffected. */
+.admin-content .text-zinc-50,
+.admin-content .text-zinc-100,
+.admin-content .text-zinc-200,
+.admin-content .text-zinc-300 { color: #172033 !important; }
+.admin-content .text-zinc-400,
+.admin-content .text-zinc-500 { color: #667085 !important; }
+.admin-content .text-zinc-600,
+.admin-content .text-zinc-700,
+.admin-content .text-zinc-800 { color: #98a2b3 !important; }
+.admin-content [class*="border-white/"] { border-color: #e4e7ec !important; }
+.admin-content [class*="divide-white/"] > :not(:last-child) { border-color: #e4e7ec !important; }
+.admin-content [class*="bg-[#111113]"],
+.admin-content [class*="bg-[#101012]"],
+.admin-content [class*="bg-[#0d0d0f]"],
+.admin-content [class*="bg-[#151517]"] { background-color: #fff !important; }
+.admin-content [class*="bg-white/[0.0"] { background-color: #f8fafc !important; }
+.admin-content [class*="bg-black/"] { background-color: #f2f4f7 !important; }
+.admin-content .bg-zinc-100.text-zinc-950 {
+  background-color: #25344f !important;
+  color: #fff !important;
+}
+.admin-content .shadow-\[0_20px_70px_rgba\(0\,0\,0\,0\.55\)\] {
+  box-shadow: 0 16px 40px rgba(16, 24, 40, 0.16) !important;
 }
 
 .admin-root details > summary::-webkit-details-marker {

@@ -24,8 +24,9 @@ import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { SocialLinks } from "@/components/social-links";
 import { Button } from "@/components/ui/button";
+import { getPublicCategoryTree } from "@/lib/repositories/categories";
 import { getPublishedProducts } from "@/lib/repositories/products";
-import { localizedPath, siteConfig, type Locale } from "@/lib/site";
+import { localizedPath, siteConfig, toContentLocale, type ContentLocale, type Locale } from "@/lib/site";
 
 type HomeCopy = {
   hero: { eyebrow: string; title: string; body: string; primary: string; secondary: string };
@@ -48,7 +49,7 @@ type HomeCopy = {
   cta: { eyebrow: string; title: string; body: string; action: string };
 };
 
-const homeCopy: Record<Locale, HomeCopy> = {
+const homeCopy: Record<ContentLocale, HomeCopy> = {
   zh: {
     hero: {
       eyebrow: "专业地板系统 · 始于 2015",
@@ -183,14 +184,96 @@ const homeCopy: Record<Locale, HomeCopy> = {
     newsletter: { eyebrow: "Stay Updated", title: "Produktinformationen immer griffbereit.", body: "Updates zu Kollektionen, Designrichtungen und Produktunterlagen." },
     cta: { eyebrow: "START A PROJECT", title: "Entwickeln wir ein\nverlässliches Bodenprogramm.", body: "Produktauswahl, OEM-Entwicklung und Exportunterstützung für Großhandel, Projekte und Eigenmarken.", action: "Projekt starten" },
   },
+  fr: {
+    hero: { eyebrow: "SYSTÈMES DE SOL PROFESSIONNELS · DEPUIS 2015", title: "Des sols fiables pour\nles marchés mondiaux.", body: "Sols SPC, WPC, LVT et stratifiés avec un accompagnement OEM / ODM flexible pour les importateurs, distributeurs, projets et marques privées.", primary: "Découvrir les produits", secondary: "Envoyer un projet" },
+    capabilities: ["Systèmes de sol étanches", "OEM / ODM flexible", "Documentation export", "Réponse commerciale rapide"],
+    trust: { title: "Pensé pour des partenariats durables", body: "Une collaboration claire et fiable, du développement produit à la livraison export.", metrics: [["2015", "Création de la marque"], ["OEM / ODM", "Personnalisation flexible"], ["Global Export", "Accompagnement international"], ["One Team", "Coordination produit et projet"]] },
+    systems: { eyebrow: "Systèmes de sol", title: "Un système adapté à chaque espace.", body: "Du noyau rigide au confort acoustique, du bois naturel à la pierre architecturale : des collections claires pour décider plus vite.", action: "Voir tous les produits" },
+    featured: { eyebrow: "Produits à la une", title: "Commencez par des produits éprouvés.", body: "Sélectionnés pour leur résistance à l’eau, leur texture authentique et leur polyvalence, à partir de nos données produits actuelles.", action: "Voir tous les produits" },
+    applications: { eyebrow: "Applications", title: "Conçu pour des espaces réels.", body: "Des orientations claires aident les équipes d’achat et de design à associer chaque système aux besoins du projet.", cards: [["Résidentiel et appartements", "Confort, résistance à l’eau et entretien quotidien simple."], ["Hôtellerie et restauration", "Continuité visuelle et entretien pratique pour un usage fréquent."], ["Commerce et showrooms", "Textures distinctives et performance commerciale fiable."], ["Bureaux et espaces publics", "Durabilité, efficacité de pose et design équilibré."]], pillars: [["Design", "Bois, pierre et motifs"], ["Performance", "Eau, usure et stabilité"], ["Livraison", "OEM, qualité et export"], ["Marchés", "Négoce, projets et marques"]] },
+    oem: { eyebrow: "Collaboration OEM / ODM", title: "Un parcours clair, du brief à la livraison.", body: "Nous transformons le positionnement marché, la structure, le décor, le verrouillage, la sous-couche, l’emballage et la documentation en programme réalisable.", steps: [["Confirmer le brief", "Marché, usage, prix et spécification cible"], ["Définir le produit", "Structure, décor, surface, verrouillage et sous-couche"], ["Valider les échantillons", "Finition, spécification, emballage et données"], ["Produire et livrer", "Contrôle qualité, emballage export et expédition"]], action: "Envoyer un projet" },
+    why: { eyebrow: "Valeurs de marque", title: "Pourquoi TOOYEI", body: "Des systèmes produits clairs et une coordination de projet unifiée, sans promesses de taille exagérées.", values: [["Systèmes produits stables", "Des familles claires pour les structures et usages principaux."], ["Personnalisation flexible", "Couleur, surface, structure, emballage et marque privée."], ["Collaboration claire", "Une équipe coordonne le brief, les échantillons et la production."], ["Orientation export", "Documentation, emballage, communication et livraison soignés."]] },
+    support: { eyebrow: "Aide à l’approvisionnement", title: "De meilleures informations. Des échanges plus rapides.", body: "Spécifications, échantillons et besoins OEM sont coordonnés par une seule équipe.", cards: [["Catalogue produits", "Parcourir les produits par système, décor et application."], ["Informations techniques", "Demander structure, spécifications et performances."], ["Planification des échantillons", "Préparer les échantillons selon le marché et le projet."], ["Brief OEM", "Partager produit, spécification, emballage et marché."]], action: "Demander l’accès" },
+    global: { eyebrow: "ACTIVITÉ MONDIALE", title: "Conçu pour les marchés mondiaux", body: "Produits de sol et accompagnement OEM pour importateurs, distributeurs, acheteurs de projets et marques privées.", markets: "Europe · Amérique du Nord · Australie · Moyen-Orient · Asie", follow: "Suivre TOOYEI" },
+    newsletter: { eyebrow: "RESTEZ INFORMÉ", title: "Gardez les informations produits à portée de main.", body: "Recevez les nouveautés collections, orientations design et documentations produits." },
+    cta: { eyebrow: "DÉMARRER UN PROJET", title: "Construisons un programme\nde sol plus fiable.", body: "Sélection produit, développement OEM et collaboration export pour le négoce, les projets et les marques privées.", action: "Démarrer un projet" },
+  },
+  ru: {
+    hero: { eyebrow: "ПРОФЕССИОНАЛЬНЫЕ НАПОЛЬНЫЕ СИСТЕМЫ · С 2015 ГОДА", title: "Надёжные покрытия\nдля мировых рынков.", body: "SPC, WPC, LVT и ламинат с гибкой поддержкой OEM / ODM для импортёров, дистрибьюторов, проектов и частных марок.", primary: "Смотреть продукцию", secondary: "Отправить запрос" },
+    capabilities: ["Водостойкие системы", "Гибкий OEM / ODM", "Экспортные документы", "Быстрая деловая поддержка"],
+    trust: { title: "Создано для долгосрочного партнёрства", body: "Понятная и надёжная система работы — от разработки продукта до экспортной поставки.", metrics: [["2015", "Основание бренда"], ["OEM / ODM", "Гибкая кастомизация"], ["Global Export", "Поддержка мировых рынков"], ["One Team", "Единая координация"]] },
+    systems: { eyebrow: "Системы покрытий", title: "Подходящее решение для каждого пространства.", body: "От жёсткого основания до тихого комфорта, от натурального дерева до архитектурного камня — понятные коллекции для быстрых решений.", action: "Все продукты" },
+    featured: { eyebrow: "Избранные продукты", title: "Начните с проверенных решений.", body: "Продукты выбраны за водостойкость, естественную фактуру и гибкость применения на основе актуальных данных.", action: "Смотреть все" },
+    applications: { eyebrow: "Применение", title: "Разработано для реальных пространств.", body: "Чёткие направления помогают закупщикам и дизайнерам сопоставить систему с задачами проекта.", cards: [["Жильё и апартаменты", "Комфорт, водостойкость и простой повседневный уход."], ["Отели и рестораны", "Визуальная цельность и практичный уход при частом использовании."], ["Розница и шоурумы", "Выразительные фактуры и надёжные коммерческие характеристики."], ["Офисы и общественные зоны", "Баланс долговечности, монтажа и дизайна."]], pillars: [["Дизайн", "Дерево, камень и узоры"], ["Характеристики", "Вода, износ и стабильность"], ["Поставка", "OEM, контроль и экспорт"], ["Рынки", "Опт, проекты и бренды"]] },
+    oem: { eyebrow: "Сотрудничество OEM / ODM", title: "Понятный путь от задачи до поставки.", body: "Мы превращаем позиционирование, конструкцию, декор, замок, подложку, упаковку и документы в выполнимую программу.", steps: [["Согласовать задачу", "Рынок, применение, цена и целевая спецификация"], ["Подобрать продукт", "Конструкция, декор, поверхность, замок и подложка"], ["Утвердить образцы", "Внешний вид, спецификация, упаковка и данные"], ["Произвести и доставить", "Контроль качества, экспортная упаковка и отгрузка"]], action: "Отправить запрос" },
+    why: { eyebrow: "Ценности бренда", title: "Почему TOOYEI", body: "Понятные продуктовые системы и единая проектная работа без преувеличенных заявлений.", values: [["Стабильные системы", "Понятные семейства для основных конструкций и применений."], ["Гибкая кастомизация", "Цвет, поверхность, конструкция, упаковка и частная марка."], ["Чёткое сотрудничество", "Одна команда ведёт задачу, образцы и производство."], ["Фокус на экспорт", "Документы, упаковка, коммуникация и поддержка поставки."]] },
+    support: { eyebrow: "Поддержка закупок", title: "Больше данных. Быстрее обсуждение проекта.", body: "Характеристики, образцы и OEM-требования координирует одна команда.", cards: [["Каталог продукции", "Поиск по системе, декору и применению."], ["Технические материалы", "Конструкция, характеристики и показатели."], ["План образцов", "Образцы под рынок и направление проекта."], ["Запрос OEM", "Продукт, спецификация, упаковка и рынок."]], action: "Запросить" },
+    global: { eyebrow: "ГЛОБАЛЬНЫЙ БИЗНЕС", title: "Для мировых рынков", body: "Напольные покрытия и OEM-поддержка для импортёров, дистрибьюторов, проектных закупок и частных марок.", markets: "Европа · Северная Америка · Австралия · Ближний Восток · Азия", follow: "Следить за TOOYEI" },
+    newsletter: { eyebrow: "БУДЬТЕ В КУРСЕ", title: "Держите информацию о продуктах под рукой.", body: "Получайте новости о коллекциях, дизайне и продуктовых материалах." },
+    cta: { eyebrow: "НАЧАТЬ ПРОЕКТ", title: "Создадим более надёжную\nпрограмму напольных покрытий.", body: "Подбор продуктов, OEM-разработка и экспортное сотрудничество для опта, проектов и частных марок.", action: "Начать проект" },
+  },
+  ja: {
+    hero: { eyebrow: "プロフェッショナル床材システム · 2015年創業", title: "世界市場のための、\n信頼できるフローリング。", body: "輸入業者、販売店、プロジェクト、プライベートブランド向けに、SPC・WPC・LVT・ラミネート床材と柔軟なOEM・ODM支援を提供します。", primary: "製品を見る", secondary: "プロジェクトを相談" },
+    capabilities: ["防水フロアシステム", "柔軟なOEM・ODM", "輸出書類サポート", "迅速なビジネス対応"],
+    trust: { title: "長期的なパートナーシップのために", body: "製品開発から輸出納品まで、明確で信頼できる実行可能な協業体制を提供します。", metrics: [["2015", "ブランド創立"], ["OEM / ODM", "柔軟なカスタマイズ"], ["Global Export", "国際市場サポート"], ["One Team", "製品と案件を一元対応"]] },
+    systems: { eyebrow: "フローリングシステム", title: "あらゆる空間に、適した床材システムを。", body: "剛性性能から静かな快適性、自然な木目から建築的な石目まで、選定を速める明確なコレクションです。", action: "すべての製品" },
+    featured: { eyebrow: "注目製品", title: "実績ある製品から選べます。", body: "防水性、自然な質感、プロジェクト対応力を基準に、現在の製品データから厳選しています。", action: "すべて見る" },
+    applications: { eyebrow: "用途", title: "実際の空間を想定した設計。", body: "明確な用途提案により、調達・設計チームが案件要件に合う床材を選びやすくします。", cards: [["住宅・マンション", "快適性、防水性、日々の手入れやすさを両立。"], ["ホテル・飲食", "利用頻度の高い空間に視覚的な統一感と実用的な維持管理。"], ["店舗・ショールーム", "個性的な質感と安定した商業性能。"], ["オフィス・公共空間", "耐久性、施工効率、デザインのバランス。"]], pillars: [["デザイン", "木目、石目、パターン"], ["性能", "防水、耐摩耗、安定性"], ["納品", "OEM、品質管理、輸出"], ["市場", "卸売、案件、ブランド"]] },
+    oem: { eyebrow: "OEM・ODM協業", title: "要件から納品まで、明確なプロセス。", body: "市場ポジション、構造、柄、ロック、下地、梱包、書類要件を実行可能な製品計画に変換します。", steps: [["要件確認", "市場、用途、価格帯、目標仕様"], ["製品選定", "構造、柄、表面、ロック、下地"], ["サンプル承認", "仕上がり、仕様、梱包、資料"], ["量産・納品", "品質確認、輸出梱包、出荷支援"]], action: "プロジェクトを相談" },
+    why: { eyebrow: "ブランド価値", title: "TOOYEIが選ばれる理由", body: "誇張された規模ではなく、明確な製品体系と統一された案件対応を重視します。", values: [["安定した製品体系", "主要な構造と用途を軸にした明確な製品群。"], ["柔軟なカスタマイズ", "色、表面、構造、梱包、プライベートブランドに対応。"], ["明確な協業", "要件、サンプル、量産を一つのチームが調整。"], ["輸出市場重視", "資料、梱包、連絡、納品支援を重視。"]] },
+    support: { eyebrow: "調達サポート", title: "より良い情報で、案件協議を迅速に。", body: "仕様、サンプル、OEM要件を同じチームが調整し、情報ロスを減らします。", cards: [["製品カタログ", "システム、柄、用途から製品を検索。"], ["技術資料", "構造、仕様、性能情報を提供。"], ["サンプル計画", "市場と案件方向に合わせてサンプルを計画。"], ["OEM案件概要", "製品、仕様、梱包、市場要件を共有。"]], action: "資料を依頼" },
+    global: { eyebrow: "グローバルビジネス", title: "世界市場に向けて", body: "輸入業者、販売店、プロジェクト調達、プライベートブランド向けの床材とOEM支援。", markets: "欧州 · 北米 · オーストラリア · 中東 · アジア", follow: "TOOYEIをフォロー" },
+    newsletter: { eyebrow: "最新情報", title: "製品情報をいつでも身近に。", body: "新しいコレクション、デザイン、製品資料の更新をお届けします。" },
+    cta: { eyebrow: "プロジェクトを開始", title: "より信頼できる床材計画を、\n一緒につくりましょう。", body: "卸売、プロジェクト、プライベートブランド向けの製品選定、OEM開発、輸出協業。", action: "相談を始める" },
+  },
+  it: {
+    hero: { eyebrow: "SISTEMI DI PAVIMENTAZIONE PROFESSIONALI · DAL 2015", title: "Pavimenti affidabili per\ni mercati globali.", body: "Pavimenti SPC, WPC, LVT e laminati con supporto OEM / ODM flessibile per importatori, distributori, progetti e marchi privati.", primary: "Esplora i prodotti", secondary: "Invia un progetto" },
+    capabilities: ["Sistemi impermeabili", "OEM / ODM flessibile", "Documentazione export", "Supporto commerciale rapido"],
+    trust: { title: "Pensato per collaborazioni durature", body: "Un metodo di lavoro chiaro e affidabile, dallo sviluppo prodotto alla consegna export.", metrics: [["2015", "Fondazione del marchio"], ["OEM / ODM", "Personalizzazione flessibile"], ["Global Export", "Supporto internazionale"], ["One Team", "Coordinamento unico"]] },
+    systems: { eyebrow: "Sistemi di pavimentazione", title: "Un sistema per ogni tipo di spazio.", body: "Dalle prestazioni rigide al comfort acustico, dal legno naturale alla pietra architettonica: collezioni chiare per decidere più rapidamente.", action: "Esplora tutti i prodotti" },
+    featured: { eyebrow: "Prodotti in evidenza", title: "Parti da prodotti collaudati.", body: "Selezionati per impermeabilità, texture autentiche e versatilità, utilizzando i dati prodotto attuali.", action: "Vedi tutti" },
+    applications: { eyebrow: "Applicazioni", title: "Progettato per spazi reali.", body: "Indicazioni chiare aiutano i team di acquisto e design ad abbinare ogni sistema alle esigenze del progetto.", cards: [["Residenziale e appartamenti", "Comfort, resistenza all’acqua e manutenzione quotidiana semplice."], ["Hotel e ristorazione", "Continuità visiva e manutenzione pratica per uso frequente."], ["Retail e showroom", "Texture distintive e prestazioni commerciali affidabili."], ["Uffici e spazi pubblici", "Durata, efficienza di posa e design equilibrato."]], pillars: [["Design", "Legno, pietra e motivi"], ["Prestazioni", "Acqua, usura e stabilità"], ["Consegna", "OEM, qualità ed export"], ["Mercati", "Ingrosso, progetti e marchi"]] },
+    oem: { eyebrow: "Collaborazione OEM / ODM", title: "Un percorso chiaro dal brief alla consegna.", body: "Traduciamo posizionamento, struttura, decoro, incastro, supporto, imballaggio e documentazione in un programma realizzabile.", steps: [["Conferma del brief", "Mercato, applicazione, prezzo e specifica target"], ["Definizione prodotto", "Struttura, decoro, superficie, incastro e supporto"], ["Approvazione campioni", "Finitura, specifica, imballaggio e dati"], ["Produzione e consegna", "Controlli qualità, imballaggio export e spedizione"]], action: "Invia un progetto" },
+    why: { eyebrow: "Valori del marchio", title: "Perché TOOYEI", body: "Sistemi di prodotto chiari e lavoro coordinato, senza affermazioni di scala esagerate.", values: [["Sistemi stabili", "Famiglie chiare per strutture e applicazioni principali."], ["Personalizzazione flessibile", "Colore, superficie, struttura, imballaggio e marchio privato."], ["Collaborazione chiara", "Un team coordina brief, campioni e produzione."], ["Focus export", "Documentazione, imballaggio, comunicazione e consegna."]] },
+    support: { eyebrow: "Supporto acquisti", title: "Informazioni migliori. Progetti più rapidi.", body: "Specifiche, campioni e requisiti OEM sono coordinati da un unico team.", cards: [["Catalogo prodotti", "Sfoglia per sistema, decoro e applicazione."], ["Informazioni tecniche", "Richiedi struttura, specifiche e prestazioni."], ["Piano campioni", "Pianifica i campioni per mercato e progetto."], ["Brief OEM", "Condividi prodotto, specifica, imballaggio e mercato."]], action: "Richiedi accesso" },
+    global: { eyebrow: "BUSINESS GLOBALE", title: "Pensato per i mercati globali", body: "Pavimenti e supporto OEM per importatori, distributori, acquirenti di progetto e marchi privati.", markets: "Europa · Nord America · Australia · Medio Oriente · Asia", follow: "Segui TOOYEI" },
+    newsletter: { eyebrow: "RESTA AGGIORNATO", title: "Informazioni prodotto sempre disponibili.", body: "Ricevi aggiornamenti su collezioni, design e materiali di prodotto." },
+    cta: { eyebrow: "AVVIA UN PROGETTO", title: "Costruiamo un programma\ndi pavimenti più affidabile.", body: "Selezione prodotto, sviluppo OEM e collaborazione export per ingrosso, progetti e marchi privati.", action: "Avvia un progetto" },
+  },
+  ar: {
+    hero: { eyebrow: "أنظمة أرضيات احترافية · منذ 2015", title: "أرضيات موثوقة\nللأسواق العالمية.", body: "أرضيات SPC وWPC وLVT واللامينيت مع دعم OEM وODM مرن للمستوردين والموزعين والمشاريع والعلامات الخاصة.", primary: "استكشف المنتجات", secondary: "أرسل موجز المشروع" },
+    capabilities: ["أنظمة مقاومة للماء", "OEM وODM مرن", "وثائق التصدير", "دعم تجاري سريع"],
+    trust: { title: "مصمم لشراكات طويلة الأمد", body: "أسلوب عمل واضح وموثوق وقابل للتنفيذ، من تطوير المنتج حتى التسليم للتصدير.", metrics: [["2015", "تأسيس العلامة"], ["OEM / ODM", "تخصيص مرن"], ["Global Export", "دعم الأسواق العالمية"], ["One Team", "تنسيق المنتج والمشروع"]] },
+    systems: { eyebrow: "أنظمة الأرضيات", title: "نظام أرضيات مناسب لكل مساحة.", body: "من الأداء الصلب إلى الراحة الهادئة، ومن الخشب الطبيعي إلى الحجر المعماري، تشكيلات واضحة لاتخاذ القرار بسرعة.", action: "استكشف كل المنتجات" },
+    featured: { eyebrow: "منتجات مختارة", title: "ابدأ بمنتجات مجربة.", body: "مختارة لمقاومة الماء والملمس الطبيعي والمرونة في المشاريع اعتماداً على بيانات منتجاتنا الحالية.", action: "عرض كل المنتجات" },
+    applications: { eyebrow: "التطبيقات", title: "مصمم للمساحات الواقعية.", body: "تساعد التوجيهات الواضحة فرق التوريد والتصميم على مطابقة كل نظام مع احتياجات المشروع.", cards: [["المنازل والشقق", "راحة ومقاومة للماء وسهولة في العناية اليومية."], ["الفنادق والمطاعم", "اتساق بصري وصيانة عملية للاستخدام المتكرر."], ["التجزئة وصالات العرض", "ملمس مميز وأداء تجاري موثوق."], ["المكاتب والمساحات العامة", "توازن بين المتانة وسهولة التركيب والتصميم."]], pillars: [["التصميم", "خشب وحجر ونقوش"], ["الأداء", "ماء وتآكل وثبات"], ["التسليم", "OEM وجودة وتصدير"], ["الأسواق", "جملة ومشاريع وعلامات"]] },
+    oem: { eyebrow: "تعاون OEM وODM", title: "مسار واضح من المتطلبات إلى التسليم.", body: "نحوّل تموضع السوق والبنية والتصميم والقفل والطبقة السفلية والتغليف والوثائق إلى برنامج قابل للتنفيذ.", steps: [["تأكيد المتطلبات", "السوق والتطبيق والسعر والمواصفة المستهدفة"], ["مطابقة المنتج", "البنية والتصميم والسطح والقفل والطبقة السفلية"], ["اعتماد العينات", "التشطيب والمواصفات والتغليف والبيانات"], ["الإنتاج والتسليم", "فحص الجودة وتغليف التصدير ودعم الشحن"]], action: "أرسل موجز المشروع" },
+    why: { eyebrow: "قيم العلامة", title: "لماذا TOOYEI", body: "أنظمة منتجات واضحة وعمل مشروع منسق دون ادعاءات مبالغ فيها.", values: [["أنظمة منتجات مستقرة", "عائلات واضحة للبنى والتطبيقات الرئيسية."], ["تخصيص مرن", "اللون والسطح والبنية والتغليف والعلامة الخاصة."], ["تعاون واضح", "فريق واحد ينسق المتطلبات والعينات والإنتاج."], ["تركيز على التصدير", "اهتمام بالوثائق والتغليف والتواصل والتسليم."]] },
+    support: { eyebrow: "دعم التوريد", title: "معلومات أفضل. محادثات أسرع.", body: "ينسق فريق واحد المواصفات والعينات ومتطلبات OEM لتقليل فقدان المعلومات.", cards: [["كتالوج المنتجات", "تصفح حسب النظام والتصميم والتطبيق."], ["المعلومات الفنية", "اطلب البنية والمواصفات وبيانات الأداء."], ["تخطيط العينات", "خطط العينات وفق السوق واتجاه المشروع."], ["موجز OEM", "شارك المنتج والمواصفات والتغليف والسوق."]], action: "اطلب الوصول" },
+    global: { eyebrow: "أعمال عالمية", title: "مصمم للأسواق العالمية", body: "أرضيات ودعم OEM للمستوردين والموزعين ومشتري المشاريع والعلامات الخاصة.", markets: "أوروبا · أمريكا الشمالية · أستراليا · الشرق الأوسط · آسيا", follow: "تابع TOOYEI" },
+    newsletter: { eyebrow: "ابقَ على اطلاع", title: "احتفظ بمعلومات المنتجات في متناولك.", body: "احصل على تحديثات التشكيلات واتجاهات التصميم ومواد المنتجات." },
+    cta: { eyebrow: "ابدأ مشروعاً", title: "لنبنِ برنامج أرضيات\nأكثر موثوقية.", body: "اختيار المنتجات وتطوير OEM والتعاون في التصدير للجملة والمشاريع والعلامات الخاصة.", action: "ابدأ مشروعاً" },
+  },
 };
 
 const systems = [
-  { name: "SPC Rigid Core", image: "/media/product-eir-spc.jpg", detail: { zh: "防水 · 稳定 · 锁扣", en: "Waterproof · Stable · Click", es: "Impermeable · Estable · Click", de: "Wasserfest · Stabil · Klick" } },
-  { name: "WPC Comfort", image: "/media/product-wpc.jpg", detail: { zh: "静音 · 温润 · 舒适", en: "Quiet · Warm · Resilient", es: "Silencioso · Cálido · Cómodo", de: "Leise · Warm · Komfortabel" } },
-  { name: "LVT Design", image: "/media/product-lvt.jpg", detail: { zh: "灵活 · 精致 · 工程适用", en: "Versatile · Refined · Project-ready", es: "Versátil · Refinado · Profesional", de: "Vielseitig · Fein · Projektbereit" } },
-  { name: "Pattern Flooring", image: "/media/product-herringbone.jpg", detail: { zh: "人字拼 · 鱼骨拼 · 定制", en: "Herringbone · Chevron · Custom", es: "Espiga · Chevron · A medida", de: "Fischgrät · Chevron · Individuell" } },
+  { name: "SPC Rigid Core", image: "/media/product-eir-spc.jpg", detail: { en: "Waterproof · Stable · Click", de: "Wasserfest · Stabil · Klick", fr: "Étanche · Stable · Clic", es: "Impermeable · Estable · Click", ru: "Водостойкость · Стабильность · Замок", ja: "防水 · 安定 · クリック", it: "Impermeabile · Stabile · Clic", ar: "مقاوم للماء · ثابت · قفل", zh: "防水 · 稳定 · 锁扣" } },
+  { name: "WPC Comfort", image: "/media/product-wpc.jpg", detail: { en: "Quiet · Warm · Resilient", de: "Leise · Warm · Komfortabel", fr: "Silencieux · Chaleureux · Confortable", es: "Silencioso · Cálido · Cómodo", ru: "Тихо · Тепло · Комфортно", ja: "静音 · 温かさ · 快適", it: "Silenzioso · Caldo · Confortevole", ar: "هادئ · دافئ · مريح", zh: "静音 · 温润 · 舒适" } },
+  { name: "LVT Design", image: "/media/product-lvt.jpg", detail: { en: "Versatile · Refined · Project-ready", de: "Vielseitig · Fein · Projektbereit", fr: "Polyvalent · Raffiné · Prêt pour les projets", es: "Versátil · Refinado · Profesional", ru: "Гибкость · Детали · Для проектов", ja: "柔軟 · 上質 · 案件対応", it: "Versatile · Raffinato · Pronto per progetti", ar: "مرن · راقٍ · جاهز للمشاريع", zh: "灵活 · 精致 · 工程适用" } },
+  { name: "Pattern Flooring", image: "/media/product-herringbone.jpg", detail: { en: "Herringbone · Chevron · Custom", de: "Fischgrät · Chevron · Individuell", fr: "Bâton rompu · Chevron · Sur mesure", es: "Espiga · Chevron · A medida", ru: "Ёлочка · Шеврон · На заказ", ja: "ヘリンボーン · シェブロン · 特注", it: "Spina di pesce · Chevron · Su misura", ar: "متعرج · شيفرون · مخصص", zh: "人字拼 · 鱼骨拼 · 定制" } },
 ] as const;
+
+const homeAuxCopy: Record<ContentLocale, { heroAlt: string; capabilitiesLabel: string; sideNote: string }> = {
+  en: { heroAlt: "Contemporary interior with wood-look flooring", capabilitiesLabel: "Core capabilities", sideNote: "Flooring systems for wholesale, projects and private-label brands." },
+  de: { heroAlt: "Moderner Innenraum mit Boden in Holzoptik", capabilitiesLabel: "Kernkompetenzen", sideNote: "Bodensysteme für Großhandel, Projekte und Eigenmarken." },
+  fr: { heroAlt: "Intérieur contemporain avec sol aspect bois", capabilitiesLabel: "Compétences clés", sideNote: "Systèmes de sol pour le négoce, les projets et les marques privées." },
+  es: { heroAlt: "Interior contemporáneo con suelo de aspecto madera", capabilitiesLabel: "Capacidades principales", sideNote: "Sistemas de suelo para mayoristas, proyectos y marcas privadas." },
+  ru: { heroAlt: "Современный интерьер с напольным покрытием под дерево", capabilitiesLabel: "Ключевые возможности", sideNote: "Напольные системы для опта, проектов и частных марок." },
+  ja: { heroAlt: "木目調フローリングの現代的なインテリア", capabilitiesLabel: "主な対応力", sideNote: "卸売、プロジェクト、プライベートブランド向け床材システム。" },
+  it: { heroAlt: "Interno contemporaneo con pavimento effetto legno", capabilitiesLabel: "Competenze principali", sideNote: "Sistemi di pavimentazione per ingrosso, progetti e marchi privati." },
+  ar: { heroAlt: "مساحة داخلية عصرية بأرضية بمظهر الخشب", capabilitiesLabel: "القدرات الأساسية", sideNote: "أنظمة أرضيات للجملة والمشاريع والعلامات الخاصة." },
+  zh: { heroAlt: "现代室内空间中的木纹地板", capabilitiesLabel: "核心能力", sideNote: "面向批发、工程项目和自有品牌的地板系统。" },
+};
 
 const applicationImages = [
   "/media/product-lvt.jpg",
@@ -204,23 +287,31 @@ const whyIcons = [Layers3, Palette, Workflow, Globe2] as const;
 const supportIcons = [FileText, Ruler, PackageCheck, Target] as const;
 
 export async function HomePage({ locale }: { locale: Locale }) {
-  const t = homeCopy[locale];
-  const products = await getPublishedProducts();
+  const contentLocale = toContentLocale(locale);
+  const t = homeCopy[contentLocale];
+  const auxiliary = homeAuxCopy[contentLocale];
+  const [products, categories] = await Promise.all([getPublishedProducts(), getPublicCategoryTree(locale)]);
 
   return (
     <div className="site-shell">
-      <SiteHeader locale={locale} />
+      <SiteHeader locale={locale} initialCategories={categories} />
       <main>
         <section className="brand-hero relative isolate min-h-[620px] overflow-hidden bg-[var(--navy)] text-white lg:min-h-[720px]">
           <Image
             src="/media/hero-flooring.jpg"
-            alt={locale === "zh" ? "现代室内空间中的木纹地板" : "Contemporary interior with wood-look flooring"}
+            alt={auxiliary.heroAlt}
             fill
             priority
             sizes="100vw"
             className="brand-hero-image object-cover object-[62%_center]"
           />
-          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(8,17,31,0.98)_0%,rgba(8,17,31,0.94)_34%,rgba(8,17,31,0.55)_48%,rgba(8,17,31,0.08)_72%,rgba(8,17,31,0.04)_100%)]" />
+          <div
+            className={
+              locale === "ar"
+                ? "absolute inset-0 bg-[linear-gradient(270deg,rgba(8,17,31,0.98)_0%,rgba(8,17,31,0.94)_34%,rgba(8,17,31,0.55)_48%,rgba(8,17,31,0.08)_72%,rgba(8,17,31,0.04)_100%)]"
+                : "absolute inset-0 bg-[linear-gradient(90deg,rgba(8,17,31,0.98)_0%,rgba(8,17,31,0.94)_34%,rgba(8,17,31,0.55)_48%,rgba(8,17,31,0.08)_72%,rgba(8,17,31,0.04)_100%)]"
+            }
+          />
           <div aria-hidden="true" className="absolute left-[-0.03em] top-[16%] max-w-[9em] text-[clamp(5rem,12vw,12rem)] font-semibold leading-[0.72] tracking-[-0.07em] text-white/[0.045]">
             FLOORING SYSTEMS
           </div>
@@ -244,12 +335,12 @@ export async function HomePage({ locale }: { locale: Locale }) {
 
             <div className="absolute bottom-8 right-10 hidden w-72 border-l border-white/20 pl-6 xl:block">
               <p className="text-[0.62rem] font-bold uppercase tracking-[0.2em] text-[var(--gold)]">TOOYEI / SINCE 2015</p>
-              <p className="mt-3 whitespace-pre-line text-sm leading-6 text-white/65">Flooring systems for wholesale,{"\n"}projects and private-label brands.</p>
+              <p className="mt-3 text-sm leading-6 text-white/65">{auxiliary.sideNote}</p>
             </div>
           </div>
         </section>
 
-        <section aria-label={locale === "zh" ? "核心能力" : "Core capabilities"} className="border-b border-[var(--border)] bg-white">
+        <section aria-label={auxiliary.capabilitiesLabel} className="border-b border-[var(--border)] bg-white">
           <div className="mx-auto grid max-w-[90rem] grid-cols-2 px-5 lg:grid-cols-4 lg:px-10">
             {t.capabilities.map((label, index) => {
               const Icon = capabilityIcons[index] ?? CheckCircle2;
@@ -308,7 +399,7 @@ export async function HomePage({ locale }: { locale: Locale }) {
                       <ArrowRight className="size-4 text-[var(--muted)] transition-transform duration-300 group-hover:translate-x-1 group-hover:text-[var(--gold)]" />
                     </div>
                     <h3 className="mt-4 text-2xl font-medium tracking-[-0.035em] text-[var(--navy)] transition-colors group-hover:text-[var(--gold)]">{system.name}</h3>
-                    <p className="mt-2 text-xs tracking-[0.07em] text-[var(--muted)]">{system.detail[locale]}</p>
+                    <p className="mt-2 text-xs tracking-[0.07em] text-[var(--muted)]">{system.detail[contentLocale]}</p>
                   </div>
                 </Link>
               ))}

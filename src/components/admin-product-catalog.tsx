@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import type { Locale } from "@/lib/site";
+import { languageMarkers, type ContentLocale } from "@/lib/site";
 
 export type ProductCatalogItem = {
   slug: string;
@@ -34,7 +34,7 @@ export type ProductCatalogItem = {
   thumbnailUrl: string;
   thumbnailAlt: string;
   updatedAt: string | null;
-  translationStates: Record<Locale, TranslationStatus>;
+  translationStates: Record<ContentLocale, TranslationStatus>;
   publishedTranslations: number;
   seoReadyTranslations: number;
   completion: number;
@@ -54,7 +54,9 @@ type Props = {
   batchAction: (formData: FormData) => Promise<void>;
 };
 
-const localeLabels: Record<Locale, string> = { zh: "中", en: "EN", es: "ES", de: "DE" };
+const localeLabels: Record<ContentLocale, string> = {
+  en: "EN", de: "DE", fr: "FR", es: "ES", ru: "RU", ja: "JA", it: "IT", ar: "AR", zh: "中",
+};
 
 const statusLabel: Record<ContentStatus, string> = {
   DRAFT: "草稿",
@@ -149,7 +151,7 @@ function ProductMeta({ product }: { product: ProductCatalogItem }) {
   return (
     <>
       <div className="flex items-center gap-1.5">
-        {(Object.keys(product.translationStates) as Locale[]).map((locale) => (
+        {(Object.keys(product.translationStates) as ContentLocale[]).map((locale) => (
           <span
             key={locale}
             title={`${localeLabels[locale]}：${product.translationStates[locale]}`}
@@ -158,7 +160,7 @@ function ProductMeta({ product }: { product: ProductCatalogItem }) {
               translationClass[product.translationStates[locale]],
             )}
           >
-            {localeLabels[locale]}
+            <span aria-hidden>{languageMarkers[locale]}</span>{localeLabels[locale]}
           </span>
         ))}
         <span className="ml-auto text-[10px] text-zinc-700">更新于 {formatDate(product.updatedAt)}</span>

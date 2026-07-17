@@ -30,22 +30,22 @@ export default async function AdminLoginPage({
   const message = params.error ? messages[params.error] : undefined;
 
   return (
-    <main className="grid min-h-screen place-items-center bg-[#0a0a0b] px-5 py-12 text-white [color-scheme:dark]">
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_50%_-10%,rgba(139,92,246,0.08),transparent_28rem)]" />
-      <Card className="relative w-full max-w-sm rounded-xl border border-white/[0.08] bg-[#111113] text-white shadow-[0_30px_100px_rgba(0,0,0,0.4)] ring-0">
+    <main className="grid min-h-screen place-items-center bg-[#F6F8FB] px-5 py-12 text-[#172033] [color-scheme:light]">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_50%_-10%,rgba(37,52,79,0.07),transparent_30rem)]" />
+      <Card className="relative w-full max-w-sm rounded-xl border border-[#E4E7EC] bg-white text-[#172033] shadow-[0_24px_70px_rgba(16,24,40,0.10)] ring-0">
         <CardHeader>
           <span className="mb-5 grid size-9 place-items-center overflow-hidden rounded-md bg-[#df2029]">
-            <Image src="/brand/tooyei-symbol.png" width={28} height={29} alt="" className="h-auto brightness-0 invert" priority />
+            <Image src="/brand/tooyei-symbol.png" width={28} height={29} alt="" className="h-[29px] w-7 brightness-0 invert" priority />
           </span>
-          <CardTitle className="text-xl tracking-[-0.03em] text-zinc-50">登录 Tooyei</CardTitle>
-          <CardDescription className="text-zinc-600">进入内容与销售运营工作区。</CardDescription>
+          <CardTitle className="text-xl tracking-[-0.03em] text-[#172033]">登录 Tooyei</CardTitle>
+          <CardDescription className="text-[#667085]">进入内容与销售运营工作区。</CardDescription>
         </CardHeader>
         <CardContent>
           {message && (
-            <Alert className="mb-6 border-red-500/30 bg-red-500/8 text-red-100">
+            <Alert className="mb-6 border-red-200 bg-red-50 text-red-900">
               <LockKeyhole className="size-4" />
               <AlertTitle>{message.title}</AlertTitle>
-              <AlertDescription className="text-red-100/65">{message.description}</AlertDescription>
+              <AlertDescription className="text-red-700">{message.description}</AlertDescription>
             </Alert>
           )}
           <form action={loginAction} className="space-y-5">
@@ -58,7 +58,7 @@ export default async function AdminLoginPage({
               <Label htmlFor="password" className="admin-label">密码</Label>
               <Input id="password" name="password" type="password" minLength={12} autoComplete="current-password" required className="admin-field" />
             </div>
-            <Button type="submit" className="w-full bg-zinc-100 text-zinc-950 hover:bg-white">登录</Button>
+            <Button type="submit" className="w-full bg-[#25344F] text-white hover:bg-[#1D293F]">登录</Button>
           </form>
         </CardContent>
       </Card>

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
+import { getPublicCategoryTree } from "@/lib/repositories/categories";
 import { siteConfig } from "@/lib/site";
 
 type PolicyKind = "privacy" | "terms" | "cookies";
@@ -42,12 +43,13 @@ const policies: Record<PolicyKind, { eyebrow: string; title: string; intro: stri
   },
 };
 
-export function PolicyPage({ kind }: { kind: PolicyKind }) {
+export async function PolicyPage({ kind }: { kind: PolicyKind }) {
   const policy = policies[kind];
+  const categories = await getPublicCategoryTree("zh");
 
   return (
     <div className="site-shell">
-      <SiteHeader locale="zh" />
+      <SiteHeader locale="zh" initialCategories={categories} />
       <main>
         <section className="bg-[var(--navy)] text-white">
           <div className="mx-auto max-w-5xl px-5 py-20 lg:px-10 lg:py-28">

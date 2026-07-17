@@ -1,26 +1,35 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { HomePage } from "@/components/home-page";
-import { isLocale, locales } from "@/lib/site";
+import { isLocale, locales, localizedAlternates, openGraphLocales, toContentLocale, type ContentLocale } from "@/lib/site";
 export const dynamic = "force-dynamic";
-export function generateStaticParams(){return locales.filter((locale)=>locale!=="zh").map((locale)=>({locale}));}
+export function generateStaticParams(){return locales.map((locale)=>({locale}));}
 
-const metadataCopy = {
+const metadataCopy: Record<ContentLocale, { title: string; description: string }> = {
+  zh: { title: "TOOYEI 专业地板系统与 OEM / ODM 解决方案", description: "面向进口商、经销商、工程项目与自有品牌客户，提供 SPC、WPC、LVT、强化地板及灵活的 OEM / ODM 解决方案。" },
   en: { title: "Professional Flooring Systems & OEM / ODM Solutions", description: "SPC, WPC, LVT and laminate flooring with flexible OEM / ODM and export support for global wholesale, projects and private-label brands." },
-  es: { title: "Sistemas de suelo y soluciones OEM / ODM", description: "Suelos SPC, WPC, LVT y laminados con soporte OEM / ODM flexible para mercados globales." },
   de: { title: "Professionelle Bodensysteme & OEM / ODM Lösungen", description: "SPC-, WPC-, LVT- und Laminatböden mit flexiblem OEM / ODM und Exportunterstützung." },
+  fr: { title: "Systèmes de sol professionnels et solutions OEM / ODM", description: "Sols SPC, WPC, LVT et stratifiés avec un accompagnement OEM / ODM flexible pour les marchés mondiaux." },
+  es: { title: "Sistemas de suelo y soluciones OEM / ODM", description: "Suelos SPC, WPC, LVT y laminados con soporte OEM / ODM flexible para mercados globales." },
+  ru: { title: "Профессиональные напольные системы и решения OEM / ODM", description: "Напольные покрытия SPC, WPC, LVT и ламинат с гибкой поддержкой OEM / ODM и экспорта." },
+  ja: { title: "プロフェッショナル床材システムとOEM・ODMソリューション", description: "世界市場向けにSPC、WPC、LVT、ラミネート床材と柔軟なOEM・ODM、輸出支援を提供します。" },
+  it: { title: "Sistemi di pavimentazione e soluzioni OEM / ODM", description: "Pavimenti SPC, WPC, LVT e laminati con supporto OEM / ODM flessibile per i mercati globali." },
+  ar: { title: "أنظمة أرضيات احترافية وحلول OEM وODM", description: "أرضيات SPC وWPC وLVT واللامينيت مع دعم مرن للتصنيع والتصدير للأسواق العالمية." },
 } as const;
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;
-  if (locale !== "en" && locale !== "es" && locale !== "de") return {};
-  const content = metadataCopy[locale];
+  if (!isLocale(locale)) return {};
+  const content = metadataCopy[toContentLocale(locale)];
   return {
     title: content.title,
     description: content.description,
-    alternates: { canonical: `/${locale}` },
-    openGraph: { title: content.title, description: content.description, url: `/${locale}`, locale },
+    alternates: {
+      canonical: `/${locale}`,
+      languages: localizedAlternates(),
+    },
+    openGraph: { title: content.title, description: content.description, url: `/${locale}`, locale: openGraphLocales[locale] },
   };
 }
 
-export default async function Page({params}:{params:Promise<{locale:string}>}){const {locale}=await params;if(!isLocale(locale)||locale==="zh")notFound();return <HomePage locale={locale}/>;}
+export default async function Page({params}:{params:Promise<{locale:string}>}){const {locale}=await params;if(!isLocale(locale))notFound();return <HomePage locale={locale}/>;}

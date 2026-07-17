@@ -9,8 +9,9 @@ import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { socialLinks } from "@/config/social";
 import type { Product } from "@/lib/content";
-import { copy } from "@/lib/content";
-import { localizedPath, siteConfig, type Locale } from "@/lib/site";
+import { copy, readLocalizedText } from "@/lib/content";
+import { getPublicCategoryTree } from "@/lib/repositories/categories";
+import { localizedPath, siteConfig, toContentLocale, type Locale } from "@/lib/site";
 import { createInquiryAction } from "@/app/contact/actions";
 
 type ContactPageProps = {
@@ -104,11 +105,57 @@ const labels = {
     databaseBody: "Die Datenbank ist nicht verbunden; Anfragen können noch nicht gespeichert werden.",
     rateLimitBody: "Zu viele Einsendungen. Bitte später erneut versuchen oder per E-Mail / WhatsApp kontaktieren.",
   },
+  fr: {
+    formTitle: "Envoyer les détails du projet", formBody: "Votre demande devient une requête suivie dans l’administration.",
+    name: "Nom", email: "E-mail", phone: "Téléphone / WhatsApp", company: "Entreprise", country: "Pays / région",
+    product: "Produit recherché", noProduct: "Aucun produit précis", message: "Besoins du projet",
+    messagePlaceholder: "Indiquez le produit, les spécifications, la quantité, le marché, le délai ou l’emballage.", submit: "Envoyer la demande",
+    successTitle: "Demande envoyée", successBody: "La demande a été enregistrée pour le suivi administratif.", validationTitle: "Échec de l’envoi",
+    validationBody: "Vérifiez le nom, l’e-mail et les besoins. Le message doit contenir au moins 20 caractères.", databaseBody: "La base de données n’est pas connectée ; la demande ne peut pas encore être enregistrée.",
+    rateLimitBody: "Trop d’envois. Réessayez plus tard ou contactez-nous par e-mail / WhatsApp.",
+  },
+  ru: {
+    formTitle: "Отправить данные проекта", formBody: "Ваш запрос будет сохранён для отслеживания в панели управления.",
+    name: "Имя", email: "Эл. почта", phone: "Телефон / WhatsApp", company: "Компания", country: "Страна / регион",
+    product: "Интересующий продукт", noProduct: "Продукт ещё не выбран", message: "Требования проекта",
+    messagePlaceholder: "Укажите продукт, характеристики, объём, рынок, срок поставки или упаковку.", submit: "Отправить запрос",
+    successTitle: "Запрос отправлен", successBody: "Запрос сохранён для дальнейшей обработки.", validationTitle: "Не удалось отправить",
+    validationBody: "Проверьте имя, почту и требования. Сообщение должно содержать не менее 20 символов.", databaseBody: "База данных не подключена, поэтому запрос пока нельзя сохранить.",
+    rateLimitBody: "Слишком много отправок. Повторите позже или свяжитесь с нами по почте / WhatsApp.",
+  },
+  ja: {
+    formTitle: "プロジェクト情報を送信", formBody: "お問い合わせは管理画面で追跡可能な案件として保存されます。",
+    name: "お名前", email: "メール", phone: "電話 / WhatsApp", company: "会社名", country: "国 / 地域",
+    product: "関心のある製品", noProduct: "製品は未指定", message: "プロジェクト要件",
+    messagePlaceholder: "製品、仕様、数量、市場、納期、梱包要件をご記入ください。", submit: "お問い合わせを送信",
+    successTitle: "送信しました", successBody: "管理チームのフォロー用に保存されました。", validationTitle: "送信できませんでした",
+    validationBody: "お名前、メール、要件をご確認ください。メッセージは20文字以上必要です。", databaseBody: "データベースが未接続のため、現在は保存できません。",
+    rateLimitBody: "送信回数が多すぎます。後ほど再試行するか、メール / WhatsAppでご連絡ください。",
+  },
+  it: {
+    formTitle: "Invia i dettagli del progetto", formBody: "La richiesta diventa una pratica tracciabile nel pannello amministrativo.",
+    name: "Nome", email: "E-mail", phone: "Telefono / WhatsApp", company: "Azienda", country: "Paese / regione",
+    product: "Prodotto di interesse", noProduct: "Nessun prodotto specifico", message: "Requisiti del progetto",
+    messagePlaceholder: "Indica prodotto, specifiche, quantità, mercato, tempi o imballaggio.", submit: "Invia richiesta",
+    successTitle: "Richiesta inviata", successBody: "La richiesta è stata salvata per il follow-up amministrativo.", validationTitle: "Invio non riuscito",
+    validationBody: "Controlla nome, e-mail e requisiti. Il messaggio deve contenere almeno 20 caratteri.", databaseBody: "Il database non è collegato; la richiesta non può ancora essere salvata.",
+    rateLimitBody: "Troppi invii. Riprova più tardi o contattaci via e-mail / WhatsApp.",
+  },
+  ar: {
+    formTitle: "أرسل تفاصيل المشروع", formBody: "سيتحول طلبك إلى استفسار قابل للمتابعة في لوحة الإدارة.",
+    name: "الاسم", email: "البريد الإلكتروني", phone: "الهاتف / WhatsApp", company: "الشركة", country: "الدولة / المنطقة",
+    product: "المنتج المطلوب", noProduct: "لم يتم تحديد منتج", message: "متطلبات المشروع",
+    messagePlaceholder: "اذكر المنتج والمواصفات والكمية والسوق وموعد التسليم أو متطلبات التغليف.", submit: "إرسال الاستفسار",
+    successTitle: "تم إرسال الاستفسار", successBody: "تم حفظ الطلب لمتابعته من فريق الإدارة.", validationTitle: "تعذر الإرسال",
+    validationBody: "تحقق من الاسم والبريد والمتطلبات. يجب ألا تقل الرسالة عن 20 حرفاً.", databaseBody: "قاعدة البيانات غير متصلة، لذلك لا يمكن حفظ الاستفسار الآن.",
+    rateLimitBody: "عدد الإرسالات كبير. حاول لاحقاً أو تواصل عبر البريد / WhatsApp.",
+  },
 } as const;
 
-export function ContactPage({ locale, products, selectedProductSlug, feedback }: ContactPageProps) {
-  const t = copy[locale];
-  const formLabels = labels[locale];
+export async function ContactPage({ locale, products, selectedProductSlug, feedback }: ContactPageProps) {
+  const categories = await getPublicCategoryTree(locale);
+  const t = copy[toContentLocale(locale)];
+  const formLabels = labels[toContentLocale(locale)];
   const selectedProduct = products.find((product) => product.slug === selectedProductSlug);
   const contactPath = localizedPath(locale, "/contact");
   const sourcePath = selectedProduct ? `${contactPath}?product=${selectedProduct.slug}` : contactPath;
@@ -116,18 +163,16 @@ export function ContactPage({ locale, products, selectedProductSlug, feedback }:
 
   return (
     <div className="site-shell">
-      <SiteHeader locale={locale} />
+      <SiteHeader locale={locale} initialCategories={categories} />
       <main>
         <section className="site-dark-panel">
           <div className="mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
             <p className="brand-eyebrow">
-              {locale === "zh" ? t.enquiryEyebrow : "PROJECT ENQUIRY"}
+              {t.enquiryEyebrow}
             </p>
             <h1 className="mt-5 text-5xl font-semibold tracking-[-0.05em] sm:text-6xl">{t.discuss}</h1>
             <p className="mt-6 max-w-2xl leading-8 text-white/65">
-              {locale === "zh"
-                ? t.enquiryBody
-                : "Tell us the product system, specifications, quantity and destination market. Our export team will help shape the right solution."}
+              {t.enquiryBody}
             </p>
           </div>
         </section>
@@ -199,7 +244,7 @@ export function ContactPage({ locale, products, selectedProductSlug, feedback }:
                       <option value="">{formLabels.noProduct}</option>
                       {products.map((product) => (
                         <option key={product.slug} value={product.slug}>
-                          {product.sku} · {product.title[locale]}
+                          {product.sku} · {readLocalizedText(product.title, locale)}
                         </option>
                       ))}
                     </select>
@@ -226,10 +271,10 @@ export function ContactPage({ locale, products, selectedProductSlug, feedback }:
 
           <div className="grid gap-6 self-start">
             <Card className="site-card rounded-3xl">
-              <CardHeader><CardTitle>{locale === "zh" ? "电子邮件" : "Email"}</CardTitle></CardHeader>
+              <CardHeader><CardTitle>{formLabels.email}</CardTitle></CardHeader>
               <CardContent>
                 <p className="mb-6 text-sm leading-6 text-muted-foreground">
-                  {locale === "zh" ? t.emailHelp : "Best for specifications, drawings, catalog requests and project documents."}
+                  {t.emailHelp}
                 </p>
                 <Button asChild className="site-primary-button">
                   <a href={`mailto:${siteConfig.email}?subject=Flooring project enquiry`}><Mail /> {siteConfig.email}</a>
@@ -240,11 +285,11 @@ export function ContactPage({ locale, products, selectedProductSlug, feedback }:
               <CardHeader><CardTitle>WhatsApp</CardTitle></CardHeader>
               <CardContent>
                 <p className="mb-6 text-sm leading-6 text-muted-foreground">
-                  {locale === "zh" ? t.whatsappHelp : "Best for quick product questions, sample coordination and response updates."}
+                  {t.whatsappHelp}
                 </p>
                 <Button asChild variant="outline">
                   <a href={whatsapp.href} target="_blank" rel="noopener noreferrer">
-                    <MessageCircle /> {locale === "zh" ? t.startConversation : "Start conversation"}
+                    <MessageCircle /> {t.startConversation}
                   </a>
                 </Button>
                 <p className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">

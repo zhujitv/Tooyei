@@ -221,8 +221,8 @@ const importCatalog = async (products: CatalogProduct[]) => {
       const categorySlug = product.kind.toLowerCase().replaceAll("_", "-");
       const category = await prisma.category.upsert({
         where: { slug: categorySlug },
-        update: {},
-        create: { slug: categorySlug, kind: product.kind, status: ContentStatus.PUBLISHED },
+        update: { isActive: true },
+        create: { slug: categorySlug, kind: product.kind, status: ContentStatus.PUBLISHED, isActive: true },
       });
       for (const locale of Object.keys(categoryLocaleMap) as Array<keyof typeof categoryLocaleMap>) {
         const databaseLocale = categoryLocaleMap[locale];
@@ -253,6 +253,12 @@ const importCatalog = async (products: CatalogProduct[]) => {
           sortOrder,
           status: ContentStatus.DRAFT,
         },
+      });
+
+      await prisma.productCategory.upsert({
+        where: { productId_categoryId: { productId: record.id, categoryId: category.id } },
+        update: { sortOrder: 0 },
+        create: { productId: record.id, categoryId: category.id, sortOrder: 0 },
       });
 
       for (const locale of Object.keys(localeMap) as SourceLocale[]) {

@@ -8,9 +8,9 @@ import {
   ProductMediaRole,
   TranslationStatus,
 } from "@/generated/prisma/client";
-import { products as sampleProducts } from "@/lib/content";
+import { products as sampleProducts, readLocalizedText } from "@/lib/content";
 import { getPrisma, isDatabaseConfigured } from "@/lib/db";
-import { locales, type Locale } from "@/lib/site";
+import { contentLocales, type ContentLocale } from "@/lib/site";
 
 export type AdminProductSummary = {
   slug: string;
@@ -25,7 +25,7 @@ export type AdminProductSummary = {
   thumbnailUrl: string;
   thumbnailAlt: string;
   updatedAt: Date | null;
-  translationStates: Record<Locale, TranslationStatus>;
+  translationStates: Record<ContentLocale, TranslationStatus>;
   publishedTranslations: number;
   missingTranslations: number;
   seoReadyTranslations: number;
@@ -40,7 +40,7 @@ export type AdminProductSummary = {
 };
 
 export type AdminProductTranslation = {
-  locale: Locale;
+  locale: ContentLocale;
   title: string;
   summary: string;
   seoTitle: string;
@@ -98,6 +98,7 @@ export type AdminEditableProduct = {
   sku: string;
   category: string;
   categoryId: string | null;
+  categoryIds: string[];
   kind: ProductKind;
   status: ContentStatus;
   featured: boolean;
@@ -113,9 +114,12 @@ export type AdminEditableProduct = {
 
 export type AdminProductCategoryOption = {
   id: string;
+  parentId: string | null;
   slug: string;
   kind: ProductKind;
   label: string;
+  depth: 0 | 1;
+  isActive: boolean;
 };
 
 export type AdminProductFilters = {
@@ -138,6 +142,7 @@ export type CreateProductInput = {
   slug: string;
   sku: string;
   categoryId: string;
+  categoryIds?: string[];
   status: ContentStatus;
   featured: boolean;
   sortOrder: number;
@@ -160,6 +165,7 @@ export type UpdateProductCoreInput = {
   slug: string;
   sku: string;
   categoryId: string;
+  categoryIds: string[];
   status: ContentStatus;
   featured: boolean;
   sortOrder: number;
@@ -167,7 +173,7 @@ export type UpdateProductCoreInput = {
 
 export type UpdateProductTranslationInput = {
   slug: string;
-  locale: Locale;
+  locale: ContentLocale;
   title: string;
   summary: string;
   seoTitle?: string | null;
@@ -198,11 +204,16 @@ export type AttachUploadedProductAssetInput = {
   caption?: string;
 };
 
-const localeMap: Record<Locale, DatabaseLocale> = {
-  zh: DatabaseLocale.ZH,
+const localeMap: Record<ContentLocale, DatabaseLocale> = {
   en: DatabaseLocale.EN,
-  es: DatabaseLocale.ES,
   de: DatabaseLocale.DE,
+  fr: DatabaseLocale.FR,
+  es: DatabaseLocale.ES,
+  ru: DatabaseLocale.RU,
+  ja: DatabaseLocale.JA,
+  it: DatabaseLocale.IT,
+  ar: DatabaseLocale.AR,
+  zh: DatabaseLocale.ZH,
 };
 
 const sampleDate = new Date(0);
@@ -245,18 +256,19 @@ const sampleEditableProduct = (slug: string): AdminEditableProduct | undefined =
     sku: product.sku,
     category: product.category,
     categoryId: null,
+    categoryIds: [],
     kind: ProductKind[product.category as keyof typeof ProductKind] ?? ProductKind.SPC,
     status: ContentStatus.PUBLISHED,
     featured: true,
     sortOrder: 0,
     updatedAt: sampleDate,
-    translations: locales.map((locale) => ({
+    translations: contentLocales.map((locale) => ({
       locale,
-      title: product.title[locale],
-      summary: product.summary[locale],
-      seoTitle: product.title[locale],
-      seoDescription: product.summary[locale],
-      status: TranslationStatus.PUBLISHED,
+      title: readLocalizedText(product.title, locale),
+      summary: readLocalizedText(product.summary, locale),
+      seoTitle: readLocalizedText(product.title, locale),
+      seoDescription: readLocalizedText(product.summary, locale),
+      status: product.title[locale] ? TranslationStatus.PUBLISHED : TranslationStatus.MISSING,
     })),
     media: [
       {
@@ -303,15 +315,12 @@ const sampleSummaries = (): AdminProductSummary[] =>
     title: product.title.zh,
     thumbnailUrl: product.image,
     thumbnailAlt: product.title.zh,
-    translationStates: {
-      zh: TranslationStatus.PUBLISHED,
-      en: TranslationStatus.PUBLISHED,
-      es: TranslationStatus.PUBLISHED,
-      de: TranslationStatus.PUBLISHED,
-    },
-    publishedTranslations: locales.length,
-    missingTranslations: 0,
-    seoReadyTranslations: locales.length,
+    translationStates: Object.fromEntries(
+      contentLocales.map((locale) => [locale, product.title[locale] ? TranslationStatus.PUBLISHED : TranslationStatus.MISSING]),
+    ) as Record<ContentLocale, TranslationStatus>,
+    publishedTranslations: contentLocales.filter((locale) => Boolean(product.title[locale])).length,
+    missingTranslations: contentLocales.filter((locale) => !product.title[locale]).length,
+    seoReadyTranslations: contentLocales.filter((locale) => Boolean(product.title[locale])).length,
     contentCounts: {
       media: 1,
       features: product.features.length,
@@ -359,6 +368,10 @@ const listProductInclude = {
 const editProductInclude = {
   ...listProductInclude,
   primaryImage: true,
+  categoryAssignments: {
+    orderBy: { sortOrder: "asc" as const },
+    select: { categoryId: true },
+  },
   media: {
     orderBy: [{ role: "asc" as const }, { sortOrder: "asc" as const }],
     include: { asset: true },
@@ -384,7 +397,7 @@ const editProductInclude = {
 type AdminProductRecord = Prisma.ProductGetPayload<{ include: typeof listProductInclude }>;
 type AdminEditableProductRecord = Prisma.ProductGetPayload<{ include: typeof editProductInclude }>;
 
-const translationFor = (product: AdminProductRecord, locale: Locale) =>
+const translationFor = (product: AdminProductRecord, locale: ContentLocale) =>
   product.translations.find((translation) => translation.locale === localeMap[locale]);
 
 const zhTranslation = <T extends { locale: DatabaseLocale }>(translations: T[]) =>
@@ -392,9 +405,9 @@ const zhTranslation = <T extends { locale: DatabaseLocale }>(translations: T[]) 
 
 const toSummary = (product: AdminProductRecord): AdminProductSummary => {
   const states = Object.fromEntries(
-    locales.map((locale) => [locale, translationFor(product, locale)?.status ?? TranslationStatus.MISSING]),
-  ) as Record<Locale, TranslationStatus>;
-  const seoReadyTranslations = locales.filter((locale) => {
+    contentLocales.map((locale) => [locale, translationFor(product, locale)?.status ?? TranslationStatus.MISSING]),
+  ) as Record<ContentLocale, TranslationStatus>;
+  const seoReadyTranslations = contentLocales.filter((locale) => {
     const translation = translationFor(product, locale);
     return Boolean(translation?.seoTitle?.trim() && translation.seoDescription?.trim());
   }).length;
@@ -405,7 +418,7 @@ const toSummary = (product: AdminProductRecord): AdminProductSummary => {
     applications: product._count.applications,
     downloads: product._count.downloads,
   };
-  const publishedTranslations = locales.filter((locale) => states[locale] === TranslationStatus.PUBLISHED).length;
+  const publishedTranslations = contentLocales.filter((locale) => states[locale] === TranslationStatus.PUBLISHED).length;
   const completion = Math.min(
     100,
     15 +
@@ -414,8 +427,8 @@ const toSummary = (product: AdminProductRecord): AdminProductSummary => {
       (contentCounts.specifications ? 15 : 0) +
       (contentCounts.applications ? 5 : 0) +
       (contentCounts.downloads ? 5 : 0) +
-      Math.round((publishedTranslations / locales.length) * 20) +
-      Math.round((seoReadyTranslations / locales.length) * 10),
+      Math.round((publishedTranslations / contentLocales.length) * 20) +
+      Math.round((seoReadyTranslations / contentLocales.length) * 10),
   );
 
   return {
@@ -433,7 +446,7 @@ const toSummary = (product: AdminProductRecord): AdminProductSummary => {
     thumbnailAlt: product.primaryImage?.alt ?? translationFor(product, "zh")?.title ?? product.sku,
     translationStates: states,
     publishedTranslations,
-    missingTranslations: locales.filter((locale) => states[locale] === TranslationStatus.MISSING).length,
+    missingTranslations: contentLocales.filter((locale) => states[locale] === TranslationStatus.MISSING).length,
     seoReadyTranslations,
     contentCounts,
     completion,
@@ -469,12 +482,13 @@ const toEditableProduct = (product: AdminEditableProductRecord): AdminEditablePr
     sku: product.sku,
     category: categoryLabel(product.category),
     categoryId: product.categoryId,
+    categoryIds: product.categoryAssignments.map(({ categoryId }) => categoryId),
     kind: product.kind,
     status: product.status,
     featured: product.featured,
     sortOrder: product.sortOrder,
     updatedAt: product.updatedAt,
-    translations: locales.map((locale) => {
+    translations: contentLocales.map((locale) => {
       const translation = product.translations.find(({ locale: value }) => value === localeMap[locale]);
       return {
         locale,
@@ -574,10 +588,10 @@ const statsFromProducts = (products: AdminProductSummary[]): AdminProductStats =
   archived: products.filter((product) => product.status === ContentStatus.ARCHIVED).length,
   featured: products.filter((product) => product.featured).length,
   needsReview: products.filter((product) =>
-    locales.some((locale) => product.translationStates[locale] === TranslationStatus.NEEDS_REVIEW),
+    contentLocales.some((locale) => product.translationStates[locale] === TranslationStatus.NEEDS_REVIEW),
   ).length,
   missing: products.filter((product) =>
-    locales.some((locale) => product.translationStates[locale] === TranslationStatus.MISSING),
+    contentLocales.some((locale) => product.translationStates[locale] === TranslationStatus.MISSING),
   ).length,
 });
 
@@ -653,15 +667,26 @@ export async function getAdminProductCategoryOptions(): Promise<AdminProductCate
     const categories = Array.from(new Set(sampleProducts.map((product) => product.category)));
     return categories.map((category) => ({
       id: category.toLowerCase(),
+      parentId: null,
       slug: category.toLowerCase(),
       kind: ProductKind[category as keyof typeof ProductKind] ?? ProductKind.SPC,
       label: `${category} 地板`,
+      depth: 0,
+      isActive: true,
     }));
   }
 
   const categories = await getPrisma().category.findMany({
     where: { status: { not: ContentStatus.ARCHIVED } },
     include: {
+      parent: {
+        include: {
+          translations: {
+            where: { locale: DatabaseLocale.ZH },
+            select: { locale: true, name: true },
+          },
+        },
+      },
       translations: {
         where: { locale: DatabaseLocale.ZH },
         select: { locale: true, name: true },
@@ -670,11 +695,20 @@ export async function getAdminProductCategoryOptions(): Promise<AdminProductCate
     orderBy: [{ sortOrder: "asc" }, { slug: "asc" }],
   });
 
-  return categories.map((category) => ({
+  return categories
+    .sort((left, right) => {
+      const leftRoot = left.parent?.sortOrder ?? left.sortOrder;
+      const rightRoot = right.parent?.sortOrder ?? right.sortOrder;
+      return leftRoot - rightRoot || Number(Boolean(left.parentId)) - Number(Boolean(right.parentId)) || left.sortOrder - right.sortOrder;
+    })
+    .map((category) => ({
     id: category.id,
+    parentId: category.parentId,
     slug: category.slug,
     kind: category.kind,
-    label: categoryLabel(category),
+    label: category.parent ? `${categoryLabel(category.parent)} / ${categoryLabel(category)}` : categoryLabel(category),
+    depth: category.parentId ? 1 : 0,
+    isActive: category.isActive,
   }));
 }
 
@@ -684,11 +718,13 @@ export async function createProduct(input: CreateProductInput) {
   }
 
   const prisma = getPrisma();
-  const category = await prisma.category.findUnique({
-    where: { id: input.categoryId },
-    select: { id: true, kind: true },
-  });
+  const conflictingCategory = await prisma.category.findUnique({ where: { slug: input.slug }, select: { id: true } });
+  if (conflictingCategory) throw new Error("产品 Slug 已被栏目使用，请更换 Slug，避免前台链接冲突。");
+  const categoryIds = Array.from(new Set([input.categoryId, ...(input.categoryIds ?? [])]));
+  const categories = await prisma.category.findMany({ where: { id: { in: categoryIds } }, select: { id: true, kind: true } });
+  const category = categories.find(({ id }) => id === input.categoryId);
   if (!category) throw new Error("Product category does not exist.");
+  if (categories.length !== categoryIds.length) throw new Error("One or more product categories do not exist.");
 
   return prisma.product.create({
     data: {
@@ -696,6 +732,9 @@ export async function createProduct(input: CreateProductInput) {
       sku: input.sku,
       kind: category.kind,
       categoryId: category.id,
+      categoryAssignments: {
+        create: categoryIds.map((categoryId, sortOrder) => ({ categoryId, sortOrder })),
+      },
       status: input.status,
       featured: input.featured,
       sortOrder: input.sortOrder,
@@ -774,17 +813,21 @@ export async function updateProductCore(input: UpdateProductCoreInput) {
   }
 
   const prisma = getPrisma();
-  const category = await prisma.category.findUnique({
-    where: { id: input.categoryId },
-    select: { id: true, kind: true },
-  });
+  const categoryIds = Array.from(new Set([input.categoryId, ...input.categoryIds]));
+  const categories = await prisma.category.findMany({ where: { id: { in: categoryIds } }, select: { id: true, kind: true } });
+  const category = categories.find(({ id }) => id === input.categoryId);
   if (!category) throw new Error("Product category does not exist.");
+  if (categories.length !== categoryIds.length) throw new Error("One or more product categories do not exist.");
 
   return prisma.product.update({
     where: { slug: input.slug },
     data: {
       sku: input.sku,
       categoryId: category.id,
+      categoryAssignments: {
+        deleteMany: {},
+        create: categoryIds.map((categoryId, sortOrder) => ({ categoryId, sortOrder })),
+      },
       kind: category.kind,
       status: input.status,
       featured: input.featured,

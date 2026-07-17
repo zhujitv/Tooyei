@@ -3,6 +3,7 @@ import "server-only";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { AdminRole } from "@/generated/prisma/client";
 import { isDatabaseConfigured } from "@/lib/db";
 import { getCurrentAdminUser } from "@/lib/repositories/admin-users";
 
@@ -88,5 +89,22 @@ export async function requireAdminSession(): Promise<AdminSession> {
       redirect("/admin/login");
     }
   }
+  return session;
+}
+
+export type ProductManagerSession = AdminSession & { role: AdminRole };
+
+export async function getProductManagerSession(): Promise<ProductManagerSession | null> {
+  const session = await getAdminSession();
+  if (!session) return null;
+
+  const user = await getCurrentAdminUser(session.email);
+  if (!user?.active || (user.role !== AdminRole.OWNER && user.role !== AdminRole.EDITOR)) return null;
+  return { ...session, role: user.role };
+}
+
+export async function requireProductManagerSession(): Promise<ProductManagerSession> {
+  const session = await getProductManagerSession();
+  if (!session) redirect("/admin/content?error=permission");
   return session;
 }

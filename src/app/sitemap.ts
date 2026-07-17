@@ -1,10 +1,11 @@
 import type { MetadataRoute } from "next";
+import { getPublicCategorySlugs } from "@/lib/repositories/categories";
 import { getPublishedProductSlugs } from "@/lib/repositories/products";
 import { locales, localizedPath, siteConfig } from "@/lib/site";
 export const dynamic = "force-dynamic";
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const productSlugs = await getPublishedProductSlugs();
-  const paths=["/","/products","/contact",...productSlugs.map((slug)=>`/products/${slug}`)];
+  const [productSlugs, categorySlugs] = await Promise.all([getPublishedProductSlugs(), getPublicCategorySlugs()]);
+  const paths=["/","/products","/contact",...categorySlugs.map((slug)=>`/products/${slug}`),...productSlugs.map((slug)=>`/products/${slug}`)];
   const localizedEntries = locales.flatMap((locale)=>paths.map((path)=>({url:new URL(localizedPath(locale,path),siteConfig.url).toString(),lastModified:new Date(),changeFrequency:path.includes("/products/")?"weekly" as const:"monthly" as const,priority:path==="/"?1:path==="/products"?0.9:0.7})));
   const policyEntries = ["/privacy", "/terms", "/cookies"].map((path) => ({
     url: new URL(path, siteConfig.url).toString(),
@@ -12,5 +13,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     changeFrequency: "yearly" as const,
     priority: 0.3,
   }));
-  return [...localizedEntries, ...policyEntries];
+  return [
+    { url: new URL("/", siteConfig.url).toString(), lastModified: new Date(), changeFrequency: "monthly" as const, priority: 1 },
+    ...localizedEntries,
+    ...policyEntries,
+  ];
 }

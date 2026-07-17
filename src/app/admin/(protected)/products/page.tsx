@@ -184,7 +184,7 @@ export default async function AdminProductsPage({
           <div className="space-y-1.5 lg:col-span-3">
             <Label htmlFor="new-category" className="admin-label">分类</Label>
             <select id="new-category" name="categoryId" required defaultValue={defaultCategoryId} disabled={!databaseReady || !categories.length} className="admin-select h-8 w-full px-2.5 text-xs">
-              {categories.map((category) => <option key={category.id} value={category.id}>{category.label} · {kindLabel[category.kind]}</option>)}
+              {categories.map((category) => <option key={category.id} value={category.id}>{category.depth ? "↳ " : ""}{category.label}{category.isActive ? "" : "（已停用）"}</option>)}
             </select>
           </div>
           <div className="space-y-1.5 lg:col-span-2">

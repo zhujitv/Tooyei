@@ -9,8 +9,54 @@ import { products as sampleProducts, type LocalizedText, type Product } from "@/
 import { getPrisma, isDatabaseConfigured } from "@/lib/db";
 import { locales, type Locale } from "@/lib/site";
 
+const publicCategoryWhere: Prisma.CategoryWhereInput = {
+  isActive: true,
+  status: { not: ContentStatus.ARCHIVED },
+  OR: [
+    { parentId: null },
+    { parent: { is: { isActive: true, status: { not: ContentStatus.ARCHIVED } } } },
+  ],
+};
+
+const categoryForSlug = (slug: string): Prisma.CategoryWhereInput => ({
+  ...publicCategoryWhere,
+  AND: [
+    {
+      OR: [
+        { slug },
+        { parent: { is: { slug, isActive: true, status: { not: ContentStatus.ARCHIVED } } } },
+      ],
+    },
+  ],
+});
+
+const visibleCategoryClause: Prisma.ProductWhereInput = {
+  OR: [
+    { category: { is: publicCategoryWhere } },
+    { categoryAssignments: { some: { category: { is: publicCategoryWhere } } } },
+  ],
+};
+
 const productInclude = {
   primaryImage: true,
+  category: {
+    include: {
+      translations: true,
+      parent: { include: { translations: true } },
+    },
+  },
+  categoryAssignments: {
+    where: { category: { is: publicCategoryWhere } },
+    orderBy: { sortOrder: "asc" as const },
+    include: {
+      category: {
+        include: {
+          translations: true,
+          parent: { include: { translations: true } },
+        },
+      },
+    },
+  },
   media: {
     where: { visible: true },
     orderBy: [{ role: "asc" as const }, { sortOrder: "asc" as const }],
@@ -42,10 +88,15 @@ const productInclude = {
 type DatabaseProduct = Prisma.ProductGetPayload<{ include: typeof productInclude }>;
 
 const databaseLocale: Record<Locale, DatabaseLocale> = {
-  zh: DatabaseLocale.ZH,
   en: DatabaseLocale.EN,
-  es: DatabaseLocale.ES,
   de: DatabaseLocale.DE,
+  fr: DatabaseLocale.FR,
+  es: DatabaseLocale.ES,
+  ru: DatabaseLocale.RU,
+  ja: DatabaseLocale.JA,
+  it: DatabaseLocale.IT,
+  ar: DatabaseLocale.AR,
+  zh: DatabaseLocale.ZH,
 };
 
 const localizedText = <T extends { locale: DatabaseLocale }>(
@@ -54,7 +105,7 @@ const localizedText = <T extends { locale: DatabaseLocale }>(
 ): LocalizedText => {
   const chinese = translations.find(({ locale }) => locale === DatabaseLocale.ZH);
   const english = translations.find(({ locale }) => locale === DatabaseLocale.EN);
-  const fallback = chinese ? read(chinese) : english ? read(english) : "";
+  const fallback = english ? read(english) : chinese ? read(chinese) : "";
 
   return Object.fromEntries(
     locales.map((locale) => {
@@ -63,6 +114,33 @@ const localizedText = <T extends { locale: DatabaseLocale }>(
     }),
   ) as LocalizedText;
 };
+
+const categoryLocalizedText = <T extends { locale: DatabaseLocale; name: string }>(translations: T[], slug: string) =>
+  Object.fromEntries(
+    locales.map((locale) => {
+      const selected =
+        translations.find(({ locale: value }) => value === databaseLocale[locale]) ??
+        translations.find(({ locale: value }) => value === DatabaseLocale.EN) ??
+        translations.find(({ locale: value }) => value === DatabaseLocale.ZH);
+      return [locale, selected?.name.trim() || slug];
+    }),
+  ) as LocalizedText;
+
+const toCategoryReference = (category: DatabaseProduct["category"]) => ({
+  slug: category.slug,
+  name: categoryLocalizedText(category.translations, category.slug),
+  parent: category.parent
+    ? {
+        slug: category.parent.slug,
+        name: categoryLocalizedText(category.parent.translations, category.parent.slug),
+      }
+    : null,
+});
+
+const categoryIsPublic = (category: DatabaseProduct["category"]) =>
+  category.isActive &&
+  category.status !== ContentStatus.ARCHIVED &&
+  (!category.parent || (category.parent.isActive && category.parent.status !== ContentStatus.ARCHIVED));
 
 const isAllowedPublicAssetUrl = (url?: string | null) => {
   const value = url?.trim();
@@ -99,11 +177,17 @@ const toProduct = (product: DatabaseProduct): Product => {
   }
 
   const image = media.find(({ role }) => role === ProductMediaRole.PRIMARY)?.url ?? media[0]?.url ?? sampleImage ?? "/media/product-tile-spc.jpg";
+  const categories = product.categoryAssignments.map(({ category }) => toCategoryReference(category));
+  const primaryCategory = categoryIsPublic(product.category)
+    ? toCategoryReference(product.category)
+    : categories[0];
 
   return {
     slug: product.slug,
     sku: product.sku,
     category: product.kind,
+    primaryCategory,
+    categories,
     title: localizedText(product.translations, ({ title }) => title),
     summary: localizedText(product.translations, ({ summary }) => summary),
     seoTitle: localizedText(product.translations, ({ seoTitle, title }) => seoTitle || title),
@@ -139,13 +223,49 @@ const toProduct = (product: DatabaseProduct): Product => {
   };
 };
 
-export async function getPublishedProducts(): Promise<Product[]> {
-  if (!isDatabaseConfigured()) return sampleProducts;
+const withSampleCategory = (product: Product): Product => {
+  const slug = product.category.toLowerCase().replaceAll("_", "-");
+  const name = Object.fromEntries(
+    locales.map((locale) => [
+      locale,
+      locale === "zh"
+        ? `${product.category} 地板`
+        : locale === "es"
+          ? `Suelos ${product.category}`
+          : locale === "de"
+            ? `${product.category}-Bodenbeläge`
+            : `${product.category} Flooring`,
+    ]),
+  ) as LocalizedText;
+  const reference = { slug, name, parent: null };
+  return { ...product, primaryCategory: reference, categories: [reference] };
+};
+
+export async function getPublishedProducts(filters: { categorySlug?: string } = {}): Promise<Product[]> {
+  if (!isDatabaseConfigured()) {
+    const records = sampleProducts.map(withSampleCategory);
+    return filters.categorySlug
+      ? records.filter((product) => product.primaryCategory?.slug === filters.categorySlug)
+      : records;
+  }
 
   const records = await getPrisma().product.findMany({
     where: {
       status: ContentStatus.PUBLISHED,
       translations: { some: { locale: DatabaseLocale.ZH, status: TranslationStatus.PUBLISHED } },
+      AND: [visibleCategoryClause],
+      ...(filters.categorySlug
+        ? {
+            OR: [
+              { category: { is: categoryForSlug(filters.categorySlug) } },
+              {
+                categoryAssignments: {
+                  some: { category: { is: categoryForSlug(filters.categorySlug) } },
+                },
+              },
+            ],
+          }
+        : {}),
     },
     include: productInclude,
     orderBy: [{ featured: "desc" }, { sortOrder: "asc" }, { createdAt: "desc" }],
@@ -155,10 +275,13 @@ export async function getPublishedProducts(): Promise<Product[]> {
 }
 
 export async function getPublishedProduct(slug: string): Promise<Product | undefined> {
-  if (!isDatabaseConfigured()) return sampleProducts.find((product) => product.slug === slug);
+  if (!isDatabaseConfigured()) {
+    const product = sampleProducts.find((item) => item.slug === slug);
+    return product ? withSampleCategory(product) : undefined;
+  }
 
   const record = await getPrisma().product.findFirst({
-    where: { slug, status: ContentStatus.PUBLISHED },
+    where: { slug, status: ContentStatus.PUBLISHED, AND: [visibleCategoryClause] },
     include: productInclude,
   });
 
@@ -169,7 +292,7 @@ export async function getPublishedProductSlugs(): Promise<string[]> {
   if (!isDatabaseConfigured()) return sampleProducts.map(({ slug }) => slug);
 
   const records = await getPrisma().product.findMany({
-    where: { status: ContentStatus.PUBLISHED },
+    where: { status: ContentStatus.PUBLISHED, AND: [visibleCategoryClause] },
     select: { slug: true },
     orderBy: { sortOrder: "asc" },
   });

@@ -4,10 +4,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { ContentStatus } from "@/generated/prisma/client";
-import { requireAdminSession } from "@/lib/admin-auth";
+import { requireProductManagerSession } from "@/lib/admin-auth";
 import { isDatabaseConfigured } from "@/lib/db";
 import { safeWriteAuditLog } from "@/lib/repositories/audit-logs";
 import { batchUpdateProducts, createProduct, updateProductListSettings } from "@/lib/repositories/admin-products";
+import { contentLocales, localizedPath } from "@/lib/site";
 
 const slugSchema = z
   .string()
@@ -49,15 +50,15 @@ const revalidateProductAdminPaths = (slug?: string) => {
   if (slug) {
     revalidatePath(`/products/${slug}`);
     revalidatePath(`/admin/products/${slug}`);
-    for (const locale of ["en", "es", "de"]) {
-      revalidatePath(`/${locale}/products`);
-      revalidatePath(`/${locale}/products/${slug}`);
+    for (const locale of contentLocales) {
+      revalidatePath(localizedPath(locale, "/products"));
+      revalidatePath(localizedPath(locale, `/products/${slug}`));
     }
   }
 };
 
 export async function createProductAction(formData: FormData) {
-  const session = await requireAdminSession();
+  const session = await requireProductManagerSession();
   if (!isDatabaseConfigured()) redirect("/admin/products?error=database");
 
   const parsed = createProductSchema.safeParse({
@@ -80,6 +81,7 @@ export async function createProductAction(formData: FormData) {
       slug: parsed.data.slug,
       sku: parsed.data.sku,
       categoryId: parsed.data.categoryId,
+      categoryIds: [parsed.data.categoryId],
       status: ContentStatus[parsed.data.status],
       featured: parsed.data.featured,
       sortOrder: parsed.data.sortOrder,
@@ -108,7 +110,7 @@ export async function createProductAction(formData: FormData) {
 }
 
 export async function updateProductListSettingsAction(formData: FormData) {
-  const session = await requireAdminSession();
+  const session = await requireProductManagerSession();
   if (!isDatabaseConfigured()) redirect("/admin/products?error=database");
 
   const parsed = quickSettingsSchema.safeParse({
@@ -145,7 +147,7 @@ export async function updateProductListSettingsAction(formData: FormData) {
 }
 
 export async function batchUpdateProductsAction(formData: FormData) {
-  const session = await requireAdminSession();
+  const session = await requireProductManagerSession();
   if (!isDatabaseConfigured()) redirect("/admin/products?error=database");
 
   const parsed = batchSchema.safeParse({

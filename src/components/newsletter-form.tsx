@@ -2,9 +2,9 @@
 
 import { FormEvent, useState } from "react";
 import { ArrowRight } from "lucide-react";
-import type { Locale } from "@/lib/site";
+import { toContentLocale, type ContentLocale, type Locale } from "@/lib/site";
 
-const formCopy: Record<Locale, { placeholder: string; submit: string; invalid: string; pending: string }> = {
+const formCopy: Record<ContentLocale, { placeholder: string; submit: string; invalid: string; pending: string }> = {
   zh: {
     placeholder: "您的邮箱地址",
     submit: "订阅",
@@ -29,10 +29,15 @@ const formCopy: Record<Locale, { placeholder: string; submit: string; invalid: s
     invalid: "Bitte geben Sie eine gültige E-Mail-Adresse ein.",
     pending: "Der Newsletter wird vorbereitet. Kontaktieren Sie uns für aktuelle Unterlagen.",
   },
+  fr: { placeholder: "Votre adresse e-mail", submit: "S’abonner", invalid: "Veuillez saisir une adresse e-mail valide.", pending: "La newsletter est en préparation. Contactez-nous pour recevoir les dernières informations." },
+  ru: { placeholder: "Ваш адрес электронной почты", submit: "Подписаться", invalid: "Введите корректный адрес электронной почты.", pending: "Рассылка готовится. Свяжитесь с нами, чтобы получить актуальные материалы." },
+  ja: { placeholder: "メールアドレス", submit: "登録する", invalid: "有効なメールアドレスを入力してください。", pending: "ニュースレターは準備中です。最新資料については直接お問い合わせください。" },
+  it: { placeholder: "Il tuo indirizzo e-mail", submit: "Iscriviti", invalid: "Inserisci un indirizzo e-mail valido.", pending: "La newsletter è in preparazione. Contattaci per ricevere i materiali più recenti." },
+  ar: { placeholder: "بريدك الإلكتروني", submit: "اشترك", invalid: "يرجى إدخال بريد إلكتروني صالح.", pending: "النشرة البريدية قيد الإعداد. تواصل معنا مباشرة للحصول على أحدث المواد." },
 };
 
 export function NewsletterForm({ locale }: { locale: Locale }) {
-  const labels = formCopy[locale];
+  const labels = formCopy[toContentLocale(locale)];
   const [message, setMessage] = useState("");
   const [invalid, setInvalid] = useState(false);
 

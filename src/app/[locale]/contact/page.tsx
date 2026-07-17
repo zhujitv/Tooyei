@@ -13,7 +13,7 @@ export default async function Page({
   searchParams: Promise<{ product?: string; submitted?: string; error?: string }>;
 }) {
   const { locale } = await params;
-  if (!isLocale(locale) || locale === "zh") notFound();
+  if (!isLocale(locale)) notFound();
   const query = await searchParams;
   const products = await getPublishedProducts();
 

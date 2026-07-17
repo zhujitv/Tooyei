@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { ContentStatus, MediaKind, ProductDownloadKind, ProductMediaRole, TranslationStatus } from "@/generated/prisma/client";
-import { requireAdminSession } from "@/lib/admin-auth";
+import { requireProductManagerSession } from "@/lib/admin-auth";
 import { isDatabaseConfigured } from "@/lib/db";
 import { safeWriteAuditLog } from "@/lib/repositories/audit-logs";
 import {
@@ -19,6 +19,7 @@ import {
   type AdminProductMediaItem,
   type AdminProductSpecificationItem,
 } from "@/lib/repositories/admin-products";
+import { contentLocales, localizedPath } from "@/lib/site";
 
 const uploadSchema = z.object({
   kind: z.enum(["media", "download"]),
@@ -43,7 +44,7 @@ const safeUploadName = (name: string) =>
   name.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "") || "asset";
 
 const translationSchema = z.object({
-  locale: z.enum(["zh", "en", "es", "de"]),
+  locale: z.enum(contentLocales),
   title: z.string().trim().min(3).max(180),
   summary: z.string().trim().min(20).max(800),
   seoTitle: z.string().trim().max(220).optional(),
@@ -54,6 +55,7 @@ const translationSchema = z.object({
 const coreSchema = z.object({
   sku: z.string().trim().min(1).max(80),
   categoryId: z.string().min(1),
+  categoryIds: z.array(z.string().min(1)).max(50),
   status: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]),
   featured: z.preprocess((value) => value === "on", z.boolean()),
   sortOrder: z.coerce.number().int().min(0).max(999999),
@@ -71,9 +73,9 @@ const revalidateProductPaths = (slug: string, locale?: string) => {
   revalidatePath("/products");
   revalidatePath(`/products/${slug}`);
   if (locale) {
-    revalidatePath(locale === "zh" ? `/products/${slug}` : `/${locale}/products/${slug}`);
+    revalidatePath(localizedPath(locale as (typeof contentLocales)[number], `/products/${slug}`));
   } else {
-    for (const item of ["en", "es", "de"]) revalidatePath(`/${item}/products/${slug}`);
+    for (const item of contentLocales) revalidatePath(localizedPath(item, `/products/${slug}`));
   }
   revalidatePath("/admin/content");
   revalidatePath("/admin/products");
@@ -164,12 +166,13 @@ const parseDownloadRows = (value: string): AdminProductDownloadItem[] =>
     .filter((item) => item.title && item.url);
 
 export async function updateProductCoreAction(slug: string, formData: FormData) {
-  const session = await requireAdminSession();
+  const session = await requireProductManagerSession();
   if (!isDatabaseConfigured()) redirect(`/admin/products/${slug}?error=database`);
 
   const parsed = coreSchema.safeParse({
     sku: formData.get("sku"),
     categoryId: formData.get("categoryId"),
+    categoryIds: formData.getAll("categoryIds"),
     status: formData.get("status"),
     featured: formData.get("featured"),
     sortOrder: formData.get("sortOrder"),
@@ -180,6 +183,7 @@ export async function updateProductCoreAction(slug: string, formData: FormData) 
     slug,
     sku: parsed.data.sku,
     categoryId: parsed.data.categoryId,
+    categoryIds: parsed.data.categoryIds,
     status: ContentStatus[parsed.data.status],
     featured: parsed.data.featured,
     sortOrder: parsed.data.sortOrder,
@@ -198,7 +202,7 @@ export async function updateProductCoreAction(slug: string, formData: FormData) 
 }
 
 export async function updateProductTranslationAction(slug: string, formData: FormData) {
-  const session = await requireAdminSession();
+  const session = await requireProductManagerSession();
   if (!isDatabaseConfigured()) redirect(`/admin/products/${slug}?error=database`);
 
   const parsed = translationSchema.safeParse({
@@ -240,7 +244,7 @@ export async function updateProductTranslationAction(slug: string, formData: For
 }
 
 export async function updateProductStructuredContentAction(slug: string, formData: FormData) {
-  const session = await requireAdminSession();
+  const session = await requireProductManagerSession();
   if (!isDatabaseConfigured()) redirect(`/admin/products/${slug}?error=database`);
 
   const parsed = structuredSchema.safeParse({
@@ -274,7 +278,7 @@ export async function updateProductStructuredContentAction(slug: string, formDat
 }
 
 export async function uploadProductAssetAction(slug: string, formData: FormData) {
-  const session = await requireAdminSession();
+  const session = await requireProductManagerSession();
   if (!isDatabaseConfigured()) redirect(`/admin/products/${slug}?error=database`);
   if (!process.env.BLOB_READ_WRITE_TOKEN) redirect(`/admin/products/${slug}?error=upload`);
 

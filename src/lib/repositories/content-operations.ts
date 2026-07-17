@@ -1,10 +1,10 @@
 import { Locale as DatabaseLocale, TranslationStatus } from "@/generated/prisma/client";
 import { products } from "@/lib/content";
 import { getPrisma, isDatabaseConfigured } from "@/lib/db";
-import type { Locale } from "@/lib/site";
+import { contentLocales, type ContentLocale } from "@/lib/site";
 
 export type LocaleProgress = {
-  locale: Locale;
+  locale: ContentLocale;
   published: number;
   review: number;
   machineDraft: number;
@@ -28,12 +28,13 @@ export async function getContentOperationsSummary(): Promise<ContentOperationsSu
       articles: 0,
       faqs: 0,
       newInquiries: 0,
-      translations: [
-        { locale: "zh", published: products.length, review: 0, machineDraft: 0, missing: 0 },
-        { locale: "en", published: products.length, review: 0, machineDraft: 0, missing: 0 },
-        { locale: "es", published: products.length, review: 0, machineDraft: 0, missing: 0 },
-        { locale: "de", published: products.length, review: 0, machineDraft: 0, missing: 0 },
-      ],
+      translations: contentLocales.map((locale) => ({
+        locale,
+        published: products.filter((product) => Boolean(product.title[locale])).length,
+        review: 0,
+        machineDraft: 0,
+        missing: products.filter((product) => !product.title[locale]).length,
+      })),
     };
   }
 
@@ -49,12 +50,17 @@ export async function getContentOperationsSummary(): Promise<ContentOperationsSu
       }),
     ]);
 
-  const progressFor = (locale: Locale): LocaleProgress => {
+  const progressFor = (locale: ContentLocale): LocaleProgress => {
     const databaseLocale = {
-      zh: DatabaseLocale.ZH,
       en: DatabaseLocale.EN,
-      es: DatabaseLocale.ES,
       de: DatabaseLocale.DE,
+      fr: DatabaseLocale.FR,
+      es: DatabaseLocale.ES,
+      ru: DatabaseLocale.RU,
+      ja: DatabaseLocale.JA,
+      it: DatabaseLocale.IT,
+      ar: DatabaseLocale.AR,
+      zh: DatabaseLocale.ZH,
     }[locale];
     const count = (status: TranslationStatus) =>
       translationRecords.filter(
@@ -76,6 +82,6 @@ export async function getContentOperationsSummary(): Promise<ContentOperationsSu
     articles: articleCount,
     faqs: faqCount,
     newInquiries: newInquiryCount,
-    translations: [progressFor("zh"), progressFor("en"), progressFor("es"), progressFor("de")],
+    translations: contentLocales.map(progressFor),
   };
 }

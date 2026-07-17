@@ -9,8 +9,10 @@ export const siteConfig = {
   whatsappDisplay: "+86 180 1500 7771",
 } as const;
 
-export const locales = ["zh", "en", "es", "de"] as const;
+export const locales = ["en", "de", "fr", "es", "ru", "ja", "it", "ar", "zh"] as const;
 export type Locale = (typeof locales)[number];
+export const contentLocales = locales;
+export type ContentLocale = Locale;
 export const defaultLocale: Locale = "zh";
 
 export const isLocale = (value: string): value is Locale =>
@@ -18,12 +20,43 @@ export const isLocale = (value: string): value is Locale =>
 
 export const localizedPath = (locale: Locale, path = "/") => {
   const normalized = path.startsWith("/") ? path : `/${path}`;
-  return locale === defaultLocale ? normalized : `/${locale}${normalized}`;
+  return `/${locale}${normalized === "/" ? "" : normalized}`;
 };
 
+export const localizedAlternates = (path = "/") => ({
+  ...Object.fromEntries(locales.map((locale) => [locale, localizedPath(locale, path)])),
+  "x-default": path,
+});
+
+export const toContentLocale = (locale: Locale): ContentLocale => locale;
+
 export const languageNames: Record<Locale, string> = {
-  zh: "中文",
   en: "English",
-  es: "Español",
   de: "Deutsch",
+  fr: "Français",
+  es: "Español",
+  ru: "Русский",
+  ja: "日本語",
+  it: "Italiano",
+  ar: "العربية",
+  zh: "中文",
+};
+
+export const languageMarkers: Record<Locale, string> = {
+  en: "🇬🇧",
+  de: "🇩🇪",
+  fr: "🇫🇷",
+  es: "🇪🇸",
+  ru: "🇷🇺",
+  ja: "🇯🇵",
+  it: "🇮🇹",
+  ar: "🇸🇦",
+  zh: "🇨🇳",
+};
+
+export const localeDirection = (locale: Locale) => (locale === "ar" ? "rtl" : "ltr");
+
+export const openGraphLocales: Record<Locale, string> = {
+  en: "en_US", de: "de_DE", fr: "fr_FR", es: "es_ES", ru: "ru_RU",
+  ja: "ja_JP", it: "it_IT", ar: "ar_SA", zh: "zh_CN",
 };

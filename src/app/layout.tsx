@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import "./globals.css";
+import { isLocale, localeDirection } from "@/lib/site";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.tooyei.com"),
@@ -9,13 +11,17 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image", images: ["/media/hero-flooring.jpg"] },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const requestHeaders = await headers();
+  const requestedLocale = requestHeaders.get("x-tooyei-locale") ?? "zh";
+  const locale = isLocale(requestedLocale) ? requestedLocale : "zh";
+
   return (
-    <html lang="zh-CN" data-scroll-behavior="smooth" className="h-full antialiased">
+    <html lang={locale === "zh" ? "zh-CN" : locale} dir={localeDirection(locale)} data-scroll-behavior="smooth" className="h-full antialiased">
       <body className="min-h-full flex flex-col antialiased">{children}</body>
     </html>
   );
