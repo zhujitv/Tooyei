@@ -123,6 +123,26 @@ export type AdminProductStats = {
   missing: number;
 };
 
+export type CreateProductInput = {
+  slug: string;
+  sku: string;
+  categoryId: string;
+  status: ContentStatus;
+  featured: boolean;
+  sortOrder: number;
+  title: string;
+  summary: string;
+  seoTitle?: string | null;
+  seoDescription?: string | null;
+};
+
+export type UpdateProductListSettingsInput = {
+  slug: string;
+  status: ContentStatus;
+  featured: boolean;
+  sortOrder: number;
+};
+
 export type UpdateProductCoreInput = {
   slug: string;
   sku: string;
@@ -592,6 +612,74 @@ export async function getAdminProductCategoryOptions(): Promise<AdminProductCate
     kind: category.kind,
     label: categoryLabel(category),
   }));
+}
+
+export async function createProduct(input: CreateProductInput) {
+  if (!isDatabaseConfigured()) {
+    throw new Error("DATABASE_URL is required before products can be created.");
+  }
+
+  const prisma = getPrisma();
+  const category = await prisma.category.findUnique({
+    where: { id: input.categoryId },
+    select: { id: true, kind: true },
+  });
+  if (!category) throw new Error("Product category does not exist.");
+
+  return prisma.product.create({
+    data: {
+      slug: input.slug,
+      sku: input.sku,
+      kind: category.kind,
+      categoryId: category.id,
+      status: input.status,
+      featured: input.featured,
+      sortOrder: input.sortOrder,
+      translations: {
+        create: {
+          locale: DatabaseLocale.ZH,
+          title: input.title,
+          summary: input.summary,
+          seoTitle: input.seoTitle || null,
+          seoDescription: input.seoDescription || null,
+          status: input.status === ContentStatus.PUBLISHED ? TranslationStatus.PUBLISHED : TranslationStatus.NEEDS_REVIEW,
+          publishedAt: input.status === ContentStatus.PUBLISHED ? new Date() : null,
+        },
+      },
+    },
+    select: {
+      slug: true,
+      sku: true,
+      kind: true,
+      status: true,
+      featured: true,
+      sortOrder: true,
+      categoryId: true,
+    },
+  });
+}
+
+export async function updateProductListSettings(input: UpdateProductListSettingsInput) {
+  if (!isDatabaseConfigured()) {
+    throw new Error("DATABASE_URL is required before products can be updated.");
+  }
+
+  return getPrisma().product.update({
+    where: { slug: input.slug },
+    data: {
+      status: input.status,
+      featured: input.featured,
+      sortOrder: input.sortOrder,
+    },
+    select: {
+      slug: true,
+      sku: true,
+      kind: true,
+      status: true,
+      featured: true,
+      sortOrder: true,
+    },
+  });
 }
 
 export async function updateProductCore(input: UpdateProductCoreInput) {

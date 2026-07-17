@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Database, ImageIcon, ListChecks, Save } from "lucide-react";
+import { ArrowLeft, Database, ExternalLink, Save } from "lucide-react";
 import { ContentStatus, ProductDownloadKind, ProductMediaRole } from "@/generated/prisma/client";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ProductAssetUpload } from "@/components/product-asset-upload";
+import { ProductStructuredContentEditor } from "@/components/product-structured-content-editor";
 import { isDatabaseConfigured } from "@/lib/db";
 import { getAdminProduct, getAdminProductCategoryOptions } from "@/lib/repositories/admin-products";
 import { languageNames } from "@/lib/site";
@@ -78,12 +79,6 @@ const formatDate = (date: Date | null) =>
       }).format(date)
     : "—";
 
-const visibleText = (visible: boolean) => (visible ? "显示" : "隐藏");
-
-const safeCell = (value: string) => value.replaceAll("|", "｜").replace(/\s*\r?\n\s*/g, " ").trim();
-
-const serializeRows = (rows: string[][]) => rows.map((row) => row.map(safeCell).join(" | ")).join("\n");
-
 type PageProps = {
   params: Promise<{ slug: string }>;
   searchParams: Promise<{ saved?: string; error?: string }>;
@@ -103,60 +98,20 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
   const uploadAssetAction = uploadProductAssetAction.bind(null, slug);
 
   const savedLocale =
-    feedback.saved && !["core", "structured", "upload"].includes(feedback.saved) ? feedback.saved.toUpperCase() : undefined;
+    feedback.saved && !["core", "structured", "upload", "created"].includes(feedback.saved)
+      ? feedback.saved.toUpperCase()
+      : undefined;
 
-  const mediaValue = serializeRows(
-    product.media.map((item) => [
-      item.role,
-      item.url,
-      item.alt,
-      item.caption,
-      String(item.sortOrder),
-      visibleText(item.visible),
-    ]),
-  );
-  const featureValue = serializeRows(
-    product.features.map((item) => [
-      item.title,
-      item.description,
-      item.icon,
-      String(item.sortOrder),
-      visibleText(item.visible),
-    ]),
-  );
-  const specificationValue = serializeRows(
-    product.specifications.map((item) => [
-      item.group,
-      item.label,
-      item.value,
-      item.unit,
-      String(item.sortOrder),
-      visibleText(item.visible),
-    ]),
-  );
-  const applicationValue = serializeRows(
-    product.applications.map((item) => [
-      item.title,
-      item.description,
-      item.imageUrl,
-      item.imageAlt,
-      String(item.sortOrder),
-      visibleText(item.visible),
-    ]),
-  );
-  const downloadValue = serializeRows(
-    product.downloads.map((item) => [
-      item.kind,
-      item.title,
-      item.url,
-      item.description,
-      String(item.sortOrder),
-      visibleText(item.visible),
-    ]),
-  );
+  const mediaRoleOptions = Object.values(ProductMediaRole).map((role) => ({ value: role, label: mediaRoleLabel[role] }));
+  const downloadKindOptions = Object.values(ProductDownloadKind).map((kind) => ({
+    value: kind,
+    label: downloadKindLabel[kind],
+  }));
+  const zhTranslation = product.translations.find((translation) => translation.locale === "zh");
+  const publishedLocales = product.translations.filter((translation) => translation.status === "PUBLISHED").length;
 
   return (
-    <main className="mx-auto max-w-6xl px-5 py-10 lg:px-8 lg:py-14">
+    <main className="mx-auto max-w-7xl px-5 py-10 lg:px-8 lg:py-14">
       <Button asChild variant="ghost" className="-ml-3 text-white/60 hover:bg-white/10 hover:text-white">
         <Link href="/admin/products">
           <ArrowLeft />
@@ -164,21 +119,48 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
         </Link>
       </Button>
 
-      <div className="mt-7 flex flex-col justify-between gap-4 md:flex-row md:items-end">
-        <div>
-          <p className="font-mono text-xs tracking-[0.16em] text-[#d6b36a]">
-            {product.sku} · {product.slug}
-          </p>
-          <h1 className="mt-3 text-4xl font-semibold tracking-[-0.04em]">产品编辑器</h1>
-          <p className="mt-3 text-sm text-white/45">
-            基础信息、多语言 SEO、图库、规格参数、卖点、应用场景和下载资料集中管理。
-          </p>
+      <section className="mt-7 overflow-hidden rounded-[2rem] border border-white/10 bg-[linear-gradient(135deg,rgba(255,255,255,0.095),rgba(255,255,255,0.035))] shadow-[0_30px_90px_rgba(0,0,0,0.24)]">
+        <div className="grid gap-6 p-6 lg:grid-cols-[1.1fr_0.9fr] lg:p-8">
+          <div>
+            <p className="font-mono text-xs tracking-[0.16em] text-[#d6b36a]">
+              {product.sku} · {product.slug}
+            </p>
+            <h1 className="mt-3 text-4xl font-semibold tracking-[-0.05em] text-white sm:text-5xl">
+              {zhTranslation?.title || "产品编辑器"}
+            </h1>
+            <p className="mt-4 max-w-2xl text-sm leading-6 text-white/50">
+              集中管理基础信息、多语言 SEO、产品图库、规格参数、卖点、应用场景和下载资料。
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Button asChild className="bg-[#b68a4c] text-[#0b1220] hover:bg-[#c59b5c]">
+                <Link href={`/products/${product.slug}`} target="_blank">
+                  <ExternalLink />
+                  查看公开页
+                </Link>
+              </Button>
+              <Badge className={databaseReady ? "bg-emerald-600" : "bg-amber-600"}>
+                <Database className="size-3.5" />
+                {databaseReady ? "可保存" : "只读"}
+              </Badge>
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {[
+              ["发布状态", productStatusLabel[product.status]],
+              ["类型", kindLabel[product.kind]],
+              ["可见媒体", `${product.media.filter((item) => item.visible).length} 项`],
+              ["发布语言", `${publishedLocales}/${product.translations.length}`],
+              ["结构模块", `${product.features.length + product.specifications.length + product.applications.length} 项`],
+              ["最后更新", formatDate(product.updatedAt)],
+            ].map(([label, value]) => (
+              <div key={label} className="rounded-2xl border border-white/10 bg-[#050a13]/30 p-4">
+                <p className="text-xs text-white/35">{label}</p>
+                <p className="mt-2 text-sm font-semibold text-white/80">{value}</p>
+              </div>
+            ))}
+          </div>
         </div>
-        <Badge className={databaseReady ? "bg-emerald-600" : "bg-amber-600"}>
-          <Database className="size-3.5" />
-          {databaseReady ? "可保存" : "只读"}
-        </Badge>
-      </div>
+      </section>
 
       {feedback.saved ? (
         <Alert className="mt-7 border-emerald-500/30 bg-emerald-500/8 text-emerald-100">
@@ -186,6 +168,8 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
           <AlertTitle>
             {feedback.saved === "core"
               ? "产品基础信息已保存"
+              : feedback.saved === "created"
+                ? "新产品已创建"
               : feedback.saved === "upload"
                 ? "文件已上传并关联"
               : feedback.saved === "structured"
@@ -195,6 +179,8 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
           <AlertDescription className="text-emerald-100/65">
             {feedback.saved === "core"
               ? "产品列表、公开页面和缓存已刷新。"
+              : feedback.saved === "created"
+                ? "可以继续完善图片、规格、卖点、应用场景、下载资料和多语言 SEO。"
               : feedback.saved === "upload"
                 ? "对象存储和产品媒体关系已更新。"
               : feedback.saved === "structured"
@@ -325,122 +311,37 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
         </CardContent>
       </Card>
 
-      <Card className="mt-8 admin-card rounded-3xl">
+      <Card className="mt-8 admin-card rounded-[2rem]">
         <CardHeader>
-          <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <ListChecks className="size-5 text-[#d6b36a]" />
-                结构化内容
-              </CardTitle>
-              <p className="mt-2 text-sm text-white/40">
-                当前先以中文为主录入；其他语言前台会回退中文，后续再进入结构化字段翻译。
-              </p>
-            </div>
-            <div className="grid grid-cols-5 gap-2 text-center text-xs text-white/45">
-              <span className="rounded-lg bg-white/[0.05] px-3 py-2">图库 {product.media.length}</span>
-              <span className="rounded-lg bg-white/[0.05] px-3 py-2">卖点 {product.features.length}</span>
-              <span className="rounded-lg bg-white/[0.05] px-3 py-2">参数 {product.specifications.length}</span>
-              <span className="rounded-lg bg-white/[0.05] px-3 py-2">场景 {product.applications.length}</span>
-              <span className="rounded-lg bg-white/[0.05] px-3 py-2">资料 {product.downloads.length}</span>
-            </div>
-          </div>
+          <CardTitle>媒体上传</CardTitle>
+          <p className="text-sm text-white/40">上传图片、视频或资料后会自动关联当前产品；下方仍可继续调整排序和显示状态。</p>
         </CardHeader>
         <CardContent>
           <ProductAssetUpload action={uploadAssetAction} disabled={!databaseReady} />
-          <form action={saveStructuredAction} className="space-y-6">
-            <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <Label htmlFor="media">产品图片 / 图库</Label>
-                <Badge variant="outline" className="border-white/15 text-white/50">
-                  {Object.values(ProductMediaRole).map((role) => `${role}=${mediaRoleLabel[role]}`).join(" · ")}
-                </Badge>
-              </div>
-              <Textarea
-                id="media"
-                name="media"
-                defaultValue={mediaValue}
-                disabled={!databaseReady}
-                placeholder="PRIMARY | /media/product.jpg | 图片ALT | 图片说明 | 0 | 显示"
-                className="min-h-36 border-white/10 bg-white/[0.07] font-mono text-xs disabled:opacity-60"
-              />
-              <p className="mt-2 text-xs text-white/35">格式：角色 | 图片URL | ALT | 说明 | 排序 | 显示/隐藏</p>
-            </div>
+        </CardContent>
+      </Card>
 
-            <div className="grid gap-6 lg:grid-cols-2">
-              <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
-                <Label htmlFor="features">卖点模块</Label>
-                <Textarea
-                  id="features"
-                  name="features"
-                  defaultValue={featureValue}
-                  disabled={!databaseReady}
-                  placeholder="100% 防水 | 适合厨房、浴室和商业空间 | shield | 0 | 显示"
-                  className="mt-3 min-h-44 border-white/10 bg-white/[0.07] font-mono text-xs disabled:opacity-60"
-                />
-                <p className="mt-2 text-xs text-white/35">格式：标题 | 描述 | 图标代号 | 排序 | 显示/隐藏</p>
-              </div>
-
-              <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
-                <Label htmlFor="specifications">产品参数表</Label>
-                <Textarea
-                  id="specifications"
-                  name="specifications"
-                  defaultValue={specificationValue}
-                  disabled={!databaseReady}
-                  placeholder="结构 | 总厚度 | 5.0 | mm | 0 | 显示"
-                  className="mt-3 min-h-44 border-white/10 bg-white/[0.07] font-mono text-xs disabled:opacity-60"
-                />
-                <p className="mt-2 text-xs text-white/35">格式：分组 | 参数名 | 参数值 | 单位 | 排序 | 显示/隐藏</p>
-              </div>
-            </div>
-
-            <div className="grid gap-6 lg:grid-cols-2">
-              <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
-                <Label htmlFor="applications">应用场景</Label>
-                <Textarea
-                  id="applications"
-                  name="applications"
-                  defaultValue={applicationValue}
-                  disabled={!databaseReady}
-                  placeholder="酒店客房 | 防水耐磨，适合中高人流项目 | /media/hotel.jpg | 酒店地板应用 | 0 | 显示"
-                  className="mt-3 min-h-44 border-white/10 bg-white/[0.07] font-mono text-xs disabled:opacity-60"
-                />
-                <p className="mt-2 text-xs text-white/35">格式：标题 | 描述 | 图片URL | 图片ALT | 排序 | 显示/隐藏</p>
-              </div>
-
-              <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <Label htmlFor="downloads">下载资料</Label>
-                  <Badge variant="outline" className="border-white/15 text-white/50">
-                    {Object.values(ProductDownloadKind)
-                      .map((kind) => `${kind}=${downloadKindLabel[kind]}`)
-                      .join(" · ")}
-                  </Badge>
-                </div>
-                <Textarea
-                  id="downloads"
-                  name="downloads"
-                  defaultValue={downloadValue}
-                  disabled={!databaseReady}
-                  placeholder="SPEC_SHEET | TY602 规格表 | /downloads/ty602.pdf | 含尺寸、包装和技术参数 | 0 | 显示"
-                  className="min-h-44 border-white/10 bg-white/[0.07] font-mono text-xs disabled:opacity-60"
-                />
-                <p className="mt-2 text-xs text-white/35">格式：类型 | 标题 | 文件URL | 描述 | 排序 | 显示/隐藏</p>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-3 border-t border-white/10 pt-5 sm:flex-row sm:items-center sm:justify-between">
-              <p className="flex items-center gap-2 text-sm text-white/35">
-                <ImageIcon className="size-4" />
-                可直接上传到对象存储，也可继续录入已有 URL。
-              </p>
-              <Button type="submit" disabled={!databaseReady} className="bg-[#b68a4c] text-[#0b1220] hover:bg-[#c59b5c]">
-                <Save />
-                保存结构化内容
-              </Button>
-            </div>
-          </form>
+      <Card className="mt-8 admin-card rounded-[2rem]">
+        <CardHeader>
+          <CardTitle>结构化内容管理</CardTitle>
+          <p className="text-sm text-white/40">
+            用行级字段维护产品图片、规格、卖点、应用场景和下载资料，不再需要手动编写分隔符格式。
+          </p>
+        </CardHeader>
+        <CardContent>
+          <ProductStructuredContentEditor
+            action={saveStructuredAction}
+            disabled={!databaseReady}
+            initial={{
+              media: product.media,
+              features: product.features,
+              specifications: product.specifications,
+              applications: product.applications,
+              downloads: product.downloads,
+            }}
+            mediaRoleOptions={mediaRoleOptions}
+            downloadKindOptions={downloadKindOptions}
+          />
         </CardContent>
       </Card>
 
