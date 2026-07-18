@@ -11,6 +11,13 @@ import {
 import { products as sampleProducts, readLocalizedText } from "@/lib/content";
 import { getPrisma, isDatabaseConfigured } from "@/lib/db";
 import type { MediaAssetOption } from "@/lib/media-asset-types";
+import {
+  getProductPublicVisibility,
+  isPublicCategoryRecord,
+  publicCategoryWhere,
+  publicProductListWhere,
+  type ProductPublicVisibilityReason,
+} from "@/lib/product-publication";
 import { contentLocales, type ContentLocale } from "@/lib/site";
 import { withDataFallback } from "@/lib/server-data";
 
@@ -20,6 +27,8 @@ export type AdminProductSummary = {
   category: string;
   categoryId: string | null;
   isClassified: boolean;
+  publicVisible: boolean;
+  publicVisibilityReasons: ProductPublicVisibilityReason[];
   kind: ProductKind;
   status: ContentStatus;
   featured: boolean;
@@ -122,6 +131,8 @@ export type AdminEditableProduct = {
   category: string;
   categoryId: string | null;
   categoryIds: string[];
+  publicVisible: boolean;
+  publicVisibilityReasons: ProductPublicVisibilityReason[];
   kind: ProductKind;
   status: ContentStatus;
   featured: boolean;
@@ -153,6 +164,7 @@ export type AdminProductFilters = {
   locale?: ContentLocale;
   translationState?: "MISSING" | "NOT_PUBLISHED" | "NEEDS_REVIEW";
   seoState?: "READY" | "MISSING";
+  visibility?: "VISIBLE" | "HIDDEN";
   page?: number;
   pageSize?: number;
 };
@@ -175,6 +187,8 @@ export type AdminProductStats = {
   missing: number;
   missingSeo: number;
   unclassified: number;
+  publicVisible: number;
+  publicHidden: number;
 };
 
 export type CreateProductInput = {
@@ -327,6 +341,8 @@ const sampleEditableProduct = (slug: string): AdminEditableProduct | undefined =
     category: product.category,
     categoryId: null,
     categoryIds: [],
+    publicVisible: true,
+    publicVisibilityReasons: [],
     kind: ProductKind[product.category as keyof typeof ProductKind] ?? ProductKind.SPC,
     status: ContentStatus.PUBLISHED,
     featured: true,
@@ -397,6 +413,8 @@ const sampleSummaries = (): AdminProductSummary[] =>
     category: product.category,
     categoryId: null,
     isClassified: true,
+    publicVisible: true,
+    publicVisibilityReasons: [],
     kind: ProductKind[product.category as keyof typeof ProductKind] ?? ProductKind.SPC,
     status: ContentStatus.PUBLISHED,
     featured: true,
@@ -445,6 +463,9 @@ const listProductSelect = {
     select: {
       kind: true,
       slug: true,
+      isActive: true,
+      status: true,
+      parent: { select: { isActive: true, status: true } },
       translations: {
         where: { locale: DatabaseLocale.ZH },
         select: { name: true, locale: true },
@@ -463,6 +484,11 @@ const listProductSelect = {
   primaryImage: {
     select: { url: true, alt: true },
   },
+  categoryAssignments: {
+    where: { category: { is: publicCategoryWhere } },
+    take: 1,
+    select: { categoryId: true },
+  },
   _count: {
     select: {
       media: true,
@@ -478,6 +504,7 @@ const listProductSelect = {
 const editProductInclude = {
   category: {
     include: {
+      parent: { select: { isActive: true, status: true } },
       translations: {
         where: { locale: DatabaseLocale.ZH },
         select: { name: true, locale: true },
@@ -488,7 +515,16 @@ const editProductInclude = {
   primaryImage: true,
   categoryAssignments: {
     orderBy: { sortOrder: "asc" as const },
-    select: { categoryId: true },
+    select: {
+      categoryId: true,
+      category: {
+        select: {
+          isActive: true,
+          status: true,
+          parent: { select: { isActive: true, status: true } },
+        },
+      },
+    },
   },
   media: {
     orderBy: [{ role: "asc" as const }, { sortOrder: "asc" as const }],
@@ -543,6 +579,11 @@ const toSummary = (product: AdminProductRecord): AdminProductSummary => {
     downloads: product._count.downloads,
   };
   const publishedTranslations = contentLocales.filter((locale) => states[locale] === TranslationStatus.PUBLISHED).length;
+  const visibility = getProductPublicVisibility({
+    productStatus: product.status,
+    zhTranslationStatus: states.zh,
+    hasPublicCategory: isPublicCategoryRecord(product.category) || product.categoryAssignments.length > 0,
+  });
   const completion = Math.min(
     100,
     15 +
@@ -561,6 +602,7 @@ const toSummary = (product: AdminProductRecord): AdminProductSummary => {
     category: categoryLabel(product.category),
     categoryId: product.categoryId,
     isClassified: product._count.categoryAssignments > 0,
+    ...visibility,
     kind: product.kind,
     status: product.status,
     featured: product.featured,
@@ -633,6 +675,15 @@ const toEditableProduct = (product: AdminEditableProductRecord): AdminEditablePr
     });
   }
 
+  const visibility = getProductPublicVisibility({
+    productStatus: product.status,
+    zhTranslationStatus:
+      product.translations.find(({ locale }) => locale === DatabaseLocale.ZH)?.status ?? TranslationStatus.MISSING,
+    hasPublicCategory:
+      isPublicCategoryRecord(product.category) ||
+      product.categoryAssignments.some(({ category }) => isPublicCategoryRecord(category)),
+  });
+
   return {
     id: product.id,
     slug: product.slug,
@@ -640,6 +691,7 @@ const toEditableProduct = (product: AdminEditableProductRecord): AdminEditablePr
     category: categoryLabel(product.category),
     categoryId: product.categoryId,
     categoryIds: product.categoryAssignments.map(({ categoryId }) => categoryId),
+    ...visibility,
     kind: product.kind,
     status: product.status,
     featured: product.featured,
@@ -795,6 +847,8 @@ const buildWhere = (filters: AdminProductFilters = {}): Prisma.ProductWhereInput
   if (filters.seoState === "READY") {
     clauses.push({ AND: translationLocalesFor(filters.locale).map((locale) => hasSeoTranslation(locale)) });
   }
+  if (filters.visibility === "VISIBLE") clauses.push(publicProductListWhere);
+  if (filters.visibility === "HIDDEN") clauses.push({ NOT: publicProductListWhere });
   if (query) clauses.push(searchCondition(query));
 
   return clauses.length ? { AND: clauses } : {};
@@ -822,6 +876,8 @@ const applySampleFilters = (products: AdminProductSummary[], filters: AdminProdu
     ) return false;
     if (filters.seoState === "MISSING" && product.seoReadyTranslations === contentLocales.length) return false;
     if (filters.seoState === "READY" && product.seoReadyTranslations !== contentLocales.length) return false;
+    if (filters.visibility === "VISIBLE" && !product.publicVisible) return false;
+    if (filters.visibility === "HIDDEN" && product.publicVisible) return false;
     if (!query) return true;
     return [product.title, product.sku, product.slug, product.category]
       .filter(Boolean)
@@ -843,6 +899,8 @@ const statsFromProducts = (products: AdminProductSummary[]): AdminProductStats =
   ).length,
   missingSeo: products.filter((product) => product.seoReadyTranslations < contentLocales.length).length,
   unclassified: products.filter((product) => !product.isClassified).length,
+  publicVisible: products.filter((product) => product.publicVisible).length,
+  publicHidden: products.filter((product) => !product.publicVisible).length,
 });
 
 const uniqueByAssetId = <T extends { assetId?: string }>(items: T[]) => {
@@ -931,7 +989,8 @@ export async function getAdminProduct(slug: string): Promise<AdminEditableProduc
 export async function getAdminProductStats(): Promise<AdminProductStats> {
   if (!isDatabaseConfigured()) return statsFromProducts(sampleSummaries());
 
-  const result = await withDataFallback("admin-products.stats", () => getPrisma().$queryRaw<Array<{
+  const prisma = getPrisma();
+  const result = await withDataFallback("admin-products.stats", () => Promise.all([prisma.$queryRaw<Array<{
     total: number;
     published: number;
     draft: number;
@@ -975,12 +1034,14 @@ export async function getAdminProductStats(): Promise<AdminProductStats> {
         SELECT 1 FROM "ProductCategory" assignment WHERE assignment."productId" = product."id"
       ))::int AS unclassified
     FROM "Product" product
-  `), null);
+  `), prisma.product.count({ where: publicProductListWhere })]), null);
   if (!result) return statsFromProducts(sampleSummaries());
-  const [stats] = result;
+  const [rows, publicVisible] = result;
+  const [stats] = rows;
+  const total = stats?.total ?? 0;
 
   return {
-    total: stats?.total ?? 0,
+    total,
     published: stats?.published ?? 0,
     draft: stats?.draft ?? 0,
     archived: stats?.archived ?? 0,
@@ -989,6 +1050,8 @@ export async function getAdminProductStats(): Promise<AdminProductStats> {
     missing: stats?.missing ?? 0,
     missingSeo: stats?.missing_seo ?? 0,
     unclassified: stats?.unclassified ?? 0,
+    publicVisible,
+    publicHidden: Math.max(0, total - publicVisible),
   };
 }
 

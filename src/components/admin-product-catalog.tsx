@@ -7,6 +7,8 @@ import { AlertDialog } from "radix-ui";
 import {
   Check,
   CircleAlert,
+  Eye,
+  EyeOff,
   ExternalLink,
   FileText,
   FolderInput,
@@ -23,6 +25,7 @@ import {
   Trash2,
 } from "lucide-react";
 import type { ContentStatus, ProductKind, TranslationStatus } from "@/generated/prisma/client";
+import type { ProductPublicVisibilityReason } from "@/lib/product-publication";
 import type { AdminProductCategoryOption, BatchProductOperation } from "@/lib/repositories/admin-products";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,6 +39,8 @@ export type ProductCatalogItem = {
   category: string;
   categoryId: string | null;
   isClassified: boolean;
+  publicVisible: boolean;
+  publicVisibilityReasons: ProductPublicVisibilityReason[];
   kind: ProductKind;
   status: ContentStatus;
   featured: boolean;
@@ -92,6 +97,15 @@ const translationClass: Record<TranslationStatus, string> = {
   MISSING: "admin-badge-missing",
 };
 
+const publicVisibilityReasonLabel: Record<ProductPublicVisibilityReason, string> = {
+  PRODUCT_NOT_PUBLISHED: "产品状态不是已发布",
+  ZH_TRANSLATION_NOT_PUBLISHED: "中文内容尚未审核发布",
+  CATEGORY_NOT_PUBLIC: "没有已启用的前台栏目",
+};
+
+const visibilityReasonText = (product: ProductCatalogItem) =>
+  product.publicVisibilityReasons.map((reason) => publicVisibilityReasonLabel[reason]).join(" · ");
+
 const kindLabel: Record<ProductKind, string> = {
   SPC: "SPC",
   ESPC: "ESPC",
@@ -130,13 +144,23 @@ function ProductThumbnail({ product }: { product: ProductCatalogItem }) {
         </div>
       )}
       <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/60 to-transparent" />
-      <Badge className={cn("absolute left-3 top-3 border", statusClass[product.status])}>{statusLabel[product.status]}</Badge>
+      <Badge className={cn("absolute left-12 top-3 border", statusClass[product.status])}>{statusLabel[product.status]}</Badge>
       {product.featured ? (
         <span className="absolute right-3 top-3 grid size-6 place-items-center rounded-md border border-violet-300/20 bg-violet-400/15 text-violet-200 backdrop-blur-md">
           <Sparkles className="size-3.5" />
           <span className="sr-only">精选产品</span>
         </span>
       ) : null}
+      <Badge
+        className={cn(
+          "absolute bottom-3 right-3 gap-1 border backdrop-blur-md",
+          product.publicVisible ? "border-emerald-300/25 bg-emerald-400/15 text-emerald-200" : "border-amber-300/25 bg-amber-400/15 text-amber-100",
+        )}
+        title={product.publicVisible ? "满足当前产品中心公开条件" : visibilityReasonText(product)}
+      >
+        {product.publicVisible ? <Eye className="size-3" /> : <EyeOff className="size-3" />}
+        {product.publicVisible ? "产品中心可见" : "产品中心不可见"}
+      </Badge>
     </div>
   );
 }
@@ -224,6 +248,11 @@ function QuickSettings({
       <form action={action} className="grid gap-3 border-t border-white/[0.06] bg-black/15 p-4">
         <input type="hidden" name="slug" value={product.slug} />
         <input type="hidden" name="returnTo" value={returnTo} />
+        {product.status === "PUBLISHED" && !product.publicVisible ? (
+          <div className="rounded-md border border-amber-400/20 bg-amber-400/[0.07] px-2.5 py-2 text-[10px] leading-4 text-amber-200/80">
+            <span className="font-medium text-amber-200">状态已发布，但产品中心不可见：</span>{visibilityReasonText(product)}
+          </div>
+        ) : null}
         <div className="grid grid-cols-[1fr_88px] gap-2">
           <select name="status" defaultValue={product.status} disabled={disabled} className="admin-select h-8 px-2 text-xs">
             <option value="DRAFT">草稿</option>
@@ -281,9 +310,21 @@ export function AdminProductCatalog({ products, categories, databaseReady, canDe
   const [selected, setSelected] = useState<string[]>([]);
   const [batchOperation, setBatchOperation] = useState<BatchProductOperation>("PUBLISH");
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [publishOpen, setPublishOpen] = useState(false);
   const batchFormRef = useRef<HTMLFormElement>(null);
   const confirmedDeleteRef = useRef(false);
+  const confirmedPublishRef = useRef(false);
   const selectedSet = useMemo(() => new Set(selected), [selected]);
+  const selectedProducts = useMemo(
+    () => products.filter((product) => selectedSet.has(product.slug)),
+    [products, selectedSet],
+  );
+  const publishBlockedProducts = useMemo(
+    () => selectedProducts.filter((product) =>
+      product.publicVisibilityReasons.some((reason) => reason !== "PRODUCT_NOT_PUBLISHED"),
+    ),
+    [selectedProducts],
+  );
   const allSelected = products.length > 0 && selected.length === products.length;
 
   const toggleProduct = (slug: string) =>
@@ -373,13 +414,26 @@ export function AdminProductCatalog({ products, categories, databaseReady, canDe
                         {product.title}
                       </Link>
                       <p className="mt-1 truncate font-mono text-[10px] text-zinc-700">{product.sku} · {product.slug}</p>
+                      {!product.publicVisible ? (
+                        <p className="mt-2 flex items-start gap-1.5 rounded-md border border-amber-400/15 bg-amber-400/[0.055] px-2.5 py-2 text-[10px] leading-4 text-amber-200/75">
+                          <CircleAlert className="mt-0.5 size-3 shrink-0 text-amber-300" />
+                          <span>{visibilityReasonText(product)}</span>
+                        </p>
+                      ) : null}
                     </div>
-                    <Button asChild size="icon-sm" variant="ghost" className="text-zinc-600 hover:bg-white/[0.06] hover:text-zinc-200">
-                      <Link href={`/products/${product.slug}`} target="_blank">
-                        <ExternalLink />
-                        <span className="sr-only">查看公开页面</span>
-                      </Link>
-                    </Button>
+                    {product.publicVisible ? (
+                      <Button asChild size="icon-sm" variant="ghost" className="text-zinc-600 hover:bg-white/[0.06] hover:text-zinc-200">
+                        <Link href={`/products/${product.slug}`} target="_blank">
+                          <ExternalLink />
+                          <span className="sr-only">查看公开页面</span>
+                        </Link>
+                      </Button>
+                    ) : (
+                      <Button type="button" size="icon-sm" variant="ghost" disabled title={visibilityReasonText(product)}>
+                        <EyeOff />
+                        <span className="sr-only">产品中心暂不展示</span>
+                      </Button>
+                    )}
                   </div>
                   <div className="mt-4 space-y-3">
                     <Completion value={product.completion} />
@@ -414,7 +468,13 @@ export function AdminProductCatalog({ products, categories, databaseReady, canDe
               setDeleteOpen(true);
               return;
             }
+            if (batchOperation === "PUBLISH" && publishBlockedProducts.length > 0 && !confirmedPublishRef.current) {
+              event.preventDefault();
+              setPublishOpen(true);
+              return;
+            }
             confirmedDeleteRef.current = false;
+            confirmedPublishRef.current = false;
           }}
           className="fixed bottom-5 left-1/2 z-40 flex w-[min(calc(100%-2rem),620px)] -translate-x-1/2 flex-wrap items-center gap-2 rounded-xl border border-white/[0.12] bg-[#1a1a1d]/95 p-2.5 shadow-[0_20px_70px_rgba(0,0,0,0.55)] backdrop-blur-xl lg:left-[calc(50%+7.5rem)]"
         >
@@ -447,8 +507,47 @@ export function AdminProductCatalog({ products, categories, databaseReady, canDe
           {batchOperation === "REVIEW" ? (
             <p className="basis-full px-2 text-[10px] text-zinc-500">审核通过会批准待审核语言版本；产品仍需执行“批量发布”后才会公开。</p>
           ) : null}
+          {batchOperation === "PUBLISH" ? (
+            <p className={cn("basis-full rounded-md px-2 py-1.5 text-[10px]", publishBlockedProducts.length ? "bg-amber-400/[0.08] text-amber-200/80" : "text-emerald-300/75")}>
+              发布后预计 {selected.length - publishBlockedProducts.length} 个在产品中心可见
+              {publishBlockedProducts.length ? `；${publishBlockedProducts.length} 个仍需先审核中文内容或启用栏目。` : "，所选产品已满足公开条件。"}
+            </p>
+          ) : null}
         </form>
       ) : null}
+
+      <AlertDialog.Root open={publishOpen} onOpenChange={setPublishOpen}>
+        <AlertDialog.Portal>
+          <AlertDialog.Overlay className="fixed inset-0 z-[100] bg-[#101828]/45 backdrop-blur-[2px]" />
+          <AlertDialog.Content className="fixed left-1/2 top-1/2 z-[101] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-xl border border-[#E4E7EC] bg-white p-6 shadow-2xl">
+            <div className="grid size-10 place-items-center rounded-full bg-amber-50 text-amber-600"><EyeOff className="size-5" /></div>
+            <AlertDialog.Title className="mt-4 text-lg font-semibold text-[#172033]">仍有 {publishBlockedProducts.length} 个产品不会出现在产品中心</AlertDialog.Title>
+            <AlertDialog.Description className="mt-2 text-sm leading-6 text-[#667085]">
+              这些产品缺少已审核发布的中文内容，或没有已启用的前台栏目。继续操作只会更新产品状态，不会让它们立即出现在产品中心。
+            </AlertDialog.Description>
+            <div className="mt-4 max-h-32 overflow-y-auto rounded-lg border border-[#E4E7EC] bg-[#F8FAFC] p-3 text-xs leading-5 text-[#667085]">
+              {publishBlockedProducts.slice(0, 8).map((product) => <p key={product.slug}><span className="font-medium text-[#344054]">{product.sku}</span>：{visibilityReasonText(product)}</p>)}
+              {publishBlockedProducts.length > 8 ? <p>另有 {publishBlockedProducts.length - 8} 个产品</p> : null}
+            </div>
+            <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <AlertDialog.Cancel asChild><Button type="button" variant="outline">返回先处理</Button></AlertDialog.Cancel>
+              <AlertDialog.Action asChild>
+                <Button
+                  type="button"
+                  className="bg-amber-600 text-white hover:bg-amber-500"
+                  onClick={() => {
+                    confirmedPublishRef.current = true;
+                    setPublishOpen(false);
+                    batchFormRef.current?.requestSubmit();
+                  }}
+                >
+                  仍然更新发布状态
+                </Button>
+              </AlertDialog.Action>
+            </div>
+          </AlertDialog.Content>
+        </AlertDialog.Portal>
+      </AlertDialog.Root>
 
       <AlertDialog.Root open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialog.Portal>

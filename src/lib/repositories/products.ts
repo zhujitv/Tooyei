@@ -7,17 +7,14 @@ import {
 } from "@/generated/prisma/client";
 import { products as sampleProducts, type LocalizedText, type Product, type ProductMediaItem } from "@/lib/content";
 import { getPrisma, isDatabaseConfigured } from "@/lib/db";
+import {
+  isPublicCategoryRecord,
+  publicCategoryWhere,
+  publicProductListWhere,
+  visibleProductCategoryWhere,
+} from "@/lib/product-publication";
 import { locales, type Locale } from "@/lib/site";
 import { withDataFallback } from "@/lib/server-data";
-
-const publicCategoryWhere: Prisma.CategoryWhereInput = {
-  isActive: true,
-  status: { not: ContentStatus.ARCHIVED },
-  OR: [
-    { parentId: null },
-    { parent: { is: { isActive: true, status: { not: ContentStatus.ARCHIVED } } } },
-  ],
-};
 
 const categoryForSlug = (slug: string): Prisma.CategoryWhereInput => ({
   ...publicCategoryWhere,
@@ -30,13 +27,6 @@ const categoryForSlug = (slug: string): Prisma.CategoryWhereInput => ({
     },
   ],
 });
-
-const visibleCategoryClause: Prisma.ProductWhereInput = {
-  OR: [
-    { category: { is: publicCategoryWhere } },
-    { categoryAssignments: { some: { category: { is: publicCategoryWhere } } } },
-  ],
-};
 
 const productInclude = {
   primaryImage: true,
@@ -147,11 +137,6 @@ const toCategoryReference = (category: DatabaseProduct["category"]) => ({
     : null,
 });
 
-const categoryIsPublic = (category: DatabaseProduct["category"]) =>
-  category.isActive &&
-  category.status !== ContentStatus.ARCHIVED &&
-  (!category.parent || (category.parent.isActive && category.parent.status !== ContentStatus.ARCHIVED));
-
 const isAllowedPublicAssetUrl = (url?: string | null) => {
   const value = url?.trim();
   if (!value) return false;
@@ -190,7 +175,7 @@ const toProduct = (product: DatabaseProduct): Product => {
 
   const image = media.find(({ role }) => role === ProductMediaRole.PRIMARY)?.url ?? media[0]?.url ?? sampleImage ?? "/media/product-tile-spc.jpg";
   const categories = product.categoryAssignments.map(({ category }) => toCategoryReference(category));
-  const primaryCategory = categoryIsPublic(product.category)
+  const primaryCategory = isPublicCategoryRecord(product.category)
     ? toCategoryReference(product.category)
     : categories[0];
 
@@ -266,9 +251,7 @@ export async function getPublishedProducts(filters: { categorySlug?: string } = 
 
   const records = await withDataFallback<DatabaseProduct[] | null>("products.published.list", () => getPrisma().product.findMany({
     where: {
-      status: ContentStatus.PUBLISHED,
-      translations: { some: { locale: DatabaseLocale.ZH, status: TranslationStatus.PUBLISHED } },
-      AND: [visibleCategoryClause],
+      ...publicProductListWhere,
       ...(filters.categorySlug
         ? {
             OR: [
@@ -300,7 +283,7 @@ export async function getPublishedProduct(slug: string): Promise<Product | undef
   }
 
   const record = await withDataFallback<DatabaseProduct | null>("products.published.detail", () => getPrisma().product.findFirst({
-    where: { slug, status: ContentStatus.PUBLISHED, AND: [visibleCategoryClause] },
+    where: { slug, status: ContentStatus.PUBLISHED, AND: [visibleProductCategoryWhere] },
     include: productInclude,
   }), null, { slug });
   if (!record) {
@@ -315,7 +298,7 @@ export async function getPublishedProductSlugs(): Promise<string[]> {
   if (!isDatabaseConfigured()) return sampleProducts.map(({ slug }) => slug);
 
   const records = await withDataFallback("products.published.slugs", () => getPrisma().product.findMany({
-    where: { status: ContentStatus.PUBLISHED, AND: [visibleCategoryClause] },
+    where: { status: ContentStatus.PUBLISHED, AND: [visibleProductCategoryWhere] },
     select: { slug: true },
     orderBy: { sortOrder: "asc" },
   }), () => sampleProducts.map(({ slug }) => ({ slug })));

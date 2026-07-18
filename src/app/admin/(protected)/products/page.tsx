@@ -4,6 +4,8 @@ import {
   CheckCircle2,
   ChevronDown,
   Database,
+  Eye,
+  EyeOff,
   Filter,
   FolderCheck,
   FolderX,
@@ -98,6 +100,7 @@ export default async function AdminProductsPage({
     locale?: string;
     translationState?: string;
     seoState?: string;
+    visibility?: string;
     page?: string;
     saved?: string;
     error?: string;
@@ -117,9 +120,12 @@ export default async function AdminProductsPage({
   const seoState = ["READY", "MISSING"].includes(filters.seoState ?? "")
     ? (filters.seoState as "READY" | "MISSING")
     : undefined;
+  const visibility = ["VISIBLE", "HIDDEN"].includes(filters.visibility ?? "")
+    ? (filters.visibility as "VISIBLE" | "HIDDEN")
+    : undefined;
   const page = Math.max(1, Number.parseInt(filters.page ?? "1", 10) || 1);
   const [productPage, stats, categories, managerSession] = await Promise.all([
-    getAdminProducts({ q: filters.q, status, kind, classification, locale, translationState, seoState, page }),
+    getAdminProducts({ q: filters.q, status, kind, classification, locale, translationState, seoState, visibility, page }),
     getAdminProductStats(),
     getAdminProductCategoryOptions(),
     databaseReady ? getProductManagerSession() : Promise.resolve(null),
@@ -158,6 +164,7 @@ export default async function AdminProductsPage({
 
   const metrics = [
     { label: "产品总数", value: stats.total, detail: `${stats.published} 个已发布 · ${stats.draft} 个草稿`, icon: Package, tone: "text-zinc-100" },
+    { label: "产品中心可见", value: stats.publicVisible, detail: `${stats.publicHidden} 个仍被公开条件阻止`, icon: Eye, tone: stats.publicHidden ? "text-amber-300" : "text-emerald-300" },
     { label: "语言待审核", value: stats.needsReview, detail: "存在等待人工审核的语言版本", icon: ShieldCheck, tone: stats.needsReview ? "text-blue-300" : "text-emerald-300" },
     { label: "未归类", value: stats.unclassified, detail: "尚未关联动态栏目", icon: FolderX, tone: stats.unclassified ? "text-rose-300" : "text-emerald-300" },
     { label: "翻译待完善", value: stats.missing, detail: `覆盖 ${contentLocales.length} 个语言版本`, icon: Languages, tone: stats.missing ? "text-amber-300" : "text-emerald-300" },
@@ -207,7 +214,7 @@ export default async function AdminProductsPage({
         </Alert>
       ) : null}
 
-      <section className="mt-5 grid gap-px overflow-hidden rounded-xl border border-white/[0.07] bg-white/[0.07] sm:grid-cols-2 xl:grid-cols-6">
+      <section className="mt-5 grid gap-px overflow-hidden rounded-xl border border-white/[0.07] bg-white/[0.07] sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
         {metrics.map(({ label, value, detail, icon: Icon, tone }) => (
           <div key={label} className="bg-[#111113] p-4">
             <div className="flex items-center justify-between">
@@ -220,23 +227,28 @@ export default async function AdminProductsPage({
         ))}
       </section>
 
-      <section className="mt-4 grid gap-3 lg:grid-cols-2 2xl:grid-cols-4" aria-label="产品运营待办">
-        <Link href={filteredHref({ classification: null, translationState: "NEEDS_REVIEW", seoState: null })} className="group flex items-center gap-3 rounded-xl border border-[#E4E7EC] bg-white p-4 transition-colors hover:border-[#B8C0CC]">
+      <section className="mt-4 grid gap-3 lg:grid-cols-2 2xl:grid-cols-5" aria-label="产品运营待办">
+        <Link href={filteredHref({ visibility: "HIDDEN", classification: null, translationState: null, seoState: null })} className="group flex items-center gap-3 rounded-xl border border-[#E4E7EC] bg-white p-4 transition-colors hover:border-[#B8C0CC]">
+          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-amber-50 text-amber-600"><EyeOff className="size-4" /></span>
+          <span className="min-w-0 flex-1"><span className="block text-sm font-medium text-[#172033]">修复产品中心不可见</span><span className="mt-1 block text-xs text-[#667085]">{stats.publicHidden ? `${stats.publicHidden} 个产品需要处理` : "所有已发布产品均可见"}</span></span>
+          <Search className="size-4 text-[#98A2B3] transition-colors group-hover:text-[#344054]" />
+        </Link>
+        <Link href={filteredHref({ visibility: null, classification: null, translationState: "NEEDS_REVIEW", seoState: null })} className="group flex items-center gap-3 rounded-xl border border-[#E4E7EC] bg-white p-4 transition-colors hover:border-[#B8C0CC]">
           <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-blue-50 text-blue-600"><ShieldCheck className="size-4" /></span>
           <span className="min-w-0 flex-1"><span className="block text-sm font-medium text-[#172033]">审核语言内容</span><span className="mt-1 block text-xs text-[#667085]">{stats.needsReview ? `${stats.needsReview} 个产品等待审核` : "当前没有待审核内容"}</span></span>
           <Search className="size-4 text-[#98A2B3] transition-colors group-hover:text-[#344054]" />
         </Link>
-        <Link href={filteredHref({ classification: "UNCLASSIFIED", translationState: null, seoState: null })} className="group flex items-center gap-3 rounded-xl border border-[#E4E7EC] bg-white p-4 transition-colors hover:border-[#B8C0CC]">
+        <Link href={filteredHref({ visibility: null, classification: "UNCLASSIFIED", translationState: null, seoState: null })} className="group flex items-center gap-3 rounded-xl border border-[#E4E7EC] bg-white p-4 transition-colors hover:border-[#B8C0CC]">
           <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-rose-50 text-rose-600"><FolderX className="size-4" /></span>
           <span className="min-w-0 flex-1"><span className="block text-sm font-medium text-[#172033]">处理未归类产品</span><span className="mt-1 block text-xs text-[#667085]">{stats.unclassified ? `${stats.unclassified} 个产品等待归类` : "所有产品均已归类"}</span></span>
           <FolderCheck className="size-4 text-[#98A2B3] transition-colors group-hover:text-[#344054]" />
         </Link>
-        <Link href={filteredHref({ classification: null, translationState: "MISSING", seoState: null })} className="group flex items-center gap-3 rounded-xl border border-[#E4E7EC] bg-white p-4 transition-colors hover:border-[#B8C0CC]">
+        <Link href={filteredHref({ visibility: null, classification: null, translationState: "MISSING", seoState: null })} className="group flex items-center gap-3 rounded-xl border border-[#E4E7EC] bg-white p-4 transition-colors hover:border-[#B8C0CC]">
           <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-amber-50 text-amber-600"><Languages className="size-4" /></span>
           <span className="min-w-0 flex-1"><span className="block text-sm font-medium text-[#172033]">补齐语言翻译</span><span className="mt-1 block text-xs text-[#667085]">{stats.missing ? `${stats.missing} 个产品缺少至少一种语言` : "九语言内容已覆盖"}</span></span>
           <Search className="size-4 text-[#98A2B3] transition-colors group-hover:text-[#344054]" />
         </Link>
-        <Link href={filteredHref({ classification: null, translationState: null, seoState: "MISSING" })} className="group flex items-center gap-3 rounded-xl border border-[#E4E7EC] bg-white p-4 transition-colors hover:border-[#B8C0CC]">
+        <Link href={filteredHref({ visibility: null, classification: null, translationState: null, seoState: "MISSING" })} className="group flex items-center gap-3 rounded-xl border border-[#E4E7EC] bg-white p-4 transition-colors hover:border-[#B8C0CC]">
           <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-violet-50 text-violet-600"><SearchCheck className="size-4" /></span>
           <span className="min-w-0 flex-1"><span className="block text-sm font-medium text-[#172033]">完善各语言 SEO</span><span className="mt-1 block text-xs text-[#667085]">{stats.missingSeo ? `${stats.missingSeo} 个产品的 SEO 字段不完整` : "九语言 SEO 已完整"}</span></span>
           <Search className="size-4 text-[#98A2B3] transition-colors group-hover:text-[#344054]" />
@@ -333,6 +345,11 @@ export default async function AdminProductsPage({
             <option value="">全部 SEO 状态</option>
             <option value="MISSING">SEO 待完善</option>
             <option value="READY">SEO 已完整</option>
+          </select>
+          <select id="visibility" name="visibility" defaultValue={visibility || ""} className="admin-select h-8 px-2.5 text-xs xl:col-span-2">
+            <option value="">全部产品中心状态</option>
+            <option value="VISIBLE">产品中心可见</option>
+            <option value="HIDDEN">产品中心不可见</option>
           </select>
           <div className="flex items-center gap-2 md:col-span-2 xl:col-span-3">
             <Button type="submit" size="sm" variant="outline" className="flex-1 border-white/[0.1] bg-white/[0.04] text-zinc-300 hover:bg-white/[0.08] hover:text-white">

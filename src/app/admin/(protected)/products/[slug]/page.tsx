@@ -6,7 +6,10 @@ import {
   Check,
   CheckCircle2,
   Circle,
+  CircleAlert,
   Database,
+  Eye,
+  EyeOff,
   ExternalLink,
   FileStack,
   ImageIcon,
@@ -54,6 +57,12 @@ const productStatusLabel: Record<ContentStatus, string> = {
   PUBLISHED: "已发布",
   ARCHIVED: "已归档",
 };
+
+const publicVisibilityReasonLabel = {
+  PRODUCT_NOT_PUBLISHED: "产品状态尚未发布",
+  ZH_TRANSLATION_NOT_PUBLISHED: "中文内容尚未审核发布",
+  CATEGORY_NOT_PUBLIC: "未关联已启用且公开的产品栏目",
+} as const;
 
 const kindLabel: Record<string, string> = {
   SPC: "SPC 石塑地板",
@@ -160,6 +169,9 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
   ];
   const completeness = completenessSections.reduce((sum, section) => sum + section.score, 0);
   const readinessItems = [
+    ["产品状态已发布", !product.publicVisibilityReasons.includes("PRODUCT_NOT_PUBLISHED")],
+    ["中文内容已审核发布", !product.publicVisibilityReasons.includes("ZH_TRANSLATION_NOT_PUBLISHED")],
+    ["已关联公开栏目", !product.publicVisibilityReasons.includes("CATEGORY_NOT_PUBLIC")],
     ["至少 1 个可见媒体", product.media.some((item) => item.visible)],
     [`全部 ${product.translations.length} 个语言版本资料完整`, completeLocales === product.translations.length],
     [`全部 ${product.translations.length} 个语言版本 SEO 完整`, seoReadyLocales === product.translations.length],
@@ -423,6 +435,13 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="outline" className="admin-badge-neutral">{productStatusLabel[product.status]}</Badge>
+              <Badge
+                variant="outline"
+                className={product.publicVisible ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700"}
+              >
+                {product.publicVisible ? <Eye className="size-3" /> : <EyeOff className="size-3" />}
+                {product.publicVisible ? "产品中心可见" : "产品中心不可见"}
+              </Badge>
               <span className="text-[10px] text-slate-400">{kindLabel[product.kind]}</span>
               {product.featured ? <Badge className="admin-badge-ai">AI 精选</Badge> : null}
             </div>
@@ -435,12 +454,31 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
             <div className="relative grid size-9 place-items-center rounded-full" style={{ background: `conic-gradient(${completeness >= 80 ? "#22c55e" : "#f59e0b"} ${completeness * 3.6}deg, #e2e8f0 0deg)` }}><div className="absolute inset-[3px] rounded-full bg-white" /><span className="relative font-mono text-[9px] text-slate-700">{completeness}</span></div>
             <div><p className="text-[10px] text-[#94A3B8]">资料完整度</p><p className="mt-0.5 text-xs font-medium text-[#475569]">{completeness >= 80 ? "接近发布标准" : completeness >= 55 ? "继续完善资料" : "资料缺失较多"}</p></div>
           </div>
-          <Button asChild size="sm" variant="outline" className="border-[#E5E7EB] bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900"><Link href={`/products/${product.slug}`} target="_blank"><ExternalLink />公开页面</Link></Button>
+          {product.publicVisible ? (
+            <Button asChild size="sm" variant="outline" className="border-[#E5E7EB] bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900">
+              <Link href={`/products/${product.slug}`} target="_blank"><ExternalLink />公开页面</Link>
+            </Button>
+          ) : (
+            <Button size="sm" variant="outline" disabled className="border-[#E5E7EB] bg-white text-slate-400">
+              <EyeOff />产品中心暂不展示
+            </Button>
+          )}
         </div>
       </header>
 
+      {!product.publicVisible ? (
+        <Alert className="mt-5 border-amber-200 bg-amber-50 text-amber-900">
+          <CircleAlert className="size-4" />
+          <AlertTitle>该产品当前不会显示在前台产品中心</AlertTitle>
+          <AlertDescription>
+            请处理：{product.publicVisibilityReasons.map((reason) => publicVisibilityReasonLabel[reason]).join("；")}。
+            仅更新“产品状态”不足以让产品公开显示。
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
       {feedback.saved ? (
-        <Alert className="mt-5 border-emerald-200 bg-emerald-50 text-emerald-800"><Save className="size-4" /><AlertTitle>{feedback.saved === "core" ? "产品基础信息已保存" : feedback.saved === "created" ? "新产品已创建" : feedback.saved === "upload" ? "文件已上传并关联" : feedback.saved === "structured" ? "产品结构化内容已保存" : "翻译已保存"}</AlertTitle><AlertDescription>{feedback.saved === "core" ? "产品列表、公开页面和缓存已刷新。" : feedback.saved === "created" ? "可以继续完善图片、规格、卖点、应用场景、下载资料和多语言 SEO。" : feedback.saved === "upload" ? "对象存储和产品媒体关系已更新。" : feedback.saved === "structured" ? "图库、规格、卖点、应用场景和下载资料已同步到公开产品页。" : `${savedLocale} 版本、SEO 字段和公开页面缓存已更新。`}</AlertDescription></Alert>
+        <Alert className="mt-5 border-emerald-200 bg-emerald-50 text-emerald-800"><Save className="size-4" /><AlertTitle>{feedback.saved === "core" ? "产品基础信息已保存" : feedback.saved === "created" ? "新产品已创建" : feedback.saved === "upload" ? "文件已上传并关联" : feedback.saved === "structured" ? "产品结构化内容已保存" : "翻译已保存"}</AlertTitle><AlertDescription>{feedback.saved === "core" ? product.publicVisible ? "产品列表、公开页面和缓存已刷新。" : "基础信息已更新，但产品仍未满足产品中心公开条件。" : feedback.saved === "created" ? "可以继续完善图片、规格、卖点、应用场景、下载资料和多语言 SEO。" : feedback.saved === "upload" ? "对象存储和产品媒体关系已更新。" : feedback.saved === "structured" ? "图库、规格、卖点、应用场景和下载资料已同步到公开产品页。" : `${savedLocale} 版本、SEO 字段和公开页面缓存已更新。`}</AlertDescription></Alert>
       ) : null}
       {feedback.error ? (
         <Alert className="mt-5 border-amber-200 bg-amber-50 text-amber-900"><Database className="size-4" /><AlertTitle>修改未保存</AlertTitle><AlertDescription>{feedback.error === "database" ? "请先连接 PostgreSQL 并初始化产品目录。" : feedback.error === "core" ? "请检查 SKU、分类、状态和排序。" : feedback.error === "structured" ? "请检查结构化内容字段。" : feedback.error === "upload" ? "请检查文件类型、大小、媒体服务和数据库连接。" : "请检查标题、摘要、SEO 字段和发布状态。"}</AlertDescription></Alert>
