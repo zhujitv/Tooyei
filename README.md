@@ -53,10 +53,13 @@ Link a public Blob store and provide `BLOB_READ_WRITE_TOKEN` before using upload
 The product translation center at `/admin/translations` can create resumable
 jobs across English, German, French, Spanish, Russian, Japanese, Italian,
 Arabic and Chinese. The translation layer uses a provider interface rather
-than calling a vendor from queue code. New translation-center jobs use
-Volcengine Doubao exclusively. Configure it with `DOUBAO_API_KEY`,
-`DOUBAO_API_BASE_URL` and `DOUBAO_MODEL`. Historical jobs retain their recorded
-provider and model metadata and continue to resolve the matching adapter. Each
+than calling a vendor from queue code. New translation-center jobs use the
+dedicated Volcengine `Doubao-Seed-Translation` model. Configure it with
+`DOUBAO_API_KEY`, `DOUBAO_API_BASE_URL` and `DOUBAO_MODEL`. The dedicated
+adapter translates stable field segments with explicit source/target language
+codes, then reconstructs the validated product JSON in application code.
+Historical jobs retain their recorded provider and model metadata and continue
+to resolve the matching Doubao adapter. Each
 product-language item persists its
 status, response ID, input hash, token usage, errors and QA warnings. Generated
 main content, SEO metadata and structured product fields are saved as

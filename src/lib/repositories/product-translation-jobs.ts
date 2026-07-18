@@ -635,11 +635,8 @@ export async function startProductTranslationJobExecution(jobId: string, actorEm
     if (job.status === TranslationJobStatus.CLOSED) throw new Error("已关闭任务不能继续执行，请先恢复任务。");
     if (job.status === TranslationJobStatus.COMPLETED) throw new Error("任务已全部完成，没有待执行项目。");
     if (job.status === TranslationJobStatus.RUNNING) throw new Error("任务已由另一个执行器运行，请勿重复启动。");
-    const service = getTranslationProviderState(job.provider);
+    const service = getTranslationProviderState(job.provider, job.model);
     if (!service.configured) throw new Error(service.error || "该任务的翻译 Provider 尚未配置完整。");
-    if (service.model !== job.model) {
-      throw new Error(`任务使用 ${job.provider} / ${job.model}，该 Provider 当前模型为 ${service.model}；请恢复模型配置或新建任务。`);
-    }
 
     const runningItems = await tx.productTranslationJobItem.count({
       where: { jobId, status: TranslationJobItemStatus.RUNNING },
@@ -770,7 +767,7 @@ export async function processNextProductTranslationJobItem(jobId: string, execut
     select: { provider: true, model: true },
   });
   if (!jobConfig) throw new Error("任务未运行、已停止，或执行凭证已失效。");
-  const service = getTranslationProviderState(jobConfig.provider);
+  const service = getTranslationProviderState(jobConfig.provider, jobConfig.model);
   if (!service.configured) {
     await prisma.productTranslationJob.updateMany({
       where: { id: jobId, status: TranslationJobStatus.RUNNING, executionId },
@@ -778,14 +775,6 @@ export async function processNextProductTranslationJobItem(jobId: string, execut
     });
     throw new Error(service.error || "该任务的翻译 Provider 尚未配置完整，任务已暂停。");
   }
-  if (service.model !== jobConfig.model) {
-    await prisma.productTranslationJob.updateMany({
-      where: { id: jobId, status: TranslationJobStatus.RUNNING, executionId },
-      data: { status: TranslationJobStatus.PAUSED, executionId: null, lockedAt: null, lockedBy: null, heartbeatAt: null },
-    });
-    throw new Error(`任务使用 ${jobConfig.provider} / ${jobConfig.model}，该 Provider 当前模型为 ${service.model}；请恢复模型配置或新建任务。`);
-  }
-
   const item = await prisma.$transaction(async (tx) => {
     const job = await tx.productTranslationJob.findFirst({
       where: { id: jobId, status: TranslationJobStatus.RUNNING, executionId },

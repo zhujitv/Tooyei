@@ -132,7 +132,7 @@ export default async function TranslationCenterPage({
             <Database className="size-3.5" />{databaseReady ? "数据库已连接" : "数据库未连接"}
           </span>
           <span className="inline-flex items-center gap-2 rounded-md border border-[#E4E7EC] bg-white px-3 py-2 text-xs text-[#475467]">
-            <Bot className="size-3.5" />{translationService.configured ? "火山大模型已就绪" : "火山大模型待配置"}
+            <Bot className="size-3.5" />{translationService.configured ? "豆包专用翻译已就绪" : "豆包专用翻译待配置"}
           </span>
         </div>
       </header>
@@ -154,8 +154,8 @@ export default async function TranslationCenterPage({
       {!translationService.configured ? (
         <Alert className="mt-5 border-amber-200 bg-amber-50 text-amber-900">
           <TriangleAlert className="size-4" />
-          <AlertTitle>需要配置火山大模型</AlertTitle>
-          <AlertDescription>请在服务端配置 DOUBAO_API_KEY；任务数据和现有产品不受影响。</AlertDescription>
+          <AlertTitle>需要配置豆包专用翻译模型</AlertTitle>
+          <AlertDescription>请在服务端配置 DOUBAO_API_KEY 和 DOUBAO_MODEL；任务数据和现有产品不受影响。</AlertDescription>
         </Alert>
       ) : null}
 
@@ -204,7 +204,7 @@ export default async function TranslationCenterPage({
                     </span>
                   </div>
                   <p className="mt-1 truncate font-mono text-[11px] text-[#667085]">{translationService.model || "未设置模型"}</p>
-                  <p className="mt-1 text-[11px] text-[#98A2B3]">翻译中心的新任务统一使用火山大模型；任务会永久记录模型信息，API Key 仅保存在服务端。</p>
+                  <p className="mt-1 text-[11px] text-[#98A2B3]">新任务使用豆包专用翻译模型；旧任务继续使用创建时记录的豆包模型，API Key 仅保存在服务端。</p>
                 </div>
               </div>
             </div>

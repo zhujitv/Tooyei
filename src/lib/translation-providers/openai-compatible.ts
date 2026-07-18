@@ -56,6 +56,7 @@ export class OpenAICompatibleProvider implements TranslationProvider {
             ? completion.usage.prompt_tokens + completion.usage.completion_tokens
             : null
         ),
+        warnings: [],
       };
     } catch (error) {
       if (error instanceof OpenAI.APIConnectionTimeoutError) {

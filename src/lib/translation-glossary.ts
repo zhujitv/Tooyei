@@ -20,13 +20,19 @@ export const buildingMaterialsGlossary: readonly GlossaryEntry[] = [
   { source: "slip resistance", translations: { ZH: "防滑性能", DE: "Rutschhemmung", JA: "防滑性能", FR: "résistance au glissement", ES: "resistencia al deslizamiento", RU: "сопротивление скольжению", IT: "resistenza allo scivolamento", AR: "مقاومة الانزلاق" } },
 ] as const;
 
-export function buildBuildingMaterialsGlossaryPrompt(sourceJson: string, targetLocale: Locale) {
+export function getBuildingMaterialsGlossaryTerms(sourceJson: string, targetLocale: Locale) {
   const normalized = sourceJson.toLocaleLowerCase("en");
-  const matches = buildingMaterialsGlossary.filter((entry) => normalized.includes(entry.source.toLocaleLowerCase("en")));
+  return buildingMaterialsGlossary
+    .filter((entry) => normalized.includes(entry.source.toLocaleLowerCase("en")))
+    .map((entry) => ({
+      source: entry.source,
+      target: entry.preserve ? entry.source : entry.translations?.[targetLocale] ?? entry.source,
+    }));
+}
+
+export function buildBuildingMaterialsGlossaryPrompt(sourceJson: string, targetLocale: Locale) {
+  const matches = getBuildingMaterialsGlossaryTerms(sourceJson, targetLocale);
   if (!matches.length) return "";
-  const rules = matches.map((entry) => {
-    if (entry.preserve) return `${entry.source} => preserve exactly`;
-    return `${entry.source} => ${entry.translations?.[targetLocale] ?? entry.source}`;
-  });
+  const rules = matches.map((entry) => `${entry.source} => ${entry.source === entry.target ? "preserve exactly" : entry.target}`);
   return `Building-materials glossary (mandatory terminology): ${rules.join("; ")}.`;
 }

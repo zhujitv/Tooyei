@@ -15,16 +15,20 @@ TranslationProvider interface
         |
 Provider registry
         |
-Volcengine Doubao
- (OpenAI-compatible transport)
+Volcengine Doubao model router
+        |                  |
+Seed Translation      Historical general models
+(Responses API)       (OpenAI-compatible transport)
 ```
 
-The service sends every adapter the same request:
+The service sends every adapter the same request contract:
 
 - system prompt;
 - serialized source product;
 - output schema and schema name;
 - maximum output token budget.
+- source and target language codes;
+- matching building-material glossary terms.
 
 Every adapter returns the same result:
 
@@ -41,16 +45,19 @@ returns, so changing providers cannot bypass product-content safety checks.
 ```dotenv
 DOUBAO_API_KEY=""
 DOUBAO_API_BASE_URL="https://ark.cn-beijing.volces.com/api/v3"
-DOUBAO_MODEL="doubao-seed-2-0-lite-260215"
+DOUBAO_MODEL="doubao-seed-translation-250915"
 DOUBAO_RESPONSE_FORMAT="json_object"
 DOUBAO_REQUEST_TIMEOUT_MS="90000"
+DOUBAO_TRANSLATION_CONCURRENCY="6"
 ```
 
-The translation center creates new jobs only with `volcengine-doubao`. It uses
-the official OpenAI Node SDK compatibility transport,
-  with the Ark base URL, a Doubao model or endpoint ID, and a separate API key.
-  It defaults to `json_object`, then applies the shared Zod validation and
-  stable-ID checks before any database write.
+The translation center creates new jobs only with `volcengine-doubao`. When the
+recorded model belongs to the `Doubao-Seed-Translation` family, the registry
+uses the Ark Responses translation contract. It sends every visitor-facing
+field with explicit source/target language codes, protects matched terminology,
+and reconstructs the JSON in application code. IDs are never sent as text to
+translate. Older Doubao models continue to use the OpenAI-compatible structured
+generation adapter.
 
 Restart or redeploy after changing Vercel runtime environment variables. The
 translation center shows the Doubao configuration state and does not expose a
@@ -67,12 +74,11 @@ provider selector.
 
 ## Job consistency
 
-Each job stores its provider and model. The runner resolves that exact adapter
-instead of the current default, including for historical jobs created before
-the translation center was limited to Doubao. A queued job stops with an
-explicit error if its recorded provider is no longer configured or its model
-changed. This prevents a provider switch from silently changing the meaning,
-cost or quality profile of an existing batch.
+Each job stores its provider and model. The runner resolves that exact model and
+adapter instead of requiring it to match the current default. Changing
+`DOUBAO_MODEL` affects only newly created jobs; queued and historical jobs keep
+their recorded model. A job stops only when its recorded provider can no longer
+be authenticated or resolved.
 
 ## Durable Translation Worker
 

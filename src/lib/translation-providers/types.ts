@@ -26,6 +26,9 @@ export type StructuredTranslationRequest = {
   schemaName: string;
   schema: Record<string, unknown>;
   maxOutputTokens: number;
+  sourceLanguage?: string;
+  targetLanguage?: string;
+  glossaryTerms?: Array<{ source: string; target: string }>;
 };
 
 export type StructuredTranslationResult = {
@@ -34,6 +37,7 @@ export type StructuredTranslationResult = {
   promptTokens: number | null;
   completionTokens: number | null;
   totalTokens: number | null;
+  warnings: string[];
 };
 
 export type TranslationProviderErrorType =

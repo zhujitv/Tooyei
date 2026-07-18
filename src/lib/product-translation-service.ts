@@ -4,7 +4,10 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import { Locale } from "@/generated/prisma/client";
 import { getPrisma } from "@/lib/db";
-import { buildBuildingMaterialsGlossaryPrompt } from "@/lib/translation-glossary";
+import {
+  buildBuildingMaterialsGlossaryPrompt,
+  getBuildingMaterialsGlossaryTerms,
+} from "@/lib/translation-glossary";
 import { getTranslationProviderState } from "@/lib/translation-providers/config";
 import { getTranslationProvider } from "@/lib/translation-providers/registry";
 import type { TranslationProcessingStep } from "@/lib/translation-worker-config";
@@ -17,7 +20,7 @@ import {
   TranslationResponseParseError,
 } from "@/lib/translation-response-parser";
 
-export const productTranslationPromptVersion = "tooyei-product-json-v3";
+export const productTranslationPromptVersion = "tooyei-product-json-v4";
 
 export class TranslationBusinessError extends Error {
   readonly name = "TranslationBusinessError";
@@ -197,11 +200,8 @@ export async function generateProductTranslation(
   onStep?: (step: Extract<TranslationProcessingStep, "GET_CONTENT" | "BUILD_PROMPT" | "CALL_MODEL">) => Promise<void>,
 ): Promise<GeneratedProductTranslation> {
   if (sourceLocale === targetLocale) throw new TranslationBusinessError("源语言和目标语言不能相同。");
-  const state = getTranslationProviderState(expected?.provider);
+  const state = getTranslationProviderState(expected?.provider, expected?.model);
   if (!state.configured || !state.provider) throw new TranslationBusinessError(state.error || "翻译 Provider 尚未配置完整。");
-  if (expected && expected.model !== state.model) {
-    throw new TranslationBusinessError(`任务使用 ${expected.provider} / ${expected.model}，该 Provider 当前模型为 ${state.model}；请恢复模型配置或新建任务。`);
-  }
 
   await onStep?.("GET_CONTENT");
   const prisma = getPrisma();
@@ -243,15 +243,17 @@ export async function generateProductTranslation(
   }
 
   const requestedContentTypes = expected?.contentTypes?.length ? expected.contentTypes : translationContentTypes;
+  const translatesProduct = requestedContentTypes.includes("PRODUCT");
+  const translatesSeo = requestedContentTypes.includes("SEO");
   const source = {
     product: {
       slug: product.slug,
       sku: product.sku,
       kind: product.kind,
-      title: main.title,
-      summary: main.summary,
-      seoTitle: main.seoTitle ?? "",
-      seoDescription: main.seoDescription ?? "",
+      title: translatesProduct ? main.title : "",
+      summary: translatesProduct ? main.summary : "",
+      seoTitle: translatesSeo ? main.seoTitle ?? "" : "",
+      seoDescription: translatesSeo ? main.seoDescription ?? "" : "",
     },
     media: requestedContentTypes.some((type) => type === "MEDIA_ALT" || type === "MEDIA_CAPTION") ? product.media.map((item) => {
       const translation = preferredTranslation(item.translations, sourceLocale);
@@ -300,12 +302,15 @@ export async function generateProductTranslation(
     buildBuildingMaterialsGlossaryPrompt(sourceJson, targetLocale),
   ].filter(Boolean).join(" ");
   await onStep?.("CALL_MODEL");
-  const generated = await getTranslationProvider(state.provider).generateStructured({
+  const generated = await getTranslationProvider(state.provider, state.model).generateStructured({
     systemPrompt,
     sourceJson,
     schemaName: "tooyei_product_translation",
     schema: productTranslationJsonSchema,
     maxOutputTokens: 12000,
+    sourceLanguage: sourceLocale.toLowerCase(),
+    targetLanguage: targetLocale.toLowerCase(),
+    glossaryTerms: getBuildingMaterialsGlossaryTerms(sourceJson, targetLocale),
   });
   let parsed: Record<string, unknown>;
   try {
@@ -324,7 +329,14 @@ export async function generateProductTranslation(
 
   const rawResult = parsed;
   const normalizedResult = normalizeTranslationResult(rawResult);
-  const warnings = getTranslationResultQcWarnings(normalizedResult);
+  const ignoredQcWarnings = new Set([
+    ...(!translatesProduct ? ["模型响应缺少 title", "模型响应缺少 summary"] : []),
+    ...(!translatesSeo ? ["模型响应缺少 seoTitle", "模型响应缺少 seoDescription"] : []),
+  ]);
+  const warnings = [
+    ...generated.warnings,
+    ...getTranslationResultQcWarnings(normalizedResult).filter((warning) => !ignoredQcWarnings.has(warning)),
+  ];
   const normalized = {
     product: normalizedResult.product,
     media: normalizeStructuredItems(normalizedResult.media, source.media, {

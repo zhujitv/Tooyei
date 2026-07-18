@@ -21,7 +21,7 @@ const providerAliases: Record<string, TranslationProviderId> = {
 const providerLabels: Record<TranslationProviderId, string> = {
   "openai-responses": "OpenAI Responses",
   "openai-compatible": "OpenAI-compatible API",
-  "volcengine-doubao": "火山引擎豆包大模型",
+  "volcengine-doubao": "火山引擎豆包",
 };
 
 const cleanBaseUrl = (value: string) => value.trim().replace(/\/+$/, "");
@@ -84,7 +84,7 @@ const resolveProviderValues = (provider: TranslationProviderId): ResolvedProvide
             || "https://ark.cn-beijing.volces.com/api/v3",
         ),
         model: process.env.DOUBAO_MODEL?.trim()
-          || "doubao-seed-2-0-lite-260215",
+          || "doubao-seed-translation-250915",
         timeoutMs: parseTimeoutMs(
           process.env.DOUBAO_REQUEST_TIMEOUT_MS,
         ),
@@ -106,7 +106,10 @@ export type TranslationProviderState = {
   error: string | null;
 };
 
-export function getTranslationProviderState(requestedProvider?: string): TranslationProviderState {
+export function getTranslationProviderState(
+  requestedProvider?: string,
+  recordedModel?: string,
+): TranslationProviderState {
   const requested = requestedProvider?.trim().toLowerCase() || defaultProviderValue();
   const provider = resolveTranslationProviderId(requested);
   if (!provider) {
@@ -121,7 +124,11 @@ export function getTranslationProviderState(requestedProvider?: string): Transla
     };
   }
 
-  const values = resolveProviderValues(provider);
+  const configuredValues = resolveProviderValues(provider);
+  const values = {
+    ...configuredValues,
+    model: recordedModel?.trim() || configuredValues.model,
+  };
 
   const missing = [
     !values.apiKey ? provider === "volcengine-doubao" ? "DOUBAO_API_KEY" : "API Key" : null,
@@ -140,8 +147,11 @@ export function getTranslationProviderState(requestedProvider?: string): Transla
   };
 }
 
-export function getTranslationProviderConfig(requestedProvider?: string): TranslationProviderConfig {
-  const state = getTranslationProviderState(requestedProvider);
+export function getTranslationProviderConfig(
+  requestedProvider?: string,
+  recordedModel?: string,
+): TranslationProviderConfig {
+  const state = getTranslationProviderState(requestedProvider, recordedModel);
   if (!state.configured || !state.provider) {
     throw new Error(state.error || "翻译 Provider 尚未配置完整。");
   }

@@ -91,6 +91,7 @@ export class OpenAIResponsesProvider implements TranslationProvider {
             ? payload.usage.input_tokens + payload.usage.output_tokens
             : null
         ),
+        warnings: [],
       };
     } catch (error) {
       if (error instanceof TranslationProviderRequestError) throw error;
