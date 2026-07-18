@@ -30,7 +30,6 @@ import { getAdminProduct, getAdminProductCategoryOptions } from "@/lib/repositor
 import { contentLocales, languageMarkers, languageNames } from "@/lib/site";
 import {
   updateProductCoreAction,
-  finalizeProductAssetUploadAction,
   updateProductStructuredContentAction,
   createProductStructuredTranslationJobAction,
   updateProductStructuredTranslationAction,
@@ -111,7 +110,6 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
   const saveStructuredAction = updateProductStructuredContentAction.bind(null, slug);
   const saveStructuredTranslationAction = updateProductStructuredTranslationAction.bind(null, slug);
   const translateStructuredAction = createProductStructuredTranslationJobAction.bind(null, slug);
-  const finalizeAssetAction = finalizeProductAssetUploadAction.bind(null, slug);
   const blobConfigured = Boolean(process.env.BLOB_READ_WRITE_TOKEN);
 
   const structuredTranslationSaved = feedback.saved?.startsWith("structured-") ?? false;
@@ -283,7 +281,6 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
         <CardContent className="pt-1">
           <ProductAssetUpload
             slug={slug}
-            finalizeAction={finalizeAssetAction}
             disabled={!databaseReady}
             blobConfigured={blobConfigured}
           />
@@ -327,6 +324,8 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
             action={saveStructuredAction}
             translationAction={translateStructuredAction}
             disabled={!databaseReady}
+            productSlug={slug}
+            serviceConfigured={blobConfigured}
             initial={{ media: product.media, features: product.features, specifications: product.specifications, applications: product.applications, downloads: product.downloads }}
             mediaRoleOptions={mediaRoleOptions}
             downloadKindOptions={downloadKindOptions}
@@ -440,7 +439,7 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
         <Alert className="mt-5 border-emerald-200 bg-emerald-50 text-emerald-800"><Save className="size-4" /><AlertTitle>{feedback.saved === "core" ? "产品基础信息已保存" : feedback.saved === "created" ? "新产品已创建" : feedback.saved === "upload" ? "文件已上传并关联" : feedback.saved === "structured" ? "产品结构化内容已保存" : "翻译已保存"}</AlertTitle><AlertDescription>{feedback.saved === "core" ? "产品列表、公开页面和缓存已刷新。" : feedback.saved === "created" ? "可以继续完善图片、规格、卖点、应用场景、下载资料和多语言 SEO。" : feedback.saved === "upload" ? "对象存储和产品媒体关系已更新。" : feedback.saved === "structured" ? "图库、规格、卖点、应用场景和下载资料已同步到公开产品页。" : `${savedLocale} 版本、SEO 字段和公开页面缓存已更新。`}</AlertDescription></Alert>
       ) : null}
       {feedback.error ? (
-        <Alert className="mt-5 border-amber-200 bg-amber-50 text-amber-900"><Database className="size-4" /><AlertTitle>修改未保存</AlertTitle><AlertDescription>{feedback.error === "database" ? "请先连接 PostgreSQL 并初始化产品目录。" : feedback.error === "core" ? "请检查 SKU、分类、状态和排序。" : feedback.error === "structured" ? "请检查结构化内容字段。" : feedback.error === "upload" ? "请检查文件类型、大小、Blob 配置和数据库连接。" : "请检查标题、摘要、SEO 字段和发布状态。"}</AlertDescription></Alert>
+        <Alert className="mt-5 border-amber-200 bg-amber-50 text-amber-900"><Database className="size-4" /><AlertTitle>修改未保存</AlertTitle><AlertDescription>{feedback.error === "database" ? "请先连接 PostgreSQL 并初始化产品目录。" : feedback.error === "core" ? "请检查 SKU、分类、状态和排序。" : feedback.error === "structured" ? "请检查结构化内容字段。" : feedback.error === "upload" ? "请检查文件类型、大小、媒体服务和数据库连接。" : "请检查标题、摘要、SEO 字段和发布状态。"}</AlertDescription></Alert>
       ) : null}
 
       <AdminProductTabs

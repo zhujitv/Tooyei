@@ -4,10 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { ContentStatus, Locale, MediaKind, ProductDownloadKind, ProductMediaRole, TranslationStatus } from "@/generated/prisma/client";
-import { getProductManagerSession, requireProductManagerSession, requireTranslationManagerSession } from "@/lib/admin-auth";
+import { requireProductManagerSession, requireTranslationManagerSession } from "@/lib/admin-auth";
 import { isDatabaseConfigured } from "@/lib/db";
-import { productAssetFinalizeSchema, type ProductAssetFinalizeInput } from "@/lib/product-asset-policy";
-import { persistProductAssetUpload } from "@/lib/product-asset-service";
 import { safeWriteAuditLog } from "@/lib/repositories/audit-logs";
 import {
   replaceProductStructuredContent,
@@ -109,10 +107,11 @@ const parseEnum = <T extends Record<string, string>>(values: T, value: string | 
 
 const parseMediaRows = (value: string): AdminProductMediaItem[] =>
   splitLines(value)
-    .map(([id, role, url, alt, caption, sortOrder, visible], index) => {
+    .map(([id, assetId, role, url, alt, caption, sortOrder, visible], index) => {
       const parsedRole = parseEnum(ProductMediaRole, role, index === 0 ? ProductMediaRole.PRIMARY : ProductMediaRole.GALLERY);
       return {
         id: id ?? "",
+        assetId: assetId ?? "",
         role: parsedRole,
         kind: parsedRole === ProductMediaRole.VIDEO ? MediaKind.VIDEO : MediaKind.IMAGE,
         url: url ?? "",
@@ -122,7 +121,7 @@ const parseMediaRows = (value: string): AdminProductMediaItem[] =>
         visible: parseVisible(visible),
       };
     })
-    .filter((item) => item.url);
+    .filter((item) => item.assetId);
 
 const parseFeatureRows = (value: string): AdminProductFeatureItem[] =>
   splitLines(value)
@@ -151,8 +150,9 @@ const parseSpecificationRows = (value: string): AdminProductSpecificationItem[] 
 
 const parseApplicationRows = (value: string): AdminProductApplicationItem[] =>
   splitLines(value)
-    .map(([id, title, description, imageUrl, imageAlt, sortOrder, visible], index) => ({
+    .map(([id, assetId, title, description, imageUrl, imageAlt, sortOrder, visible], index) => ({
       id: id ?? "",
+      assetId: assetId ?? "",
       title: title ?? "",
       description: description ?? "",
       imageUrl: imageUrl ?? "",
@@ -164,8 +164,9 @@ const parseApplicationRows = (value: string): AdminProductApplicationItem[] =>
 
 const parseDownloadRows = (value: string): AdminProductDownloadItem[] =>
   splitLines(value)
-    .map(([id, kind, title, url, description, sortOrder, visible], index) => ({
+    .map(([id, assetId, kind, title, url, description, sortOrder, visible], index) => ({
       id: id ?? "",
+      assetId: assetId ?? "",
       kind: parseEnum(ProductDownloadKind, kind, ProductDownloadKind.OTHER),
       title: title ?? "",
       url: url ?? "",
@@ -173,7 +174,7 @@ const parseDownloadRows = (value: string): AdminProductDownloadItem[] =>
       sortOrder: parseSortOrder(sortOrder, index),
       visible: parseVisible(visible),
     }))
-    .filter((item) => item.title && item.url);
+    .filter((item) => item.title && item.assetId);
 
 export async function updateProductCoreAction(slug: string, formData: FormData) {
   const session = await requireProductManagerSession();
@@ -398,32 +399,4 @@ export async function createProductStructuredTranslationJobAction(slug: string, 
     metadata: { productId: product.id, slug, mode, contentTypes: requestedTypes, totalItems: job.totalItems },
   });
   redirect(`/admin/translations/${job.id}?run=1`);
-}
-
-export type ProductAssetFinalizeActionResult = {
-  ok: boolean;
-  message: string;
-};
-
-export async function finalizeProductAssetUploadAction(
-  slug: string,
-  input: ProductAssetFinalizeInput,
-): Promise<ProductAssetFinalizeActionResult> {
-  const session = await getProductManagerSession();
-  if (!session) return { ok: false, message: "登录已过期或没有产品管理权限，请重新登录。" };
-  if (!isDatabaseConfigured()) return { ok: false, message: "数据库尚未配置，无法关联产品。" };
-  if (!process.env.BLOB_READ_WRITE_TOKEN) return { ok: false, message: "Vercel Blob 尚未配置。" };
-
-  const parsed = productAssetFinalizeSchema.safeParse(input);
-  if (!parsed.success || parsed.data.metadata.slug !== slug) {
-    return { ok: false, message: "上传文件信息校验失败。" };
-  }
-
-  try {
-    await persistProductAssetUpload(parsed.data, session.email);
-    return { ok: true, message: "文件已上传并关联到当前产品。" };
-  } catch (error) {
-    console.error("Product asset finalization failed", error instanceof Error ? error.message : error);
-    return { ok: false, message: error instanceof Error ? error.message : "文件关联失败，请重试。" };
-  }
 }

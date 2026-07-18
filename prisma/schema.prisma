@@ -76,6 +76,24 @@ enum MediaKind {
   DOCUMENT
 }
 
+enum AssetType {
+  IMAGE
+  VIDEO
+  DOCUMENT
+  CERTIFICATE
+  CATALOG
+  SPEC_SHEET
+  INSTALLATION_GUIDE
+  WARRANTY
+  OTHER
+}
+
+enum StorageProvider {
+  VERCEL_BLOB
+  EXTERNAL
+  LOCAL
+}
+
 enum ProductMediaRole {
   PRIMARY
   GALLERY
@@ -135,6 +153,8 @@ model Category {
   status       ContentStatus         @default(DRAFT)
   isActive     Boolean               @default(true)
   coverImage   String?
+  coverAssetId String?
+  coverAsset   MediaAsset?           @relation("CategoryCoverAsset", fields: [coverAssetId], references: [id], onDelete: SetNull)
   sortOrder    Int                   @default(0)
   parentId     String?
   parent       Category?             @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
@@ -148,6 +168,7 @@ model Category {
   @@index([isActive, sortOrder])
   @@index([status, sortOrder])
   @@index([parentId])
+  @@index([coverAssetId])
 }
 
 model CategoryTranslation {
@@ -390,20 +411,34 @@ model ProductSpecificationTranslation {
 model MediaAsset {
   id          String         @id @default(cuid())
   kind        MediaKind      @default(IMAGE)
+  assetType   AssetType      @default(OTHER)
   pathname    String         @unique
   url         String
+  originalFilename String?
   alt         String?
   mimeType    String
   width       Int?
   height      Int?
   sizeBytes   Int?
   checksum    String?
+  storageProvider StorageProvider @default(EXTERNAL)
+  uploadedAt  DateTime?
+  orphanedAt  DateTime?
+  deletedAt   DateTime?
+  blobDeletedAt DateTime?
+  uploadedById String?
+  uploadedBy  AdminUser?     @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
   products    ProductMedia[]
   primaryFor  Product[]      @relation("ProductPrimaryImage")
   applications ProductApplication[] @relation("ProductApplicationImage")
   downloads   ProductDownload[] @relation("ProductDownloadAsset")
+  categoryCovers Category[]  @relation("CategoryCoverAsset")
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
+
+  @@index([assetType, createdAt])
+  @@index([storageProvider, orphanedAt, deletedAt])
+  @@index([uploadedById, createdAt])
 }
 
 model ProductMedia {
@@ -639,6 +674,7 @@ model AdminUser {
   sessions     AdminSession[]
   auditLogs    AuditLog[]
   translationJobs ProductTranslationJob[]
+  uploadedAssets MediaAsset[]
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
 }

@@ -24,6 +24,7 @@ export const categoryMutationSchema = z
     kind: z.enum(ProductKind),
     isActive: z.boolean(),
     coverImage: coverImageSchema,
+    coverAssetId: z.string().trim().min(1).nullable().optional(),
     sortOrder: z.coerce.number().int().min(0).max(999999),
     translations: z.object({
       en: translationSchema,

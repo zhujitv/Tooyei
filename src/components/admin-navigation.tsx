@@ -8,6 +8,7 @@ import {
   FolderTree,
   LayoutDashboard,
   Languages,
+  Images,
   LogOut,
   Menu,
   MessageSquare,
@@ -32,6 +33,7 @@ const navItems = [
   { href: "/admin/products", label: "产品", icon: Package },
   { href: "/admin/translations", label: "翻译中心", icon: Languages },
   { href: "/admin/categories", label: "产品栏目", icon: FolderTree },
+  { href: "/admin/media", label: "媒体中心", icon: Images },
   { href: "/admin/inquiries", label: "询盘", icon: MessageSquare },
   { href: "/admin/users", label: "团队与权限", icon: Users },
 ] as const;

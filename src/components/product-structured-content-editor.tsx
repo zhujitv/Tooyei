@@ -3,11 +3,13 @@
 import { useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, FileText, GripVertical, Grid2X2, ImageIcon, Layers3, ListPlus, Plus, Save, Sparkles, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { FileUploader, ImageUploader, MediaUploader } from "@/components/media-uploader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { contentLocales, languageNames, type ContentLocale } from "@/lib/site";
+import type { MediaAssetOption } from "@/lib/media-asset-types";
 
 type MediaTranslations = Partial<Record<ContentLocale, { alt: string; caption: string }>>;
 type FeatureTranslations = Partial<Record<ContentLocale, { title: string; description: string }>>;
@@ -29,6 +31,7 @@ type MediaRow = {
   caption: string;
   sortOrder: number;
   visible: boolean;
+  asset?: MediaAssetOption | null;
   translations?: MediaTranslations;
 };
 
@@ -64,6 +67,7 @@ type ApplicationRow = {
   imageAlt: string;
   sortOrder: number;
   visible: boolean;
+  asset?: MediaAssetOption | null;
   translations?: ApplicationTranslations;
 };
 
@@ -76,6 +80,7 @@ type DownloadRow = {
   url: string;
   sortOrder: number;
   visible: boolean;
+  asset?: MediaAssetOption | null;
   translations?: DownloadTranslations;
 };
 
@@ -83,6 +88,8 @@ type Props = {
   action: (formData: FormData) => Promise<void>;
   translationAction?: (formData: FormData) => Promise<void>;
   disabled?: boolean;
+  productSlug: string;
+  serviceConfigured?: boolean;
   initial: {
     media: Array<Omit<MediaRow, "databaseId">>;
     features: Array<Omit<FeatureRow, "databaseId">>;
@@ -112,6 +119,7 @@ const emptyMediaRow = (sortOrder: number): Omit<MediaRow, "id"> => ({
   caption: "",
   sortOrder,
   visible: true,
+  asset: null,
 });
 
 const emptyFeatureRow = (sortOrder: number): Omit<FeatureRow, "id"> => ({
@@ -141,6 +149,7 @@ const emptyApplicationRow = (sortOrder: number): Omit<ApplicationRow, "id"> => (
   imageAlt: "",
   sortOrder,
   visible: true,
+  asset: null,
 });
 
 const emptyDownloadRow = (sortOrder: number): Omit<DownloadRow, "id"> => ({
@@ -151,13 +160,14 @@ const emptyDownloadRow = (sortOrder: number): Omit<DownloadRow, "id"> => ({
   url: "",
   sortOrder,
   visible: true,
+  asset: null,
 });
 
 const serializeMedia = (rows: MediaRow[]) =>
   rows
     .filter((row) => row.url.trim())
     .map((row) =>
-      [row.databaseId, row.role, row.url, row.alt, row.caption, row.sortOrder, visibleLabel(row.visible)].map(safeCell).join(" | "),
+      [row.databaseId, row.asset?.id ?? "", row.role, row.url, row.alt, row.caption, row.sortOrder, visibleLabel(row.visible)].map(safeCell).join(" | "),
     )
     .join("\n");
 
@@ -181,7 +191,7 @@ const serializeApplications = (rows: ApplicationRow[]) =>
   rows
     .filter((row) => row.title.trim())
     .map((row) =>
-      [row.databaseId, row.title, row.description, row.imageUrl, row.imageAlt, row.sortOrder, visibleLabel(row.visible)]
+      [row.databaseId, row.asset?.id ?? "", row.title, row.description, row.imageUrl, row.imageAlt, row.sortOrder, visibleLabel(row.visible)]
         .map(safeCell)
         .join(" | "),
     )
@@ -191,13 +201,22 @@ const serializeDownloads = (rows: DownloadRow[]) =>
   rows
     .filter((row) => row.title.trim() && row.url.trim())
     .map((row) =>
-      [row.databaseId, row.kind, row.title, row.url, row.description, row.sortOrder, visibleLabel(row.visible)].map(safeCell).join(" | "),
+      [row.databaseId, row.asset?.id ?? "", row.kind, row.title, row.url, row.description, row.sortOrder, visibleLabel(row.visible)].map(safeCell).join(" | "),
     )
     .join("\n");
 
 const metricClass = "rounded-xl border border-[#E5E7EB] bg-white px-4 py-3 shadow-sm";
 const rowClass = "rounded-xl border border-[#E5E7EB] bg-white p-4 shadow-sm";
 const sectionClass = "space-y-4 rounded-xl border border-[#E5E7EB] bg-[#F8FAFC] p-5";
+
+const downloadAssetType = (kind: string) => {
+  if (kind === "CATALOG") return "CATALOG" as const;
+  if (kind === "SPEC_SHEET") return "SPEC_SHEET" as const;
+  if (kind === "INSTALLATION_GUIDE") return "INSTALLATION_GUIDE" as const;
+  if (kind === "WARRANTY") return "WARRANTY" as const;
+  if (kind === "CERTIFICATE") return "CERTIFICATE" as const;
+  return "DOCUMENT" as const;
+};
 
 const completionForLocale = <T extends { translations?: Partial<Record<ContentLocale, unknown>> }>(
   rows: T[],
@@ -305,6 +324,8 @@ export function ProductStructuredContentEditor({
   action,
   translationAction,
   disabled = false,
+  productSlug,
+  serviceConfigured = true,
   initial,
   mediaRoleOptions,
   downloadKindOptions,
@@ -416,39 +437,34 @@ export function ProductStructuredContentEditor({
                 <div className="flex items-center gap-1">
                   <Button type="button" size="icon" variant="ghost" disabled={disabled || index === 0} aria-label="上移媒体" onClick={() => setMedia((rows) => reorder(rows, row.id, rows[index - 1]?.id ?? row.id))}><ArrowUp /></Button>
                   <Button type="button" size="icon" variant="ghost" disabled={disabled || index === media.length - 1} aria-label="下移媒体" onClick={() => setMedia((rows) => reorder(rows, row.id, rows[index + 1]?.id ?? row.id))}><ArrowDown /></Button>
-                  <Button type="button" variant="ghost" size="icon" disabled={disabled || media.length <= 1} onClick={() => setMedia((rows) => rows.filter((item) => item.id !== row.id))} aria-label={`删除第 ${index + 1} 张媒体`} className="text-zinc-500 hover:bg-rose-500/15 hover:text-rose-200"><Trash2 /></Button>
+                  <Button type="button" variant="ghost" size="icon" disabled={disabled || media.length <= 1} onClick={() => { if (window.confirm("确认解除该媒体与当前产品的关联？文件仍会保留在媒体中心。")) setMedia((rows) => rows.filter((item) => item.id !== row.id)); }} aria-label={`删除第 ${index + 1} 张媒体`} className="text-zinc-500 hover:bg-rose-500/15 hover:text-rose-200"><Trash2 /></Button>
                 </div>
               </div>
-              <div className="grid gap-3 sm:grid-cols-[160px_1fr]">
-                <div className="aspect-[4/3] overflow-hidden rounded-lg border border-white/[0.08] bg-[#151517]">
-                  {row.url ? <div role="img" aria-label={row.alt || `媒体 ${index + 1} 预览`} className="size-full bg-cover bg-center" style={{ backgroundImage: `url(${JSON.stringify(row.url)})` }} /> : <div className="grid size-full place-items-center"><ImageIcon className="size-7 text-zinc-700" /></div>}
-                </div>
-                <div className="space-y-3">
-                  <select
-                    aria-label={`媒体 ${index + 1} 类型`}
-                    value={row.role}
-                    disabled={disabled}
-                    onChange={(event) =>
-                      setMedia((rows) => rows.map((item) => (item.id === row.id ? { ...item, role: event.target.value } : item)))
-                    }
-                    className="h-9 w-full rounded-lg admin-field px-3 text-sm disabled:opacity-60"
-                  >
-                    {mediaRoleOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                  <Input
-                    value={row.url}
-                    disabled={disabled}
-                    placeholder="/media/product.jpg 或 https://..."
-                    onChange={(event) =>
-                      setMedia((rows) => rows.map((item) => (item.id === row.id ? { ...item, url: event.target.value } : item)))
-                    }
-                    className="admin-field disabled:opacity-60"
-                  />
-                </div>
+              <div className="space-y-3">
+                <select
+                  aria-label={`媒体 ${index + 1} 类型`}
+                  value={row.role}
+                  disabled={disabled}
+                  onChange={(event) => setMedia((rows) => rows.map((item) => (item.id === row.id ? { ...item, role: event.target.value } : item)))}
+                  className="admin-select w-full px-3"
+                >
+                  {mediaRoleOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
+                <MediaUploader
+                  value={row.asset}
+                  legacyUrl={row.url}
+                  target="PRODUCT_STRUCTURED"
+                  assetType={row.role === "VIDEO" ? "VIDEO" : "IMAGE"}
+                  productSlug={productSlug}
+                  role={row.role as "PRIMARY" | "GALLERY" | "DETAIL" | "APPLICATION" | "PACKAGING" | "VIDEO"}
+                  alt={row.alt}
+                  caption={row.caption}
+                  accept={row.role === "VIDEO" ? "video" : "image"}
+                  disabled={disabled}
+                  serviceConfigured={serviceConfigured}
+                  compact
+                  onChange={(asset) => setMedia((rows) => rows.map((item) => item.id === row.id ? { ...item, asset, url: asset?.url ?? "" } : item))}
+                />
               </div>
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
@@ -718,9 +734,18 @@ export function ProductStructuredContentEditor({
           {applications.map((row, index) => (
             <div key={row.id} className={rowClass}>
               <div className="grid gap-3">
-                <div className="aspect-[16/7] overflow-hidden rounded-lg border border-white/[0.08] bg-[#151517]">
-                  {row.imageUrl ? <div role="img" aria-label={row.imageAlt || `应用场景 ${index + 1} 预览`} className="size-full bg-cover bg-center" style={{ backgroundImage: `url(${JSON.stringify(row.imageUrl)})` }} /> : <div className="grid size-full place-items-center"><ImageIcon className="size-7 text-zinc-700" /></div>}
-                </div>
+                <ImageUploader
+                  value={row.asset}
+                  legacyUrl={row.imageUrl}
+                  target="PRODUCT_APPLICATION"
+                  assetType="IMAGE"
+                  productSlug={productSlug}
+                  alt={row.imageAlt}
+                  disabled={disabled}
+                  serviceConfigured={serviceConfigured}
+                  compact
+                  onChange={(asset) => setApplications((rows) => rows.map((item) => item.id === row.id ? { ...item, asset, imageUrl: asset?.url ?? "" } : item))}
+                />
                 <Input
                   value={row.title}
                   disabled={disabled}
@@ -743,22 +768,11 @@ export function ProductStructuredContentEditor({
                   }
                   className="min-h-20 admin-field disabled:opacity-60"
                 />
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <Input
-                    value={row.imageUrl}
-                    disabled={disabled}
-                    placeholder="场景图片 URL"
-                    onChange={(event) =>
-                      setApplications((rows) =>
-                        rows.map((item) => (item.id === row.id ? { ...item, imageUrl: event.target.value } : item)),
-                      )
-                    }
-                    className="admin-field disabled:opacity-60"
-                  />
+                <div className="grid gap-3">
                   <Input
                     value={row.imageAlt}
                     disabled={disabled}
-                    placeholder="图片 ALT"
+                    placeholder="图片 ALT（替换图片时不会清空）"
                     onChange={(event) =>
                       setApplications((rows) =>
                         rows.map((item) => (item.id === row.id ? { ...item, imageAlt: event.target.value } : item)),
@@ -797,7 +811,7 @@ export function ProductStructuredContentEditor({
                     variant="ghost"
                     size="sm"
                     disabled={disabled || applications.length <= 1}
-                    onClick={() => setApplications((rows) => rows.filter((item) => item.id !== row.id))}
+                    onClick={() => { if (window.confirm("确认删除该应用场景？关联图片仍会保留在媒体中心。")) setApplications((rows) => rows.filter((item) => item.id !== row.id)); }}
                     className="text-zinc-500 hover:bg-rose-500/15 hover:text-rose-200"
                   >
                     <Trash2 />
@@ -823,12 +837,12 @@ export function ProductStructuredContentEditor({
       </section>
 
       <section className={sectionClass}>
-        <SectionHeader icon={FileText} title="下载资料" description="上传或填写产品目录、规格表、安装指南、质保和证书。" count={downloads.length} />
+        <SectionHeader icon={FileText} title="下载资料" description="直接上传产品目录、规格表、安装指南、质保和证书，不再填写文件地址。" count={downloads.length} />
         <LanguageCompletion rows={downloads.filter((row) => row.title.trim() && row.url.trim())} fields={[{ key: "title", required: () => true }]} />
         <div className="space-y-3">
           {downloads.map((row, index) => (
             <div key={row.id} className={rowClass}>
-              <div className="grid gap-3 lg:grid-cols-[150px_1fr_1.2fr_1fr_90px_auto_auto] lg:items-end">
+              <div className="grid gap-3 lg:grid-cols-[150px_1fr_1fr_90px_auto_auto] lg:items-end">
                 <select
                   value={row.kind}
                   disabled={disabled}
@@ -849,15 +863,6 @@ export function ProductStructuredContentEditor({
                   placeholder="资料标题"
                   onChange={(event) =>
                     setDownloads((rows) => rows.map((item) => (item.id === row.id ? { ...item, title: event.target.value } : item)))
-                  }
-                  className="admin-field disabled:opacity-60"
-                />
-                <Input
-                  value={row.url}
-                  disabled={disabled}
-                  placeholder="/downloads/file.pdf 或 https://..."
-                  onChange={(event) =>
-                    setDownloads((rows) => rows.map((item) => (item.id === row.id ? { ...item, url: event.target.value } : item)))
                   }
                   className="admin-field disabled:opacity-60"
                 />
@@ -899,12 +904,27 @@ export function ProductStructuredContentEditor({
                   variant="ghost"
                   size="icon"
                   disabled={disabled || downloads.length <= 1}
-                  onClick={() => setDownloads((rows) => rows.filter((item) => item.id !== row.id))}
+                  onClick={() => { if (window.confirm("确认解除该资料与当前产品的关联？文件仍会保留在媒体中心。")) setDownloads((rows) => rows.filter((item) => item.id !== row.id)); }}
                   aria-label={`删除第 ${index + 1} 条资料`}
                   className="text-zinc-500 hover:bg-rose-500/15 hover:text-rose-200"
                 >
                   <Trash2 />
                 </Button>
+              </div>
+              <div className="mt-3">
+                <FileUploader
+                  value={row.asset}
+                  legacyUrl={row.url}
+                  target="PRODUCT_STRUCTURED"
+                  assetType={downloadAssetType(row.kind)}
+                  productSlug={productSlug}
+                  downloadKind={row.kind as "CATALOG" | "SPEC_SHEET" | "INSTALLATION_GUIDE" | "WARRANTY" | "CERTIFICATE" | "OTHER"}
+                  title={row.title}
+                  disabled={disabled}
+                  serviceConfigured={serviceConfigured}
+                  compact
+                  onChange={(asset) => setDownloads((rows) => rows.map((item) => item.id === row.id ? { ...item, asset, url: asset?.url ?? "" } : item))}
+                />
               </div>
             </div>
           ))}

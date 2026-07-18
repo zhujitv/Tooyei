@@ -3,12 +3,14 @@ import "server-only";
 import {
   ContentStatus,
   Locale as DatabaseLocale,
+  MediaKind,
   ProductKind,
   TranslationStatus,
   type Prisma,
 } from "@/generated/prisma/client";
 import { products as sampleProducts } from "@/lib/content";
 import { getPrisma, isDatabaseConfigured } from "@/lib/db";
+import type { MediaAssetOption } from "@/lib/media-asset-types";
 import { contentLocales, type ContentLocale, type Locale } from "@/lib/site";
 
 const localeMap: Record<Locale, DatabaseLocale> = {
@@ -72,6 +74,7 @@ export type AdminCategoryNode = {
   kind: ProductKind;
   isActive: boolean;
   coverImage: string;
+  coverAsset: MediaAssetOption | null;
   sortOrder: number;
   productCount: number;
   childCount: number;
@@ -88,6 +91,7 @@ export type CategoryMutationInput = {
   kind: ProductKind;
   isActive: boolean;
   coverImage?: string | null;
+  coverAssetId?: string | null;
   sortOrder: number;
   translations: Record<ContentLocale, CategoryTranslationFields>;
 };
@@ -202,7 +206,7 @@ export async function getPublicCategoryTree(locale: Locale): Promise<PublicCateg
 
   const records = await getPrisma().category.findMany({
     where: publicCategoryWhere,
-    include: { translations: true },
+    include: { translations: true, coverAsset: true },
     orderBy: [{ sortOrder: "asc" }, { slug: "asc" }],
   });
 
@@ -211,7 +215,7 @@ export async function getPublicCategoryTree(locale: Locale): Promise<PublicCateg
     parentId: record.parentId,
     slug: record.slug,
     ...localizedTranslation(record.translations, locale, record.slug),
-    coverImage: record.coverImage,
+    coverImage: record.coverAsset?.url ?? record.coverImage,
     sortOrder: record.sortOrder,
     children: [],
   }));
@@ -224,10 +228,11 @@ export async function getPublicCategoryBySlug(slug: string, locale: Locale): Pro
     where: { slug, ...publicCategoryWhere },
     include: {
       translations: true,
+      coverAsset: true,
       parent: { include: { translations: true } },
       children: {
         where: { isActive: true, status: { not: ContentStatus.ARCHIVED } },
-        include: { translations: true },
+        include: { translations: true, coverAsset: true },
         orderBy: [{ sortOrder: "asc" }, { slug: "asc" }],
       },
     },
@@ -239,7 +244,7 @@ export async function getPublicCategoryBySlug(slug: string, locale: Locale): Pro
     parentId: record.parentId,
     slug: record.slug,
     ...localizedTranslation(record.translations, locale, record.slug),
-    coverImage: record.coverImage,
+    coverImage: record.coverAsset?.url ?? record.coverImage,
     sortOrder: record.sortOrder,
     parent: record.parent
       ? { slug: record.parent.slug, name: localizedTranslation(record.parent.translations, locale, record.parent.slug).name }
@@ -249,7 +254,7 @@ export async function getPublicCategoryBySlug(slug: string, locale: Locale): Pro
       parentId: child.parentId,
       slug: child.slug,
       ...localizedTranslation(child.translations, locale, child.slug),
-      coverImage: child.coverImage,
+      coverImage: child.coverAsset?.url ?? child.coverImage,
       sortOrder: child.sortOrder,
       children: [],
     })),
@@ -269,6 +274,7 @@ export async function getPublicCategorySlugs(): Promise<string[]> {
 type AdminCategoryRecord = Prisma.CategoryGetPayload<{
   include: {
     translations: true;
+    coverAsset: true;
     _count: { select: { children: true; products: true; productAssignments: true } };
   };
 }>;
@@ -283,7 +289,24 @@ const buildAdminTree = (records: AdminCategoryRecord[]) => {
       slug: record.slug,
       kind: record.kind,
       isActive: record.isActive,
-      coverImage: record.coverImage ?? "",
+      coverImage: record.coverAsset?.url ?? record.coverImage ?? "",
+      coverAsset: record.coverAsset ? {
+        id: record.coverAsset.id,
+        url: record.coverAsset.url,
+        pathname: record.coverAsset.pathname,
+        filename: record.coverAsset.originalFilename || record.coverAsset.pathname.split("/").pop() || "未命名资源",
+        mimeType: record.coverAsset.mimeType,
+        sizeBytes: record.coverAsset.sizeBytes,
+        width: record.coverAsset.width,
+        height: record.coverAsset.height,
+        assetType: record.coverAsset.assetType,
+        storageProvider: record.coverAsset.storageProvider,
+        uploadedAt: record.coverAsset.uploadedAt?.toISOString() ?? null,
+        createdAt: record.coverAsset.createdAt.toISOString(),
+        orphaned: false,
+        referenceCount: 1,
+        references: [],
+      } : null,
       sortOrder: record.sortOrder,
       productCount: Math.max(record._count.products, record._count.productAssignments),
       childCount: record._count.children,
@@ -322,6 +345,7 @@ export async function getAdminCategoryTree(): Promise<AdminCategoryNode[]> {
       kind: ProductKind[category.slug.toUpperCase() as keyof typeof ProductKind] ?? ProductKind.SPC,
       isActive: true,
       coverImage: category.coverImage ?? "",
+      coverAsset: null,
       sortOrder: category.sortOrder,
       productCount: sampleProducts.filter((product) => product.category.toLowerCase() === category.slug).length,
       childCount: 0,
@@ -338,6 +362,7 @@ export async function getAdminCategoryTree(): Promise<AdminCategoryNode[]> {
   const records = await getPrisma().category.findMany({
     include: {
       translations: true,
+      coverAsset: true,
       _count: { select: { children: true, products: true, productAssignments: true } },
     },
     orderBy: [{ sortOrder: "asc" }, { slug: "asc" }],
@@ -383,6 +408,16 @@ const translationWrites = (input: CategoryMutationInput) =>
       publishedAt: new Date(),
     }));
 
+const requireCoverAsset = async (tx: Prisma.TransactionClient, assetId: string) => {
+  await tx.$queryRaw`SELECT "id" FROM "MediaAsset" WHERE "id" = ${assetId} FOR UPDATE`;
+  const asset = await tx.mediaAsset.findFirst({ where: { id: assetId, deletedAt: null } });
+  if (!asset) throw new Error("选择的栏目封面资源不存在、已删除或不可用。");
+  if (asset.kind !== MediaKind.IMAGE || !asset.mimeType.startsWith("image/")) {
+    throw new Error("栏目封面只能关联图片资源。");
+  }
+  return asset;
+};
+
 export async function createCategory(input: CategoryMutationInput) {
   requireDatabase();
   assertRequiredTranslations(input);
@@ -393,18 +428,27 @@ export async function createCategory(input: CategoryMutationInput) {
   const conflictingProduct = await getPrisma().product.findUnique({ where: { slug }, select: { id: true } });
   if (conflictingProduct) throw new Error("该 Slug 已被产品使用，请使用其他 Slug，避免前台链接冲突。");
 
-  return getPrisma().category.create({
-    data: {
-      parentId: parent?.id ?? null,
-      slug,
-      kind: parent?.kind ?? input.kind,
-      status: input.isActive ? ContentStatus.PUBLISHED : ContentStatus.DRAFT,
-      isActive: input.isActive,
-      coverImage: input.coverImage?.trim() || null,
-      sortOrder: input.sortOrder,
-      translations: { create: translationWrites(input) },
-    },
-    select: { id: true, slug: true },
+  return getPrisma().$transaction(async (tx) => {
+    if (!input.coverAssetId && input.coverImage?.trim()) {
+      throw new Error("新栏目封面必须从媒体中心选择或上传。");
+    }
+    const coverAsset = input.coverAssetId ? await requireCoverAsset(tx, input.coverAssetId) : null;
+    const category = await tx.category.create({
+      data: {
+        parentId: parent?.id ?? null,
+        slug,
+        kind: parent?.kind ?? input.kind,
+        status: input.isActive ? ContentStatus.PUBLISHED : ContentStatus.DRAFT,
+        isActive: input.isActive,
+        coverImage: coverAsset?.url ?? null,
+        coverAssetId: coverAsset?.id ?? null,
+        sortOrder: input.sortOrder,
+        translations: { create: translationWrites(input) },
+      },
+      select: { id: true, slug: true },
+    });
+    if (coverAsset) await tx.mediaAsset.update({ where: { id: coverAsset.id }, data: { orphanedAt: null } });
+    return category;
   });
 }
 
@@ -414,7 +458,7 @@ export async function updateCategory(categoryId: string, input: CategoryMutation
   const prisma = getPrisma();
   const current = await prisma.category.findUnique({
     where: { id: categoryId },
-    select: { id: true, children: { select: { id: true }, take: 1 } },
+    select: { id: true, coverImage: true, children: { select: { id: true }, take: 1 } },
   });
   if (!current) throw new Error("栏目不存在或已被删除。");
 
@@ -434,6 +478,11 @@ export async function updateCategory(categoryId: string, input: CategoryMutation
 
   const writes = translationWrites(input);
   return prisma.$transaction(async (tx) => {
+    if (!input.coverAssetId && input.coverImage?.trim() && input.coverImage.trim() !== current.coverImage) {
+      throw new Error("栏目封面必须从媒体中心选择或上传；历史地址只能原样保留。");
+    }
+    const coverAsset = input.coverAssetId ? await requireCoverAsset(tx, input.coverAssetId) : null;
+    const coverImage = coverAsset?.url ?? (input.coverImage?.trim() || null);
     await tx.category.update({
       where: { id: categoryId },
       data: {
@@ -442,7 +491,8 @@ export async function updateCategory(categoryId: string, input: CategoryMutation
         kind: parent?.kind ?? input.kind,
         status: input.isActive ? ContentStatus.PUBLISHED : ContentStatus.DRAFT,
         isActive: input.isActive,
-        coverImage: input.coverImage?.trim() || null,
+        coverImage,
+        coverAssetId: coverAsset?.id ?? null,
         sortOrder: input.sortOrder,
       },
     });
@@ -459,6 +509,8 @@ export async function updateCategory(categoryId: string, input: CategoryMutation
         await tx.categoryTranslation.deleteMany({ where: { categoryId, locale: localeMap[locale] } });
       }
     }
+
+    if (coverAsset) await tx.mediaAsset.update({ where: { id: coverAsset.id }, data: { orphanedAt: null } });
 
     return { id: categoryId, slug };
   });

@@ -156,7 +156,7 @@ export function ProductStructuredTranslationEditor({ action, disabled = false, i
             const target = active.media.find(({ id }) => id === item.id)!;
             const source = chinese.media.find(({ id }) => id === item.id)!;
             return <div key={item.id} className={rowClass}>
-              <div className={sourceClass}><p className="font-medium text-zinc-400">媒体 {index + 1} · {item.role}</p><p className="mt-1 truncate">{item.url}</p><p className="mt-2">中文 ALT：{source.alt || "—"}</p></div>
+              <div className={sourceClass}><p className="font-medium text-zinc-400">媒体 {index + 1} · {item.role}</p><p className="mt-1 truncate">{item.asset?.filename || "历史媒体资源"}</p><p className="mt-2">中文 ALT：{source.alt || "—"}</p></div>
               <div className="grid gap-3 sm:grid-cols-2"><div className="space-y-1.5"><Label>ALT</Label><Input aria-label={`媒体 ${index + 1} ${languageNames[activeLocale]} ALT`} value={target.alt} maxLength={240} disabled={disabled} onChange={(event) => updateRow("media", item.id, "alt", event.target.value)} className="admin-field" /></div><div className="space-y-1.5"><Label>图片说明</Label><Input aria-label={`媒体 ${index + 1} ${languageNames[activeLocale]}说明`} value={target.caption} maxLength={500} disabled={disabled} onChange={(event) => updateRow("media", item.id, "caption", event.target.value)} className="admin-field" /></div></div>
             </div>;
           })}
@@ -202,7 +202,7 @@ export function ProductStructuredTranslationEditor({ action, disabled = false, i
           {initial.downloads.map((item, index) => {
             const target = active.downloads.find(({ id }) => id === item.id)!;
             const source = chinese.downloads.find(({ id }) => id === item.id)!;
-            return <div key={item.id} className={rowClass}><div className={sourceClass}><p className="font-medium text-zinc-400">资料 {index + 1} · {item.kind}</p><p className="mt-2">{source.title || "—"}</p><p className="mt-1 truncate text-zinc-600">{item.url}</p></div><div className="space-y-3"><Input aria-label={`资料 ${index + 1} ${languageNames[activeLocale]}标题`} value={target.title} maxLength={180} placeholder="资料标题" disabled={disabled} onChange={(event) => updateRow("downloads", item.id, "title", event.target.value)} className="admin-field" /><Textarea aria-label={`资料 ${index + 1} ${languageNames[activeLocale]}说明`} value={target.description} maxLength={1200} placeholder="资料说明" disabled={disabled} onChange={(event) => updateRow("downloads", item.id, "description", event.target.value)} className="min-h-20 admin-field" /></div></div>;
+            return <div key={item.id} className={rowClass}><div className={sourceClass}><p className="font-medium text-zinc-400">资料 {index + 1} · {item.kind}</p><p className="mt-2">{source.title || "—"}</p><p className="mt-1 truncate text-zinc-600">{item.asset?.filename || "历史文件资源"}</p></div><div className="space-y-3"><Input aria-label={`资料 ${index + 1} ${languageNames[activeLocale]}标题`} value={target.title} maxLength={180} placeholder="资料标题" disabled={disabled} onChange={(event) => updateRow("downloads", item.id, "title", event.target.value)} className="admin-field" /><Textarea aria-label={`资料 ${index + 1} ${languageNames[activeLocale]}说明`} value={target.description} maxLength={1200} placeholder="资料说明" disabled={disabled} onChange={(event) => updateRow("downloads", item.id, "description", event.target.value)} className="min-h-20 admin-field" /></div></div>;
           })}
         </section>
       ) : null}

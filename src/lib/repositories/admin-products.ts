@@ -10,6 +10,7 @@ import {
 } from "@/generated/prisma/client";
 import { products as sampleProducts, readLocalizedText } from "@/lib/content";
 import { getPrisma, isDatabaseConfigured } from "@/lib/db";
+import type { MediaAssetOption } from "@/lib/media-asset-types";
 import { contentLocales, type ContentLocale } from "@/lib/site";
 
 export type AdminProductSummary = {
@@ -54,6 +55,7 @@ export type AdminStructuredTranslationMap<T> = Record<ContentLocale, T>;
 
 export type AdminProductMediaItem = {
   id: string;
+  assetId?: string;
   role: ProductMediaRole;
   kind: MediaKind;
   url: string;
@@ -61,6 +63,7 @@ export type AdminProductMediaItem = {
   caption: string;
   sortOrder: number;
   visible: boolean;
+  asset?: MediaAssetOption | null;
   translations?: AdminStructuredTranslationMap<{ alt: string; caption: string }>;
 };
 
@@ -87,23 +90,27 @@ export type AdminProductSpecificationItem = {
 
 export type AdminProductApplicationItem = {
   id: string;
+  assetId?: string;
   title: string;
   description: string;
   imageUrl: string;
   imageAlt: string;
   sortOrder: number;
   visible: boolean;
+  asset?: MediaAssetOption | null;
   translations?: AdminStructuredTranslationMap<{ title: string; description: string; imageAlt: string }>;
 };
 
 export type AdminProductDownloadItem = {
   id: string;
+  assetId?: string;
   kind: ProductDownloadKind;
   title: string;
   description: string;
   url: string;
   sortOrder: number;
   visible: boolean;
+  asset?: MediaAssetOption | null;
   translations?: AdminStructuredTranslationMap<{ title: string; description: string }>;
 };
 
@@ -239,6 +246,7 @@ export type UpdateProductStructuredTranslationsInput = {
 };
 
 export type AttachUploadedProductAssetInput = {
+  assetId: string;
   slug: string;
   pathname: string;
   url: string;
@@ -278,21 +286,6 @@ const structuredTranslationMap = <T extends { locale: DatabaseLocale }, R>(
 
 const sampleDate = new Date(0);
 
-const mediaMimeType = (url: string, kind: MediaKind) => {
-  const pathname = url.split("?")[0]?.toLowerCase() ?? "";
-  if (kind === MediaKind.VIDEO) return pathname.endsWith(".webm") ? "video/webm" : "video/mp4";
-  if (kind === MediaKind.DOCUMENT) {
-    if (pathname.endsWith(".xlsx")) return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-    if (pathname.endsWith(".docx")) return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-    return "application/pdf";
-  }
-  if (pathname.endsWith(".png")) return "image/png";
-  if (pathname.endsWith(".webp")) return "image/webp";
-  return "image/jpeg";
-};
-
-const normalizePathname = (url: string) => url.trim();
-
 const truncateSeoText = (value: string, maxLength: number) => {
   const characters = Array.from(value.trim());
   return characters.length <= maxLength ? characters.join("") : `${characters.slice(0, maxLength - 1).join("")}…`;
@@ -303,19 +296,6 @@ const seoTitleFor = (seoTitle: string | null | undefined, title: string) =>
 
 const seoDescriptionFor = (seoDescription: string | null | undefined, summary: string) =>
   truncateSeoText(seoDescription?.trim() || summary, 180);
-
-const isAllowedAssetUrl = (url: string) => {
-  const value = url.trim();
-  if (!value) return false;
-  if (value.startsWith("/")) return !value.startsWith("//");
-
-  try {
-    const parsed = new URL(value);
-    return parsed.protocol === "https:" || parsed.protocol === "http:";
-  } catch {
-    return false;
-  }
-};
 
 const mediaKindForRole = (role: ProductMediaRole) => (role === ProductMediaRole.VIDEO ? MediaKind.VIDEO : MediaKind.IMAGE);
 
@@ -582,6 +562,23 @@ const toSummary = (product: AdminProductRecord): AdminProductSummary => {
 };
 
 const toEditableProduct = (product: AdminEditableProductRecord): AdminEditableProduct => {
+  const assetOption = (asset: AdminEditableProductRecord["media"][number]["asset"]): MediaAssetOption => ({
+    id: asset.id,
+    url: asset.url,
+    pathname: asset.pathname,
+    filename: asset.originalFilename || asset.pathname.split("/").pop() || "未命名资源",
+    mimeType: asset.mimeType,
+    sizeBytes: asset.sizeBytes,
+    width: asset.width,
+    height: asset.height,
+    assetType: asset.assetType,
+    storageProvider: asset.storageProvider,
+    uploadedAt: asset.uploadedAt?.toISOString() ?? null,
+    createdAt: asset.createdAt.toISOString(),
+    orphaned: false,
+    referenceCount: 1,
+    references: [],
+  });
   const media = product.media.map(({ asset, role, alt, caption, sortOrder, translations, visible }) => {
     const translation = zhTranslation(translations);
     return {
@@ -593,6 +590,7 @@ const toEditableProduct = (product: AdminEditableProductRecord): AdminEditablePr
       caption: translation?.caption ?? caption ?? "",
       sortOrder,
       visible,
+      asset: assetOption(asset),
       translations: structuredTranslationMap(
         translations,
         (item) => ({ alt: item.alt, caption: item.caption ?? "" }),
@@ -612,6 +610,7 @@ const toEditableProduct = (product: AdminEditableProductRecord): AdminEditablePr
       caption: "",
       sortOrder: 0,
       visible: true,
+      asset: assetOption(product.primaryImage),
       translations: structuredTranslationMap([], () => ({ alt: "", caption: "" }), () => ({ alt: "", caption: "" })),
     });
   }
@@ -683,6 +682,7 @@ const toEditableProduct = (product: AdminEditableProductRecord): AdminEditablePr
         imageAlt: translation?.imageAlt ?? imageAsset?.alt ?? "",
         sortOrder,
         visible,
+        asset: imageAsset ? assetOption(imageAsset) : null,
         translations: structuredTranslationMap(
           translations,
           (item) => ({ title: item.title, description: item.description ?? "", imageAlt: item.imageAlt ?? "" }),
@@ -700,6 +700,7 @@ const toEditableProduct = (product: AdminEditableProductRecord): AdminEditablePr
         url: asset.url,
         sortOrder,
         visible,
+        asset: assetOption(asset),
         translations: structuredTranslationMap(
           translations,
           (item) => ({ title: item.title, description: item.description ?? "" }),
@@ -814,37 +815,27 @@ const statsFromProducts = (products: AdminProductSummary[]): AdminProductStats =
   unclassified: products.filter((product) => !product.isClassified).length,
 });
 
-const uniqueByUrl = <T extends { url: string }>(items: T[]) => {
+const uniqueByAssetId = <T extends { assetId?: string }>(items: T[]) => {
   const seen = new Set<string>();
   return items.filter((item) => {
-    const url = item.url.trim();
-    if (!isAllowedAssetUrl(url) || seen.has(url)) return false;
-    seen.add(url);
+    const assetId = item.assetId?.trim();
+    if (!assetId || seen.has(assetId)) return false;
+    seen.add(assetId);
     return true;
   });
 };
 
-const upsertAsset = async (
+const requireManagedAsset = async (
   prisma: Prisma.TransactionClient,
-  input: { url: string; kind: MediaKind; alt?: string | null },
+  assetId: string | undefined,
+  expectedKind: MediaKind,
 ) => {
-  const pathname = normalizePathname(input.url);
-  return prisma.mediaAsset.upsert({
-    where: { pathname },
-    update: {
-      kind: input.kind,
-      url: input.url,
-      alt: input.alt || null,
-      mimeType: mediaMimeType(input.url, input.kind),
-    },
-    create: {
-      kind: input.kind,
-      pathname,
-      url: input.url,
-      alt: input.alt || null,
-      mimeType: mediaMimeType(input.url, input.kind),
-    },
-  });
+  if (!assetId) throw new Error("结构化内容必须选择媒体中心中的有效资源。");
+  const asset = await prisma.mediaAsset.findFirst({ where: { id: assetId, deletedAt: null } });
+  if (!asset) throw new Error("选择的媒体资源不存在、已删除或不可用。");
+  if (asset.kind !== expectedKind) throw new Error("媒体资源类型与当前内容位置不匹配。");
+  await prisma.mediaAsset.update({ where: { id: asset.id }, data: { orphanedAt: null } });
+  return asset;
 };
 
 export async function getAdminProducts(filters: AdminProductFilters = {}): Promise<AdminProductPage> {
@@ -1284,9 +1275,9 @@ export async function replaceProductStructuredContent(input: UpdateProductStruct
     const keptApplicationIds: string[] = [];
     const keptDownloadIds: string[] = [];
 
-    for (const item of uniqueByUrl(input.media).sort((a, b) => a.sortOrder - b.sortOrder)) {
+    for (const item of uniqueByAssetId(input.media).sort((a, b) => a.sortOrder - b.sortOrder)) {
       const kind = mediaKindForRole(item.role);
-      const asset = await upsertAsset(prisma, { url: item.url, kind, alt: item.alt });
+      const asset = await requireManagedAsset(prisma, item.assetId, kind);
       keptMediaIds.push(asset.id);
       await prisma.productMedia.upsert({
         where: { productId_assetId: { productId: product.id, assetId: asset.id } },
@@ -1398,9 +1389,7 @@ export async function replaceProductStructuredContent(input: UpdateProductStruct
 
     for (const item of input.applications.sort((a, b) => a.sortOrder - b.sortOrder)) {
       if (!item.title.trim()) continue;
-      const imageAsset = isAllowedAssetUrl(item.imageUrl)
-        ? await upsertAsset(prisma, { url: item.imageUrl, kind: MediaKind.IMAGE, alt: item.imageAlt || item.title })
-        : null;
+      const imageAsset = item.assetId ? await requireManagedAsset(prisma, item.assetId, MediaKind.IMAGE) : null;
       const application = item.id
         ? await prisma.productApplication.update({
             where: { id: item.id },
@@ -1422,9 +1411,9 @@ export async function replaceProductStructuredContent(input: UpdateProductStruct
       where: { productId: product.id, ...(keptApplicationIds.length ? { id: { notIn: keptApplicationIds } } : {}) },
     });
 
-    for (const item of uniqueByUrl(input.downloads).sort((a, b) => a.sortOrder - b.sortOrder)) {
+    for (const item of uniqueByAssetId(input.downloads).sort((a, b) => a.sortOrder - b.sortOrder)) {
       if (!item.title.trim()) continue;
-      const asset = await upsertAsset(prisma, { url: item.url, kind: MediaKind.DOCUMENT, alt: item.title });
+      const asset = await requireManagedAsset(prisma, item.assetId, MediaKind.DOCUMENT);
       const download = item.id
         ? await prisma.productDownload.update({
             where: { id: item.id },
@@ -1586,29 +1575,18 @@ export async function attachUploadedProductAsset(input: AttachUploadedProductAss
   return getPrisma().$transaction(async (prisma) => {
     const product = await prisma.product.findUnique({
       where: { slug: input.slug },
-      select: { id: true },
+      select: { id: true, primaryImageId: true },
     });
     if (!product) throw new Error("Product does not exist.");
 
     const mediaKind = input.kind === "download" ? MediaKind.DOCUMENT : isVideo ? MediaKind.VIDEO : MediaKind.IMAGE;
-    const asset = await prisma.mediaAsset.upsert({
-      where: { pathname: input.pathname },
-      update: {
-        url: input.url,
-        kind: mediaKind,
-        mimeType: input.contentType,
-        sizeBytes: input.sizeBytes,
-        alt: input.alt || input.title || null,
-      },
-      create: {
-        pathname: input.pathname,
-        url: input.url,
-        kind: mediaKind,
-        mimeType: input.contentType,
-        sizeBytes: input.sizeBytes,
-        alt: input.alt || input.title || null,
-      },
-    });
+    await prisma.$queryRaw`SELECT "id" FROM "MediaAsset" WHERE "id" = ${input.assetId} FOR UPDATE`;
+    const existingAsset = await prisma.mediaAsset.findFirst({ where: { id: input.assetId, deletedAt: null } });
+    if (!existingAsset) throw new Error("Media asset does not exist or is no longer available.");
+    if (existingAsset.pathname !== input.pathname || existingAsset.url !== input.url || existingAsset.kind !== mediaKind) {
+      throw new Error("Media asset metadata does not match the requested attachment.");
+    }
+    const asset = await prisma.mediaAsset.update({ where: { id: existingAsset.id }, data: { orphanedAt: null } });
 
     // The Blob completion callback and the browser finalizer can arrive together.
     // Serialize attachment for one product/blob pair so downloads cannot be duplicated.
@@ -1684,7 +1662,7 @@ export async function attachUploadedProductAsset(input: AttachUploadedProductAss
       });
       created = !existing;
 
-      if (role === ProductMediaRole.PRIMARY && mediaKind === MediaKind.IMAGE) {
+      if (mediaKind === MediaKind.IMAGE && (role === ProductMediaRole.PRIMARY || !product.primaryImageId)) {
         await prisma.product.update({ where: { id: product.id }, data: { primaryImageId: asset.id } });
       }
     }

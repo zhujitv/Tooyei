@@ -12,7 +12,6 @@ import {
   Folder,
   FolderTree,
   GripVertical,
-  ImageIcon,
   LoaderCircle,
   Pencil,
   Plus,
@@ -22,11 +21,13 @@ import {
 } from "lucide-react";
 import { ProductKind } from "@/generated/prisma/enums";
 import { Button } from "@/components/ui/button";
+import { ImageUploader } from "@/components/media-uploader";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import type { AdminCategoryNode, CategoryMutationInput, CategoryTranslationFields } from "@/lib/repositories/categories";
+import type { MediaAssetOption } from "@/lib/media-asset-types";
 import { contentLocales, languageMarkers, type ContentLocale } from "@/lib/site";
 import { cn } from "@/lib/utils";
 
@@ -70,6 +71,7 @@ const createDraft = (parent: AdminCategoryNode | null, sortOrder: number): Categ
   kind: parent?.kind ?? ProductKind.SPC,
   isActive: true,
   coverImage: "",
+  coverAssetId: null,
   sortOrder,
   translations: blankTranslations(),
 });
@@ -92,10 +94,12 @@ export function AdminCategoryManager({
   initialCategories,
   databaseReady,
   canManage,
+  serviceConfigured,
 }: {
   initialCategories: AdminCategoryNode[];
   databaseReady: boolean;
   canManage: boolean;
+  serviceConfigured: boolean;
 }) {
   const [categories, setCategories] = useState(initialCategories);
   const [expanded, setExpanded] = useState(() => new Set(initialCategories.map((category) => category.id)));
@@ -107,6 +111,7 @@ export function AdminCategoryManager({
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [deleteTarget, setDeleteTarget] = useState<AdminCategoryNode | null>(null);
+  const [draftCoverAsset, setDraftCoverAsset] = useState<MediaAssetOption | null>(null);
 
   const rootOptions = useMemo(
     () => categories.filter((category) => category.id !== editingId),
@@ -129,6 +134,7 @@ export function AdminCategoryManager({
     const siblingCount = parent ? parent.children.length : categories.length;
     setEditingId(null);
     setDraft(createDraft(parent, siblingCount));
+    setDraftCoverAsset(null);
     setActiveLocale("zh");
     setFeedback(null);
     setDrawerOpen(true);
@@ -142,9 +148,11 @@ export function AdminCategoryManager({
       kind: category.kind,
       isActive: category.isActive,
       coverImage: category.coverImage,
+      coverAssetId: category.coverAsset?.id ?? null,
       sortOrder: category.sortOrder,
       translations: structuredClone(category.translations),
     });
+    setDraftCoverAsset(category.coverAsset);
     setActiveLocale("zh");
     setFeedback(null);
     setDrawerOpen(true);
@@ -470,9 +478,21 @@ export function AdminCategoryManager({
                   <Label htmlFor="category-sort" className="text-xs font-medium text-[#344054]">排序值</Label>
                   <Input id="category-sort" type="number" min={0} max={999999} value={draft.sortOrder} onChange={(event) => setDraft((current) => ({ ...current, sortOrder: Number(event.target.value) || 0 }))} className="admin-field" />
                 </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="category-cover" className="text-xs font-medium text-[#344054]">栏目封面图</Label>
-                  <Input id="category-cover" value={draft.coverImage ?? ""} onChange={(event) => setDraft((current) => ({ ...current, coverImage: event.target.value }))} placeholder="/media/category.jpg 或 https://…" className="admin-field" />
+                <div className="space-y-2 sm:col-span-2">
+                  <Label className="text-xs font-medium text-[#344054]">栏目封面图</Label>
+                  <ImageUploader
+                    value={draftCoverAsset}
+                    legacyUrl={draft.coverImage || ""}
+                    target="CATEGORY_COVER"
+                    assetType="IMAGE"
+                    disabled={!canManage || !databaseReady}
+                    serviceConfigured={serviceConfigured}
+                    compact
+                    onChange={(asset) => {
+                      setDraftCoverAsset(asset);
+                      setDraft((current) => ({ ...current, coverAssetId: asset?.id ?? null, coverImage: asset?.url ?? "" }));
+                    }}
+                  />
                 </div>
                 <label className="flex min-h-11 items-center justify-between rounded-lg border border-[#E4E7EC] bg-[#F9FAFB] px-3 sm:col-span-2">
                   <span><span className="block text-xs font-medium text-[#344054]">前台启用</span><span className="mt-0.5 block text-[11px] text-[#667085]">停用后前台导航和栏目页隐藏，产品关联不会删除。</span></span>
@@ -509,12 +529,6 @@ export function AdminCategoryManager({
                 </div>
               </div>
 
-              {draft.coverImage ? (
-                <div className="mt-6 overflow-hidden rounded-xl border border-[#E4E7EC] bg-[#F9FAFB] p-3">
-                  <p className="mb-2 flex items-center gap-2 text-xs font-medium text-[#667085]"><ImageIcon className="size-3.5" />封面预览</p>
-                  <img src={draft.coverImage} alt="栏目封面预览" className="aspect-[16/6] w-full rounded-lg object-cover" />
-                </div>
-              ) : null}
             </div>
             <div className="flex items-center justify-between gap-3 border-t border-[#E4E7EC] bg-[#F9FAFB] px-6 py-4">
               <p className="hidden text-[11px] text-[#667085] sm:block">回退顺序：当前语言 → English → 中文 → Slug</p>

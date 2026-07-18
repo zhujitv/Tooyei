@@ -32,6 +32,7 @@ export default async function AdminCategoriesPage() {
           initialCategories={categories}
           databaseReady={isDatabaseConfigured()}
           canManage={Boolean(managerSession)}
+          serviceConfigured={Boolean(process.env.BLOB_READ_WRITE_TOKEN)}
         />
       </div>
     </main>
