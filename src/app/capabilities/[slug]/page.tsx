@@ -9,13 +9,17 @@ import {
   isCapabilitySlug,
 } from "@/lib/capabilities";
 import { localizedAlternates } from "@/lib/site";
+import { safeMetadata } from "@/lib/metadata";
+
+export const dynamic = "force-dynamic";
 
 export function generateStaticParams() {
   return capabilitySlugs.map((slug) => ({ slug }));
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
-  const { slug } = await params;
+  return safeMetadata("metadata.capabilities.detail.zh", async () => {
+  const { slug = "" } = await params;
   if (!isCapabilitySlug(slug)) return {};
   const content = capabilitiesCopy.zh.pages[slug];
   const path = `/capabilities/${slug}`;
@@ -32,6 +36,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       images: [{ url: capabilityMedia[slug].hero, alt: content.title }],
     },
   };
+  }, { title: "TOOYEI 制造能力" });
 }
 
 export default async function Page({ params }: { params: Promise<{ slug: string }> }) {

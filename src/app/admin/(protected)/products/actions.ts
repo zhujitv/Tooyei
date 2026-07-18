@@ -15,6 +15,7 @@ import {
   updateProductListSettings,
 } from "@/lib/repositories/admin-products";
 import { contentLocales, localizedPath } from "@/lib/site";
+import { logError } from "@/lib/observability";
 
 const slugSchema = z
   .string()
@@ -125,7 +126,7 @@ export async function createProductAction(formData: FormData) {
 
     revalidateProductAdminPaths(product.slug);
   } catch (error) {
-    console.error("Create product failed", error instanceof Error ? error.message : error);
+    logError("Create product failed", { operation: "admin-product.create" }, error);
     redirect("/admin/products?error=create");
   }
 
@@ -162,7 +163,7 @@ export async function updateProductListSettingsAction(formData: FormData) {
 
     revalidateProductAdminPaths(product.slug);
   } catch (error) {
-    console.error("Update product quick settings failed", error instanceof Error ? error.message : error);
+    logError("Update product quick settings failed", { operation: "admin-product.quick-update" }, error);
     redirect(feedbackPath(formData, "error", "quick"));
   }
 
@@ -190,7 +191,7 @@ export async function assignProductCategoryAction(formData: FormData) {
     });
     revalidateProductAdminPaths(parsed.data.slug);
   } catch (error) {
-    console.error("Assign product category failed", error instanceof Error ? error.message : error);
+    logError("Assign product category failed", { operation: "admin-product.assign-category" }, error);
     redirect(feedbackPath(formData, "error", "category"));
   }
 
@@ -233,7 +234,7 @@ export async function batchUpdateProductsAction(formData: FormData) {
 
     revalidateProductAdminPaths(parsed.data.slugs);
   } catch (error) {
-    console.error("Batch update products failed", error instanceof Error ? error.message : error);
+    logError("Batch update products failed", { operation: "admin-product.batch-update" }, error);
     redirect(feedbackPath(formData, "error", "batch"));
   }
 

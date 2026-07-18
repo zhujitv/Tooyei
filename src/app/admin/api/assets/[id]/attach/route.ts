@@ -6,6 +6,7 @@ import { getProductManagerSession } from "@/lib/admin-auth";
 import { getPrisma } from "@/lib/db";
 import { attachUploadedProductAsset } from "@/lib/repositories/admin-products";
 import { safeWriteAuditLog } from "@/lib/repositories/audit-logs";
+import { apiError } from "@/lib/api-response";
 
 const schema = z.object({
   productSlug: z.string().min(1).max(180),
@@ -19,7 +20,7 @@ const schema = z.object({
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const session = await getProductManagerSession();
-  if (!session) return NextResponse.json({ ok: false, error: "没有产品媒体管理权限。" }, { status: 403 });
+  if (!session) return apiError(request, { code: "FORBIDDEN", message: "没有产品媒体管理权限。", status: 403, operation: "asset.attach" });
   try {
     const { id } = await context.params;
     const input = schema.parse(await request.json());
@@ -45,6 +46,6 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     revalidatePath(`/products/${input.productSlug}`);
     return NextResponse.json({ ok: true });
   } catch (error) {
-    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "资源关联失败。" }, { status: 400 });
+    return apiError(request, { code: "ASSET_ATTACH_FAILED", message: error instanceof Error ? error.message : "资源关联失败。", status: 400, operation: "asset.attach", error });
   }
 }

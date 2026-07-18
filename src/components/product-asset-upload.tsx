@@ -7,6 +7,7 @@ import { MediaUploader } from "@/components/media-uploader";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { MediaAssetOption } from "@/lib/media-asset-types";
+import { fetchWithRetry } from "@/lib/fetch-with-retry";
 
 type Props = {
   slug: string;
@@ -42,7 +43,7 @@ export function ProductAssetUpload({ slug, disabled = false, blobConfigured = fa
       return;
     }
     setFeedback("正在关联当前产品…");
-    const response = await fetch(`/admin/api/assets/${asset.id}/attach`, {
+    const response = await fetchWithRetry(`/admin/api/assets/${asset.id}/attach`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({

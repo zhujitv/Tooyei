@@ -7,6 +7,7 @@ import {
   getOrStartProductTranslationJobExecution,
 } from "@/lib/repositories/product-translation-jobs";
 import { contentLocales, localizedPath } from "@/lib/site";
+import { apiError } from "@/lib/api-response";
 
 export const maxDuration = 120;
 
@@ -15,13 +16,13 @@ const bodySchema = z.object({ executionId: z.string().uuid().optional() });
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const session = await getTranslationManagerSession();
-  if (!session) return NextResponse.json({ ok: false, error: "无权执行翻译任务。" }, { status: 403 });
+  if (!session) return apiError(request, { code: "FORBIDDEN", message: "无权执行翻译任务。", status: 403, operation: "translation.run" });
 
   const { id } = await context.params;
   const parsedId = idSchema.safeParse(id);
-  if (!parsedId.success) return NextResponse.json({ ok: false, error: "无效的翻译任务。" }, { status: 400 });
+  if (!parsedId.success) return apiError(request, { code: "INVALID_JOB", message: "无效的翻译任务。", status: 400, operation: "translation.run" });
   const parsedBody = bodySchema.safeParse(await request.json().catch(() => ({})));
-  if (!parsedBody.success) return NextResponse.json({ ok: false, error: "无效的执行凭证。" }, { status: 400 });
+  if (!parsedBody.success) return apiError(request, { code: "INVALID_EXECUTION", message: "无效的执行凭证。", status: 400, operation: "translation.run" });
 
   try {
     const executionId = parsedBody.data.executionId
@@ -39,10 +40,6 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     }
     return NextResponse.json({ ok: true, result });
   } catch (error) {
-    console.error("Process translation job failed", error instanceof Error ? error.message : error);
-    return NextResponse.json(
-      { ok: false, error: error instanceof Error ? error.message : "翻译任务执行失败。" },
-      { status: 400 },
-    );
+    return apiError(request, { code: "TRANSLATION_RUN_FAILED", message: error instanceof Error ? error.message : "翻译任务执行失败。", status: 400, operation: "translation.run", error });
   }
 }

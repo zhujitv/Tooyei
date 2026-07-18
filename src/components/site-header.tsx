@@ -20,6 +20,7 @@ import { SocialLinks } from "@/components/social-links";
 import type { PublicCategoryNode } from "@/lib/repositories/categories";
 import { languageMarkers, languageNames, localizedPath, locales, siteConfig, toContentLocale, type ContentLocale, type Locale } from "@/lib/site";
 import { cn } from "@/lib/utils";
+import { fetchWithRetry } from "@/lib/fetch-with-retry";
 
 const headerCopy: Record<
   ContentLocale,
@@ -194,7 +195,7 @@ export function SiteHeader({ locale, initialCategories = [] }: { locale: Locale;
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch(`/api/categories/tree?locale=${locale}`, { cache: "no-store", signal: controller.signal })
+    fetchWithRetry(`/api/categories/tree?locale=${locale}`, { cache: "no-store", signal: controller.signal, timeoutMs: 10_000 })
       .then((response) => response.json())
       .then((result: { ok?: boolean; categories?: PublicCategoryNode[] }) => {
         if (result.ok && result.categories) {

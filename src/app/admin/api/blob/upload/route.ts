@@ -9,6 +9,7 @@ import {
   mediaAssetUploadPathname,
 } from "@/lib/media-asset-policy";
 import { persistMediaAssetUpload } from "@/lib/media-asset-service";
+import { apiError } from "@/lib/api-response";
 
 export const runtime = "nodejs";
 
@@ -22,13 +23,13 @@ const errorMessage = (error: unknown) => error instanceof Error ? error.message 
 export async function POST(request: Request): Promise<NextResponse> {
   const contentLength = Number(request.headers.get("content-length") || 0);
   if (contentLength > 64 * 1024) {
-    return NextResponse.json({ error: "上传请求数据过大。" }, { status: 413 });
+    return apiError(request, { code: "PAYLOAD_TOO_LARGE", message: "上传请求数据过大。", status: 413, operation: "blob.upload" });
   }
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    return NextResponse.json({ error: "媒体服务尚未配置。" }, { status: 503 });
+    return apiError(request, { code: "MEDIA_SERVICE_UNAVAILABLE", message: "媒体服务尚未配置。", status: 503, operation: "blob.upload" });
   }
   if (!isDatabaseConfigured()) {
-    return NextResponse.json({ error: "数据库尚未配置。" }, { status: 503 });
+    return apiError(request, { code: "DATABASE_UNAVAILABLE", message: "数据库尚未配置。", status: 503, operation: "blob.upload" });
   }
 
   try {
@@ -74,7 +75,6 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     return NextResponse.json(response);
   } catch (error) {
-    console.error("Vercel Blob upload handler failed", errorMessage(error));
-    return NextResponse.json({ error: errorMessage(error) }, { status: 400 });
+    return apiError(request, { code: "BLOB_UPLOAD_FAILED", message: errorMessage(error), status: 400, operation: "blob.upload", error });
   }
 }

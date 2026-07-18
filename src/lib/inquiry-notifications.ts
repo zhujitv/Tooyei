@@ -1,4 +1,5 @@
 import type { AdminInquiryDetail } from "@/lib/repositories/inquiries";
+import { fetchWithRetry } from "@/lib/fetch-with-retry";
 
 type SendInquiryNotificationResult =
   | { status: "skipped"; reason: "missing-api-key" | "missing-recipient" }
@@ -78,7 +79,7 @@ export async function sendInquiryNotification(inquiry: AdminInquiryDetail): Prom
   const timeout = setTimeout(() => controller.abort(), 8_000);
 
   try {
-    const response = await fetch(resendEndpoint, {
+    const response = await fetchWithRetry(resendEndpoint, {
       method: "POST",
       signal: controller.signal,
       headers: {

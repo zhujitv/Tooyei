@@ -11,6 +11,7 @@ import {
   type AssignableAdminUser,
 } from "@/lib/repositories/admin-users";
 import type { Locale } from "@/lib/site";
+import { withDataFallback } from "@/lib/server-data";
 
 const inquiryProductInclude = {
   product: {
@@ -227,12 +228,12 @@ const buildWhere = (filters: AdminInquiryFilters = {}): Prisma.InquiryWhereInput
 export async function getAdminInquiries(filters: AdminInquiryFilters = {}): Promise<AdminInquirySummary[]> {
   if (!isDatabaseConfigured()) return [];
 
-  const records = await getPrisma().inquiry.findMany({
+  const records = await withDataFallback("inquiries.admin.list", () => getPrisma().inquiry.findMany({
     where: buildWhere(filters),
     include: inquiryDetailInclude,
     orderBy: { createdAt: "desc" },
     take: 100,
-  });
+  }), [], { filters });
 
   return records.map(toSummary);
 }
@@ -240,10 +241,10 @@ export async function getAdminInquiries(filters: AdminInquiryFilters = {}): Prom
 export async function getAdminInquiry(id: string): Promise<AdminInquiryDetail | null> {
   if (!isDatabaseConfigured()) return null;
 
-  const record = await getPrisma().inquiry.findUnique({
+  const record = await withDataFallback("inquiries.admin.detail", () => getPrisma().inquiry.findUnique({
     where: { id },
     include: inquiryDetailInclude,
-  });
+  }), null, { id });
 
   return record ? toDetail(record) : null;
 }
@@ -251,7 +252,7 @@ export async function getAdminInquiry(id: string): Promise<AdminInquiryDetail | 
 export async function getAdminInquiryNotes(inquiryId: string): Promise<AdminInquiryNote[]> {
   if (!isDatabaseConfigured()) return [];
 
-  return getPrisma().inquiryNote.findMany({
+  return withDataFallback("inquiries.admin.notes", () => getPrisma().inquiryNote.findMany({
     where: { inquiryId },
     orderBy: { createdAt: "desc" },
     include: {
@@ -263,7 +264,7 @@ export async function getAdminInquiryNotes(inquiryId: string): Promise<AdminInqu
         },
       },
     },
-  });
+  }), [], { inquiryId });
 }
 
 export async function createInquiryNote(input: CreateInquiryNoteInput): Promise<AdminInquiryNote> {

@@ -12,6 +12,7 @@ import { products as sampleProducts, readLocalizedText } from "@/lib/content";
 import { getPrisma, isDatabaseConfigured } from "@/lib/db";
 import type { MediaAssetOption } from "@/lib/media-asset-types";
 import { contentLocales, type ContentLocale } from "@/lib/site";
+import { withDataFallback } from "@/lib/server-data";
 
 export type AdminProductSummary = {
   slug: string;
@@ -857,7 +858,7 @@ export async function getAdminProducts(filters: AdminProductFilters = {}): Promi
 
   const prisma = getPrisma();
   const where = buildWhere(filters);
-  const [records, total] = await Promise.all([
+  const result = await withDataFallback("admin-products.list", () => Promise.all([
     prisma.product.findMany({
       where,
       select: listProductSelect,
@@ -866,7 +867,14 @@ export async function getAdminProducts(filters: AdminProductFilters = {}): Promi
       take: pageSize,
     }),
     prisma.product.count({ where }),
-  ]);
+  ]), null, { filters, requestedPage, pageSize });
+  if (!result) {
+    const filtered = applySampleFilters(sampleSummaries(), filters);
+    const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+    const page = Math.min(requestedPage, totalPages);
+    return { items: filtered.slice((page - 1) * pageSize, page * pageSize), total: filtered.length, page, pageSize, totalPages };
+  }
+  const [records, total] = result;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   if (requestedPage > totalPages) return getAdminProducts({ ...filters, page: totalPages, pageSize });
 
@@ -882,11 +890,11 @@ export async function getAdminProducts(filters: AdminProductFilters = {}): Promi
 export async function getAdminProduct(slug: string): Promise<AdminEditableProduct | undefined> {
   if (!isDatabaseConfigured()) return sampleEditableProduct(slug);
 
-  const product = await getPrisma().product.findUnique({
+  const product = await withDataFallback("admin-products.detail", () => getPrisma().product.findUnique({
     where: { slug },
     include: editProductInclude,
-  });
-  if (!product) return undefined;
+  }), null, { slug });
+  if (!product) return sampleEditableProduct(slug);
 
   return toEditableProduct(product);
 }
@@ -894,7 +902,7 @@ export async function getAdminProduct(slug: string): Promise<AdminEditableProduc
 export async function getAdminProductStats(): Promise<AdminProductStats> {
   if (!isDatabaseConfigured()) return statsFromProducts(sampleSummaries());
 
-  const [stats] = await getPrisma().$queryRaw<Array<{
+  const result = await withDataFallback("admin-products.stats", () => getPrisma().$queryRaw<Array<{
     total: number;
     published: number;
     draft: number;
@@ -938,7 +946,9 @@ export async function getAdminProductStats(): Promise<AdminProductStats> {
         SELECT 1 FROM "ProductCategory" assignment WHERE assignment."productId" = product."id"
       ))::int AS unclassified
     FROM "Product" product
-  `);
+  `), null);
+  if (!result) return statsFromProducts(sampleSummaries());
+  const [stats] = result;
 
   return {
     total: stats?.total ?? 0,
@@ -967,7 +977,7 @@ export async function getAdminProductCategoryOptions(): Promise<AdminProductCate
     }));
   }
 
-  const categories = await getPrisma().category.findMany({
+  const categories = await withDataFallback("admin-products.category-options", () => getPrisma().category.findMany({
     where: { status: { not: ContentStatus.ARCHIVED } },
     include: {
       parent: {
@@ -984,7 +994,7 @@ export async function getAdminProductCategoryOptions(): Promise<AdminProductCate
       },
     },
     orderBy: [{ sortOrder: "asc" }, { slug: "asc" }],
-  });
+  }), []);
 
   return categories
     .sort((left, right) => {

@@ -18,6 +18,7 @@ import {
   type MediaAssetUploadMetadata,
 } from "@/lib/media-asset-policy";
 import type { MediaAssetOption } from "@/lib/media-asset-types";
+import { fetchWithRetry } from "@/lib/fetch-with-retry";
 
 type Props = {
   value?: MediaAssetOption | null;
@@ -100,7 +101,7 @@ export function MediaUploader({
     setMessage("");
     try {
       const kind = accept === "media" ? "" : accept === "image" ? "IMAGE" : accept === "video" ? "VIDEO" : "DOCUMENT";
-      const response = await fetch(`/admin/api/assets?limit=60${kind ? `&kind=${encodeURIComponent(kind)}` : ""}`);
+      const response = await fetchWithRetry(`/admin/api/assets?limit=60${kind ? `&kind=${encodeURIComponent(kind)}` : ""}`);
       const payload = await response.json() as { ok: boolean; assets?: MediaAssetOption[]; error?: string };
       if (!response.ok || !payload.ok) throw new Error(payload.error || "媒体资源加载失败。");
       setLibraryAssets(payload.assets ?? []);
@@ -160,7 +161,7 @@ export function MediaUploader({
       setProgress(100);
       setStatus("processing");
       setMessage("处理中");
-      const response = await fetch("/admin/api/assets/finalize", {
+      const response = await fetchWithRetry("/admin/api/assets/finalize", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ metadata, blob: { url: blob.url, pathname: blob.pathname, contentType: blob.contentType } }),
@@ -186,7 +187,7 @@ export function MediaUploader({
         <div className={`overflow-hidden rounded-xl border border-[#E5E7EB] bg-white ${compact ? "p-3" : "p-4"}`}>
           <div className="flex gap-3">
             <div className={`${compact ? "size-20" : "h-28 w-36"} shrink-0 overflow-hidden rounded-lg border border-[#E5E7EB] bg-[#F8FAFC]`}>
-              {(value?.mimeType || "").startsWith("image/") || (!value && accept === "image") ? <img src={currentUrl} alt={alt || "资源预览"} className="size-full object-cover" /> : <div className="grid size-full place-items-center text-slate-400"><File className="size-7" /></div>}
+              {(value?.mimeType || "").startsWith("image/") || (!value && accept === "image") ? <img src={currentUrl} alt={alt || "资源预览"} className="size-full object-cover" onError={(event) => { event.currentTarget.src = "/media/placeholder.svg"; }} /> : <div className="grid size-full place-items-center text-slate-400"><File className="size-7" /></div>}
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-slate-900">{value?.filename || "历史资源"}</p>
@@ -238,7 +239,7 @@ export function MediaUploader({
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 {libraryAssets.map((asset) => (
                   <button key={asset.id} type="button" onClick={() => { onChange(asset); setLibraryOpen(false); setStatus("done"); setMessage("已选择现有资源"); }} className="overflow-hidden rounded-xl border border-slate-200 bg-white text-left transition hover:border-blue-400 hover:shadow-md">
-                    <div className="aspect-[4/3] bg-slate-100">{asset.mimeType.startsWith("image/") ? <img src={asset.url} alt="" className="size-full object-cover" /> : <div className="grid size-full place-items-center"><File className="size-8 text-slate-400" /></div>}</div>
+                    <div className="aspect-[4/3] bg-slate-100">{asset.mimeType.startsWith("image/") ? <img src={asset.url} alt="" className="size-full object-cover" onError={(event) => { event.currentTarget.src = "/media/placeholder.svg"; }} /> : <div className="grid size-full place-items-center"><File className="size-8 text-slate-400" /></div>}</div>
                     <div className="p-3"><p className="truncate text-xs font-semibold text-slate-900">{asset.filename}</p><p className="mt-1 text-[11px] text-slate-500">{formatBytes(asset.sizeBytes)} · {asset.referenceCount} 处引用</p></div>
                   </button>
                 ))}

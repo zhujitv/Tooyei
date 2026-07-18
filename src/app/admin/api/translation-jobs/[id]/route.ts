@@ -11,6 +11,7 @@ import {
   restoreProductTranslationJob,
   retryFailedProductTranslationJobItems,
 } from "@/lib/repositories/product-translation-jobs";
+import { apiError } from "@/lib/api-response";
 
 const idSchema = z.string().min(1).max(120);
 const mutationSchema = z.object({ action: z.enum(["STOP", "REQUEUE_FAILED", "CLOSE", "RESTORE"]) });
@@ -27,11 +28,11 @@ const refresh = (id: string) => {
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   const session = await getTranslationManagerSession();
-  if (!session) return NextResponse.json({ ok: false, error: "无权管理翻译任务。" }, { status: 403 });
+  if (!session) return apiError(request, { code: "FORBIDDEN", message: "无权管理翻译任务。", status: 403, operation: "translation.mutate" });
   const parsedId = await parseId(context);
-  if (!parsedId.success) return NextResponse.json({ ok: false, error: "无效的翻译任务。" }, { status: 400 });
+  if (!parsedId.success) return apiError(request, { code: "INVALID_JOB", message: "无效的翻译任务。", status: 400, operation: "translation.mutate" });
   const parsed = mutationSchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) return NextResponse.json({ ok: false, error: "无效的任务操作。" }, { status: 400 });
+  if (!parsed.success) return apiError(request, { code: "INVALID_ACTION", message: "无效的任务操作。", status: 400, operation: "translation.mutate" });
 
   try {
     const result = parsed.data.action === "STOP"
@@ -52,16 +53,15 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     return NextResponse.json({ ok: true, result });
   } catch (error) {
     const message = error instanceof Error ? error.message : "翻译任务操作失败。";
-    console.error("Translation job mutation failed", parsed.data.action, message);
-    return NextResponse.json({ ok: false, error: message }, { status: 409 });
+    return apiError(request, { code: "TRANSLATION_MUTATION_FAILED", message, status: 409, operation: "translation.mutate", error });
   }
 }
 
-export async function DELETE(_request: Request, context: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
   const session = await getProductManagerSession();
-  if (!session) return NextResponse.json({ ok: false, error: "只有管理员可以删除翻译任务。" }, { status: 403 });
+  if (!session) return apiError(request, { code: "FORBIDDEN", message: "只有管理员可以删除翻译任务。", status: 403, operation: "translation.delete" });
   const parsedId = await parseId(context);
-  if (!parsedId.success) return NextResponse.json({ ok: false, error: "无效的翻译任务。" }, { status: 400 });
+  if (!parsedId.success) return apiError(request, { code: "INVALID_JOB", message: "无效的翻译任务。", status: 400, operation: "translation.delete" });
 
   try {
     const result = await deleteProductTranslationJob(parsedId.data);
@@ -76,7 +76,6 @@ export async function DELETE(_request: Request, context: { params: Promise<{ id:
     return NextResponse.json({ ok: true, result });
   } catch (error) {
     const message = error instanceof Error ? error.message : "删除翻译任务失败。";
-    console.error("Delete translation job failed", message);
-    return NextResponse.json({ ok: false, error: message }, { status: 409 });
+    return apiError(request, { code: "TRANSLATION_DELETE_FAILED", message, status: 409, operation: "translation.delete", error });
   }
 }

@@ -1,5 +1,6 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@/generated/prisma/client";
+import { logInfo } from "@/lib/observability";
 
 type PrismaGlobal = typeof globalThis & {
   tooyeiPrisma?: PrismaClient;
@@ -22,6 +23,7 @@ export function getPrisma(): PrismaClient {
   const prisma = new PrismaClient({ adapter });
 
   prismaGlobal.tooyeiPrisma = prisma;
+  logInfo("Prisma singleton initialized", { operation: "database.client.initialize" });
 
   return prisma;
 }

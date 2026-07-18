@@ -2,8 +2,8 @@ import type { ContentLocale, Locale } from "@/lib/site";
 
 export type LocalizedText = { en: string; zh: string } & Partial<Record<Locale, string>>;
 
-export const readLocalizedText = (text: LocalizedText, locale: Locale) =>
-  text[locale]?.trim() || text.en?.trim() || text.zh;
+export const readLocalizedText = (text: LocalizedText | null | undefined, locale: Locale) =>
+  text?.[locale]?.trim() || text?.en?.trim() || text?.zh?.trim() || "";
 
 export type ProductFeatureItem = LocalizedText & {
   description?: LocalizedText;

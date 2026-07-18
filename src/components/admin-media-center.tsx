@@ -8,6 +8,7 @@ import { MediaUploader } from "@/components/media-uploader";
 import { Button } from "@/components/ui/button";
 import { assetTypeLabels, formatBytes } from "@/lib/media-asset-policy";
 import type { MediaAssetOption } from "@/lib/media-asset-types";
+import { fetchWithRetry } from "@/lib/fetch-with-retry";
 
 export function AdminMediaCenter({ assets, serviceConfigured }: { assets: MediaAssetOption[]; serviceConfigured: boolean }) {
   const router = useRouter();
@@ -19,7 +20,7 @@ export function AdminMediaCenter({ assets, serviceConfigured }: { assets: MediaA
     if (asset.referenceCount) return;
     if (!window.confirm(deleteBlob ? "确认同时删除媒体记录和实际文件？此操作无法恢复。" : "确认从媒体中心删除记录？实际文件将保留，便于安全恢复。")) return;
     setDeleting(asset.id);
-    const response = await fetch(`/admin/api/assets/${asset.id}?deleteBlob=${deleteBlob}`, { method: "DELETE" });
+    const response = await fetchWithRetry(`/admin/api/assets/${asset.id}?deleteBlob=${deleteBlob}`, { method: "DELETE" });
     const payload = await response.json() as { ok: boolean; result?: { softDeleted?: boolean }; error?: string };
     setFeedback(payload.ok ? payload.result?.softDeleted ? "资源已从媒体中心移除，实际文件和恢复记录已保留。" : "资源和实际文件已删除。" : payload.error || "资源删除失败。");
     setDeleting(null);
@@ -41,7 +42,7 @@ export function AdminMediaCenter({ assets, serviceConfigured }: { assets: MediaA
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {assets.map((asset) => (
           <article key={asset.id} className="admin-card overflow-hidden rounded-xl">
-            <div className="aspect-[16/10] bg-slate-100">{asset.mimeType.startsWith("image/") ? <img src={asset.url} alt="" className="size-full object-cover" /> : <div className="grid size-full place-items-center"><File className="size-10 text-slate-400" /></div>}</div>
+            <div className="aspect-[16/10] bg-slate-100">{asset.mimeType.startsWith("image/") ? <img src={asset.url} alt="" className="size-full object-cover" onError={(event) => { event.currentTarget.src = "/media/placeholder.svg"; }} /> : <div className="grid size-full place-items-center"><File className="size-10 text-slate-400" /></div>}</div>
             <div className="p-4">
               <div className="flex items-start justify-between gap-3"><div className="min-w-0"><h3 className="truncate text-sm font-semibold text-slate-950">{asset.filename}</h3><p className="mt-1 text-xs text-slate-500">{assetTypeLabels[asset.assetType as keyof typeof assetTypeLabels] || "其他"} · {formatBytes(asset.sizeBytes)}</p></div><span className={asset.referenceCount ? "admin-badge-success" : "admin-badge-review"}>{asset.referenceCount ? `${asset.referenceCount} 处引用` : "未使用"}</span></div>
               {asset.references.length ? <div className="mt-3 space-y-1 rounded-lg bg-slate-50 p-3">{asset.references.slice(0, 3).map((reference) => <p key={`${reference.type}-${reference.id}`} className="truncate text-xs text-slate-600">{reference.type} · {reference.label}</p>)}</div> : null}

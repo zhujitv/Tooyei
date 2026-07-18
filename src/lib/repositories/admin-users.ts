@@ -3,6 +3,7 @@ import "server-only";
 import { compare, hash } from "bcryptjs";
 import { AdminRole } from "@/generated/prisma/client";
 import { getPrisma, isDatabaseConfigured } from "@/lib/db";
+import { withDataFallback } from "@/lib/server-data";
 
 export type AssignableAdminUser = {
   id: string;
@@ -129,8 +130,8 @@ export async function verifyAdminCredentials(email: string, password: string): P
   const normalizedEmail = normalizeEmail(email);
 
   if (isDatabaseConfigured()) {
+    return withDataFallback("admin-users.verify-credentials", async () => {
     await ensureEnvironmentAdminUser();
-
     const user = await getPrisma().adminUser.findUnique({
       where: { email: normalizedEmail },
       select: { id: true, name: true, email: true, role: true, active: true, passwordHash: true },
@@ -145,6 +146,7 @@ export async function verifyAdminCredentials(email: string, password: string): P
       email: user.email,
       role: user.role,
     };
+    }, null, { email: normalizedEmail });
   }
 
   const expectedEmail = bootstrapAdminEmail();
@@ -180,8 +182,8 @@ export async function getCurrentAdminUser(email: string): Promise<AdminUserSumma
     return null;
   }
 
+  return withDataFallback("admin-users.current", async () => {
   await ensureEnvironmentAdminUser();
-
   const user = await getPrisma().adminUser.findUnique({
     where: { email: normalizedEmail },
     select: {
@@ -196,6 +198,7 @@ export async function getCurrentAdminUser(email: string): Promise<AdminUserSumma
   });
 
   return user ? { ...user, isBootstrapAdmin: isBootstrapAdminEmail(user.email) } : null;
+  }, null, { email: normalizedEmail });
 }
 
 export async function getAdminUsers(): Promise<AdminUserSummary[]> {
@@ -217,8 +220,8 @@ export async function getAdminUsers(): Promise<AdminUserSummary[]> {
       : [];
   }
 
+  return withDataFallback("admin-users.list", async () => {
   await ensureEnvironmentAdminUser();
-
   const users = await getPrisma().adminUser.findMany({
     orderBy: [{ role: "asc" }, { active: "desc" }, { name: "asc" }],
     select: {
@@ -233,13 +236,14 @@ export async function getAdminUsers(): Promise<AdminUserSummary[]> {
   });
 
   return users.map((user) => ({ ...user, isBootstrapAdmin: isBootstrapAdminEmail(user.email) }));
+  }, []);
 }
 
 export async function getAssignableAdminUsers(): Promise<AssignableAdminUser[]> {
   if (!isDatabaseConfigured()) return [];
 
+  return withDataFallback("admin-users.assignable", async () => {
   await ensureEnvironmentAdminUser();
-
   return getPrisma().adminUser.findMany({
     where: {
       active: true,
@@ -248,6 +252,7 @@ export async function getAssignableAdminUsers(): Promise<AssignableAdminUser[]> 
     orderBy: [{ role: "asc" }, { name: "asc" }],
     select: { id: true, name: true, email: true, role: true },
   });
+  }, []);
 }
 
 export async function createAdminUser(actorEmail: string, input: CreateAdminUserInput) {

@@ -10,6 +10,7 @@ import {
   translationLocales,
 } from "@/lib/repositories/product-translation-jobs";
 import { productTranslationProviderId } from "@/lib/translation-providers/types";
+import { logError } from "@/lib/observability";
 
 const localeSchema = z.enum(translationLocales);
 const createJobSchema = z.object({
@@ -66,7 +67,7 @@ export async function createTranslationJobAction(formData: FormData) {
       },
     });
   } catch (error) {
-    console.error("Create translation job failed", error instanceof Error ? error.message : error);
+    logError("Create translation job failed", { operation: "translation.job-create" }, error);
     redirect(errorPath(error));
   }
   redirect(`/admin/translations/${job.id}`);

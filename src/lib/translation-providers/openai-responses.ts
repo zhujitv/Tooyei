@@ -1,5 +1,6 @@
 import "server-only";
 
+import { fetchWithRetry } from "@/lib/fetch-with-retry";
 import { TranslationProviderRequestError } from "@/lib/translation-providers/types";
 import type {
   StructuredTranslationRequest,
@@ -38,7 +39,7 @@ export class OpenAIResponsesProvider implements TranslationProvider {
 
   async generateStructured(request: StructuredTranslationRequest): Promise<StructuredTranslationResult> {
     try {
-      const response = await fetch(`${this.config.baseUrl}/responses`, {
+      const response = await fetchWithRetry(`${this.config.baseUrl}/responses`, {
         method: "POST",
         headers: { Authorization: `Bearer ${this.config.apiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -57,7 +58,9 @@ export class OpenAIResponsesProvider implements TranslationProvider {
           },
           max_output_tokens: request.maxOutputTokens,
         }),
-        signal: AbortSignal.timeout(this.config.timeoutMs),
+        timeoutMs: this.config.timeoutMs,
+        retries: 1,
+        retryDelayMs: 500,
       });
       const payload = (await response.json().catch(() => null)) as ResponsesPayload | null;
       if (!response.ok || !payload) {

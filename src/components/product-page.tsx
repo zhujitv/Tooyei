@@ -1,5 +1,4 @@
-/* eslint-disable @next/next/no-img-element */
-import Image from "next/image";
+import { ResilientImage } from "@/components/resilient-image";
 import Link from "next/link";
 import { ArrowDownToLine, ArrowLeft, ArrowRight, Check, ChevronRight, Layers, MapPin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -110,7 +109,7 @@ function ProductVisual({ media, locale, priority = false }: { media: ProductMedi
   const alt = media.altLocalized ? readLocalizedText(media.altLocalized, locale) || media.alt : media.alt;
   if (media.url.startsWith("/")) {
     return (
-      <Image
+      <ResilientImage
         src={media.url}
         alt={alt}
         fill
@@ -121,7 +120,7 @@ function ProductVisual({ media, locale, priority = false }: { media: ProductMedi
     );
   }
 
-  return <img src={media.url} alt={alt} className="size-full object-cover" loading={priority ? "eager" : "lazy"} />;
+  return <ResilientImage src={media.url} alt={alt || "TOOYEI product image"} fill sizes="(max-width: 1024px) 100vw, 60vw" className="object-cover" priority={priority} unoptimized />;
 }
 
 export async function ProductPage({ product, locale }: { product: Product; locale: Locale }) {

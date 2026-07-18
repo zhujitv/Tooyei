@@ -12,6 +12,7 @@ import { products as sampleProducts } from "@/lib/content";
 import { getPrisma, isDatabaseConfigured } from "@/lib/db";
 import type { MediaAssetOption } from "@/lib/media-asset-types";
 import { contentLocales, type ContentLocale, type Locale } from "@/lib/site";
+import { withDataFallback } from "@/lib/server-data";
 
 const localeMap: Record<Locale, DatabaseLocale> = {
   en: DatabaseLocale.EN,
@@ -204,11 +205,11 @@ const buildPublicTree = <T extends { id: string; parentId: string | null; sortOr
 export async function getPublicCategoryTree(locale: Locale): Promise<PublicCategoryNode[]> {
   if (!isDatabaseConfigured()) return samplePublicCategories(locale);
 
-  const records = await getPrisma().category.findMany({
+  const records = await withDataFallback("categories.public.tree", () => getPrisma().category.findMany({
     where: publicCategoryWhere,
     include: { translations: true, coverAsset: true },
     orderBy: [{ sortOrder: "asc" }, { slug: "asc" }],
-  });
+  }), () => [], { locale });
 
   return buildPublicTree(records, (record) => ({
     id: record.id,
@@ -224,7 +225,7 @@ export async function getPublicCategoryTree(locale: Locale): Promise<PublicCateg
 export async function getPublicCategoryBySlug(slug: string, locale: Locale): Promise<PublicCategoryNode | undefined> {
   if (!isDatabaseConfigured()) return samplePublicCategories(locale).find((category) => category.slug === slug);
 
-  const record = await getPrisma().category.findFirst({
+  const record = await withDataFallback("categories.public.detail", () => getPrisma().category.findFirst({
     where: { slug, ...publicCategoryWhere },
     include: {
       translations: true,
@@ -236,7 +237,7 @@ export async function getPublicCategoryBySlug(slug: string, locale: Locale): Pro
         orderBy: [{ sortOrder: "asc" }, { slug: "asc" }],
       },
     },
-  });
+  }), null, { locale, slug });
   if (!record) return undefined;
 
   return {
@@ -263,11 +264,11 @@ export async function getPublicCategoryBySlug(slug: string, locale: Locale): Pro
 
 export async function getPublicCategorySlugs(): Promise<string[]> {
   if (!isDatabaseConfigured()) return samplePublicCategories("zh").map(({ slug }) => slug);
-  const records = await getPrisma().category.findMany({
+  const records = await withDataFallback("categories.public.slugs", () => getPrisma().category.findMany({
     where: publicCategoryWhere,
     select: { slug: true },
     orderBy: [{ sortOrder: "asc" }, { slug: "asc" }],
-  });
+  }), () => samplePublicCategories("zh").map(({ slug }) => ({ slug })));
   return records.map(({ slug }) => slug);
 }
 
@@ -359,14 +360,14 @@ export async function getAdminCategoryTree(): Promise<AdminCategoryNode[]> {
     }));
   }
 
-  const records = await getPrisma().category.findMany({
+  const records = await withDataFallback<AdminCategoryRecord[]>("categories.admin.tree", () => getPrisma().category.findMany({
     include: {
       translations: true,
       coverAsset: true,
       _count: { select: { children: true, products: true, productAssignments: true } },
     },
     orderBy: [{ sortOrder: "asc" }, { slug: "asc" }],
-  });
+  }), []);
   return buildAdminTree(records);
 }
 

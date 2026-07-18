@@ -8,7 +8,8 @@ import {
   LANGUAGE_COOKIE,
   LANGUAGE_PROMPT_COOKIE,
 } from "@/lib/language-preference";
-import { localizedAlternates } from "@/lib/site";
+import { localizedAlternates, type Locale } from "@/lib/site";
+import { logError } from "@/lib/observability";
 
 export const metadata: Metadata = {
   title: "TOOYEI 专业地板系统与 OEM / ODM 解决方案",
@@ -27,10 +28,17 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 export default async function Page() {
-  const [requestHeaders, cookieStore] = await Promise.all([headers(), cookies()]);
-  const hasLanguagePreference = cookieStore.has(LANGUAGE_COOKIE) || cookieStore.has(LANGUAGE_PROMPT_COOKIE);
-  const crawler = isSearchCrawler(requestHeaders.get("user-agent"));
-  const recommendedLocale = detectPreferredLocale(requestHeaders.get("accept-language"));
+  let hasLanguagePreference = true;
+  let crawler = true;
+  let recommendedLocale: Locale = "zh";
+  try {
+    const [requestHeaders, cookieStore] = await Promise.all([headers(), cookies()]);
+    hasLanguagePreference = cookieStore.has(LANGUAGE_COOKIE) || cookieStore.has(LANGUAGE_PROMPT_COOKIE);
+    crawler = isSearchCrawler(requestHeaders.get("user-agent"));
+    recommendedLocale = detectPreferredLocale(requestHeaders.get("accept-language"));
+  } catch (error) {
+    logError("Home request preferences unavailable; safe defaults used", { operation: "page.home.preferences" }, error);
+  }
 
   return (
     <>

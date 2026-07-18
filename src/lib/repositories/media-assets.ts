@@ -4,6 +4,8 @@ import { del } from "@vercel/blob";
 import { AssetType, Locale, MediaKind, Prisma, StorageProvider } from "@/generated/prisma/client";
 import { getPrisma, isDatabaseConfigured } from "@/lib/db";
 import type { MediaAssetOption } from "@/lib/media-asset-types";
+import { withDataFallback } from "@/lib/server-data";
+import { logError } from "@/lib/observability";
 
 const assetInclude = {
   products: { select: { product: { select: { id: true, slug: true, sku: true } } } },
@@ -63,25 +65,25 @@ export async function listMediaAssets(input: { q?: string; type?: AssetType; kin
       ] }],
     } : {}),
   };
-  const records = await getPrisma().mediaAsset.findMany({
+  const records = await withDataFallback("media-assets.list", () => getPrisma().mediaAsset.findMany({
     where,
     include: assetInclude,
     orderBy: [{ uploadedAt: "desc" }, { createdAt: "desc" }],
     take: Math.min(Math.max(input.limit ?? 100, 1), 200),
-  });
+  }), [], { q, productId, type: input.type, kind: input.kind });
   const urls = records.map((asset) => asset.url);
   const legacyCategoryCovers = urls.length
-    ? await getPrisma().category.findMany({ where: { coverAssetId: null, coverImage: { in: urls } }, select: { id: true, slug: true, coverImage: true } })
+    ? await withDataFallback("media-assets.legacy-category-references", () => getPrisma().category.findMany({ where: { coverAssetId: null, coverImage: { in: urls } }, select: { id: true, slug: true, coverImage: true } }), [])
     : [];
   return records.map((asset) => serializeAsset(asset, legacyCategoryCovers));
 }
 
 export async function listMediaAssetProductOptions() {
   if (!isDatabaseConfigured()) return [];
-  return getPrisma().product.findMany({
+  return withDataFallback("media-assets.product-options", () => getPrisma().product.findMany({
     select: { id: true, slug: true, sku: true, translations: { where: { locale: Locale.ZH }, select: { title: true }, take: 1 } },
     orderBy: { updatedAt: "desc" },
-  }).then((products) => products.map((product) => ({ id: product.id, label: `${product.sku} · ${product.translations[0]?.title || product.slug}` })));
+  }), []).then((products) => products.map((product) => ({ id: product.id, label: `${product.sku} · ${product.translations[0]?.title || product.slug}` })));
 }
 
 export async function deleteUnusedMediaAsset(assetId: string, deleteBlob: boolean) {
@@ -112,7 +114,7 @@ export async function deleteUnusedMediaAsset(assetId: string, deleteBlob: boolea
       blobDeleted = true;
     } catch (error) {
       await prisma.mediaAsset.updateMany({ where: { id: assetId, deletedAt: { not: null } }, data: { deletedAt: null } });
-      console.error("Orphan Blob cleanup failed", asset.pathname, error instanceof Error ? error.message : error);
+      logError("Orphan Blob cleanup failed", { operation: "media-assets.blob-delete", pathname: asset.pathname, assetId }, error);
       throw new Error("实际文件删除失败，媒体记录已恢复，请稍后重试。");
     }
   }

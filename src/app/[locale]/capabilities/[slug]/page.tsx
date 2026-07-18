@@ -9,6 +9,9 @@ import {
   isCapabilitySlug,
 } from "@/lib/capabilities";
 import { isLocale, locales, localizedAlternates, openGraphLocales } from "@/lib/site";
+import { safeMetadata } from "@/lib/metadata";
+
+export const dynamic = "force-dynamic";
 
 export function generateStaticParams() {
   return locales.flatMap((locale) => capabilitySlugs.map((slug) => ({ locale, slug })));
@@ -19,7 +22,8 @@ export async function generateMetadata({
 }: {
   params: Promise<{ locale: string; slug: string }>;
 }): Promise<Metadata> {
-  const { locale, slug } = await params;
+  return safeMetadata("metadata.capabilities.detail.localized", async () => {
+  const { locale = "", slug = "" } = await params;
   if (!isLocale(locale) || !isCapabilitySlug(slug)) return {};
   const content = capabilitiesCopy[locale].pages[slug];
   const path = `/capabilities/${slug}`;
@@ -39,6 +43,7 @@ export async function generateMetadata({
       images: [{ url: capabilityMedia[slug].hero, alt: content.title }],
     },
   };
+  }, { title: "TOOYEI Capabilities" });
 }
 
 export default async function Page({ params }: { params: Promise<{ locale: string; slug: string }> }) {

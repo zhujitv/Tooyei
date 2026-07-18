@@ -2,12 +2,14 @@ import { AssetType, MediaKind } from "@/generated/prisma/client";
 import { NextResponse } from "next/server";
 import { getProductManagerSession } from "@/lib/admin-auth";
 import { listMediaAssets } from "@/lib/repositories/media-assets";
+import { apiError } from "@/lib/api-response";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const session = await getProductManagerSession();
-  if (!session) return NextResponse.json({ ok: false, error: "没有媒体资源查看权限。" }, { status: 403 });
+  if (!session) return apiError(request, { code: "FORBIDDEN", message: "没有媒体资源查看权限。", status: 403, operation: "asset.list" });
+  try {
   const url = new URL(request.url);
   const typeValue = url.searchParams.get("type");
   const type = typeValue && Object.values(AssetType).includes(typeValue as AssetType) ? typeValue as AssetType : undefined;
@@ -23,4 +25,7 @@ export async function GET(request: Request) {
     limit,
   });
   return NextResponse.json({ ok: true, assets });
+  } catch (error) {
+    return apiError(request, { code: "ASSET_LIST_FAILED", message: "媒体资源加载失败。", status: 500, operation: "asset.list", error });
+  }
 }

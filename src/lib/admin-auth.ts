@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { AdminRole } from "@/generated/prisma/client";
 import { isDatabaseConfigured } from "@/lib/db";
 import { getCurrentAdminUser } from "@/lib/repositories/admin-users";
+import { logError } from "@/lib/observability";
 
 const cookieName = "tooyei_admin_session";
 const sessionDurationSeconds = 60 * 60 * 8;
@@ -64,17 +65,16 @@ export async function clearAdminSession() {
 export async function getAdminSession(): Promise<AdminSession | null> {
   const value = (await cookies()).get(cookieName)?.value;
   if (!value) return null;
-
-  const [payload, signature, ...rest] = value.split(".");
-  if (!payload || !signature || rest.length || !safeEqual(sign(payload), signature)) return null;
-
   try {
+    const [payload, signature, ...rest] = value.split(".");
+    if (!payload || !signature || rest.length || !safeEqual(sign(payload), signature)) return null;
     const session = JSON.parse(decode(payload)) as AdminSession & { nonce?: string };
     if (!session.email || !session.expiresAt || session.expiresAt <= Math.floor(Date.now() / 1000)) {
       return null;
     }
     return { email: session.email, expiresAt: session.expiresAt };
-  } catch {
+  } catch (error) {
+    logError("Admin session could not be read", { operation: "admin-auth.session-read" }, error);
     return null;
   }
 }

@@ -1,4 +1,4 @@
-import Image from "next/image";
+import { ResilientImage } from "@/components/resilient-image";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import type { Product } from "@/lib/content";
@@ -27,7 +27,7 @@ export function ProductCard({ product, locale, compact = false }: ProductCardPro
       className="group flex h-full flex-col overflow-hidden border border-[var(--border)] bg-white transition-colors duration-300 hover:border-[var(--gold)]/55"
     >
       <div className={cn("relative overflow-hidden bg-[#e3e2de]", compact ? "aspect-[3/2]" : "aspect-[4/3]")}>
-        <Image src={product.image} alt={`${product.sku} ${title}`} fill sizes="(max-width: 768px) 100vw, 33vw" className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]" />
+        <ResilientImage src={product.image} alt={`${product.sku || "TOOYEI"} ${title || "Product"}`} fill sizes="(max-width: 768px) 100vw, 33vw" className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]" />
         <span className="absolute left-4 top-4 border border-white/40 bg-white/90 px-3 py-1.5 text-[0.62rem] font-bold uppercase tracking-[0.12em] text-[var(--navy)] backdrop-blur">{categoryName}</span>
       </div>
       <div className={cn("flex flex-1 flex-col", compact ? "p-5" : "p-6 sm:p-7")}>

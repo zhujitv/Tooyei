@@ -38,8 +38,7 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const requestHeaders = await headers();
-  const requestedLocale = requestHeaders.get("x-tooyei-locale") ?? "zh";
+  const requestedLocale = (await headers()).get("x-tooyei-locale") ?? "zh";
   const locale = isLocale(requestedLocale) ? requestedLocale : "zh";
 
   return (

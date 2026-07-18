@@ -10,6 +10,7 @@ import { safeWriteAuditLog } from "@/lib/repositories/audit-logs";
 import { createPublicInquiry, getAdminInquiry } from "@/lib/repositories/inquiries";
 import { isDatabaseConfigured } from "@/lib/db";
 import { isLocale, localizedPath } from "@/lib/site";
+import { logError } from "@/lib/observability";
 
 const inquirySchema = z.object({
   name: z.string().trim().min(2).max(80),
@@ -49,12 +50,17 @@ export async function createInquiryAction(formData: FormData) {
   if (!isDatabaseConfigured()) redirect(`${contactPath}?error=database${productQuery}`);
   if (!isLocale(parsed.data.locale)) redirect("/contact?error=validation");
 
-  const requestHeaders = await headers();
-  const requestIp = getRequestIp(requestHeaders);
-  const rateLimit = await consumeInquiryRateLimit({
-    email: parsed.data.email,
-    ip: requestIp,
-  });
+  let rateLimit: Awaited<ReturnType<typeof consumeInquiryRateLimit>>;
+  try {
+    const requestHeaders = await headers();
+    rateLimit = await consumeInquiryRateLimit({
+      email: parsed.data.email,
+      ip: getRequestIp(requestHeaders),
+    });
+  } catch (error) {
+    logError("Inquiry rate-limit check failed; request allowed", { operation: "inquiry.rate-limit" }, error);
+    rateLimit = { allowed: true };
+  }
 
   if (!rateLimit.allowed) {
     await safeWriteAuditLog({
@@ -71,7 +77,9 @@ export async function createInquiryAction(formData: FormData) {
     redirect(`${contactPath}?error=rate_limit${productQuery}`);
   }
 
-  const inquiry = await createPublicInquiry({
+  let inquiry: Awaited<ReturnType<typeof createPublicInquiry>>;
+  try {
+  inquiry = await createPublicInquiry({
     name: parsed.data.name,
     email: parsed.data.email,
     phone: emptyToNull(parsed.data.phone),
@@ -82,12 +90,16 @@ export async function createInquiryAction(formData: FormData) {
     sourcePath: parsed.data.sourcePath || contactPath,
     productSlug: emptyToNull(parsed.data.productSlug),
   });
+  } catch (error) {
+    logError("Inquiry could not be saved", { operation: "inquiry.create", sourcePath: parsed.data.sourcePath || contactPath }, error);
+    redirect(`${contactPath}?error=server${productQuery}`);
+  }
 
   const notificationInquiry = await getAdminInquiry(inquiry.id);
   if (notificationInquiry) {
     const notification = await sendInquiryNotification(notificationInquiry);
     if (notification.status === "failed") {
-      console.error("Inquiry notification failed", notification.reason);
+      logError("Inquiry notification failed", { operation: "inquiry.notification", inquiryId: inquiry.id }, new Error(notification.reason));
     }
     await safeWriteAuditLog({
       action: "inquiry.created",

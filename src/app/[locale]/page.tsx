@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { HomePage } from "@/components/home-page";
 import { isLocale, locales, localizedAlternates, openGraphLocales, toContentLocale, type ContentLocale } from "@/lib/site";
+import { safeMetadata } from "@/lib/metadata";
 export const dynamic = "force-dynamic";
 export function generateStaticParams(){return locales.map((locale)=>({locale}));}
 
@@ -18,7 +19,8 @@ const metadataCopy: Record<ContentLocale, { title: string; description: string }
 } as const;
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
-  const { locale } = await params;
+  return safeMetadata("metadata.home.localized", async () => {
+  const { locale = "" } = await params;
   if (!isLocale(locale)) return {};
   const content = metadataCopy[toContentLocale(locale)];
   return {
@@ -30,6 +32,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
     },
     openGraph: { title: content.title, description: content.description, url: `/${locale}`, locale: openGraphLocales[locale] },
   };
+  }, { title: "TOOYEI" });
 }
 
 export default async function Page({params}:{params:Promise<{locale:string}>}){const {locale}=await params;if(!isLocale(locale))notFound();return <HomePage locale={locale}/>;}

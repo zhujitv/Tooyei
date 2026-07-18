@@ -5,6 +5,7 @@ import { capabilitiesCopy, capabilityMedia } from "@/lib/capabilities";
 import { localizedAlternates } from "@/lib/site";
 
 const content = capabilitiesCopy.zh.hub;
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: content.seoTitle,

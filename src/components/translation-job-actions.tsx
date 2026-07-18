@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { fetchWithRetry } from "@/lib/fetch-with-retry";
 
 type ConfirmAction = "STOP" | "CLOSE" | "DELETE";
 type MutationAction = ConfirmAction | "REQUEUE_FAILED" | "RESTORE";
@@ -46,7 +47,7 @@ export function TranslationJobActions({
     setPending(action);
     setMessage(null);
     try {
-      const response = await fetch(`/admin/api/translation-jobs/${jobId}`, {
+      const response = await fetchWithRetry(`/admin/api/translation-jobs/${jobId}`, {
         method: action === "DELETE" ? "DELETE" : "PATCH",
         headers: { Accept: "application/json", "Content-Type": "application/json" },
         body: action === "DELETE" ? undefined : JSON.stringify({ action }),

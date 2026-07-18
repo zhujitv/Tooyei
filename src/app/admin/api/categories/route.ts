@@ -5,6 +5,7 @@ import { getProductManagerSession } from "@/lib/admin-auth";
 import { safeWriteAuditLog } from "@/lib/repositories/audit-logs";
 import { createCategory, getAdminCategoryTree } from "@/lib/repositories/categories";
 import { contentLocales, localizedPath } from "@/lib/site";
+import { apiError } from "@/lib/api-response";
 
 export const dynamic = "force-dynamic";
 
@@ -17,21 +18,22 @@ const refreshCategoryPages = () => {
   revalidatePath("/sitemap.xml");
 };
 
-const errorResponse = (error: unknown, status = 400) =>
-  NextResponse.json(
-    { ok: false, error: categoryErrorMessage(error) },
-    { status },
-  );
+const errorResponse = (request: Request | undefined, error: unknown, status = 400) =>
+  apiError(request, { code: "CATEGORY_REQUEST_FAILED", message: categoryErrorMessage(error), status, operation: "category.collection", error });
 
-export async function GET() {
+export async function GET(request: Request) {
   const actor = await getProductManagerSession();
-  if (!actor) return errorResponse(new Error("没有产品栏目管理权限。"), 403);
-  return NextResponse.json({ ok: true, categories: await getAdminCategoryTree() });
+  if (!actor) return errorResponse(request, new Error("没有产品栏目管理权限。"), 403);
+  try {
+    return NextResponse.json({ ok: true, categories: await getAdminCategoryTree() });
+  } catch (error) {
+    return errorResponse(request, error, 500);
+  }
 }
 
 export async function POST(request: Request) {
   const actor = await getProductManagerSession();
-  if (!actor) return errorResponse(new Error("没有产品栏目管理权限。"), 403);
+  if (!actor) return errorResponse(request, new Error("没有产品栏目管理权限。"), 403);
 
   try {
     const parsed = categoryMutationSchema.parse(await request.json());
@@ -46,6 +48,6 @@ export async function POST(request: Request) {
     refreshCategoryPages();
     return NextResponse.json({ ok: true, category }, { status: 201 });
   } catch (error) {
-    return errorResponse(error);
+    return errorResponse(request, error);
   }
 }

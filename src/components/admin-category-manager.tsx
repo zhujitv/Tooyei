@@ -20,6 +20,7 @@ import {
   X,
 } from "lucide-react";
 import { ProductKind } from "@/generated/prisma/enums";
+import { fetchWithRetry } from "@/lib/fetch-with-retry";
 import { Button } from "@/components/ui/button";
 import { ImageUploader } from "@/components/media-uploader";
 import { Input } from "@/components/ui/input";
@@ -124,7 +125,7 @@ export function AdminCategoryManager({
   );
 
   const refresh = async () => {
-    const response = await fetch("/admin/api/categories", { cache: "no-store" });
+    const response = await fetchWithRetry("/admin/api/categories", { cache: "no-store" });
     const result = (await response.json()) as { ok: boolean; categories?: AdminCategoryNode[]; error?: string };
     if (!response.ok || !result.ok || !result.categories) throw new Error(result.error || "无法刷新栏目数据。");
     setCategories(result.categories);
@@ -173,7 +174,7 @@ export function AdminCategoryManager({
     setPending(true);
     setFeedback(null);
     try {
-      const response = await fetch(editingId ? `/admin/api/categories/${editingId}` : "/admin/api/categories", {
+      const response = await fetchWithRetry(editingId ? `/admin/api/categories/${editingId}` : "/admin/api/categories", {
         method: editingId ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(editingId ? { action: "update", data: draft } : draft),
@@ -194,7 +195,7 @@ export function AdminCategoryManager({
     setPending(true);
     setFeedback(null);
     try {
-      const response = await fetch(`/admin/api/categories/${category.id}`, {
+      const response = await fetchWithRetry(`/admin/api/categories/${category.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "toggle", isActive: !category.isActive }),
@@ -215,7 +216,7 @@ export function AdminCategoryManager({
     setPending(true);
     setFeedback(null);
     try {
-      const response = await fetch(`/admin/api/categories/${deleteTarget.id}`, { method: "DELETE" });
+      const response = await fetchWithRetry(`/admin/api/categories/${deleteTarget.id}`, { method: "DELETE" });
       const result = (await response.json()) as { ok: boolean; error?: string };
       if (!response.ok || !result.ok) throw new Error(result.error || "删除栏目失败。");
       await refresh();
@@ -233,7 +234,7 @@ export function AdminCategoryManager({
     setPending(true);
     setFeedback(null);
     try {
-      const response = await fetch("/admin/api/categories/reorder", {
+      const response = await fetchWithRetry("/admin/api/categories/reorder", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ parentId, orderedIds }),
@@ -321,7 +322,7 @@ export function AdminCategoryManager({
             )}
             <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-lg border border-[#E4E7EC] bg-[#F6F8FB] text-[#475467]">
               {category.coverImage ? (
-                <img src={category.coverImage} alt="" className="size-full object-cover" />
+                <img src={category.coverImage} alt="" className="size-full object-cover" onError={(event) => { event.currentTarget.src = "/media/placeholder.svg"; }} />
               ) : depth === 0 ? (
                 <FolderTree className="size-4" />
               ) : (

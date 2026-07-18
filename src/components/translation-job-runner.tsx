@@ -6,6 +6,7 @@ import { AlertDialog } from "radix-ui";
 import { LoaderCircle, Pause, Play, RefreshCw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { fetchWithRetry } from "@/lib/fetch-with-retry";
 
 type Progress = {
   status: string;
@@ -65,7 +66,7 @@ export function TranslationJobRunner({
     let executionId: string | undefined;
     try {
       while (continueRef.current && !terminalStatuses.has(current.status)) {
-        const response = await fetch(`/admin/api/translation-jobs/${jobId}/run`, {
+        const response = await fetchWithRetry(`/admin/api/translation-jobs/${jobId}/run`, {
           method: "POST",
           headers: { Accept: "application/json", "Content-Type": "application/json" },
           body: JSON.stringify(executionId ? { executionId } : {}),
@@ -110,7 +111,7 @@ export function TranslationJobRunner({
     setStopping(true);
     setMessage(null);
     try {
-      const response = await fetch(`/admin/api/translation-jobs/${jobId}`, {
+      const response = await fetchWithRetry(`/admin/api/translation-jobs/${jobId}`, {
         method: "PATCH",
         headers: { Accept: "application/json", "Content-Type": "application/json" },
         body: JSON.stringify({ action: "STOP" }),

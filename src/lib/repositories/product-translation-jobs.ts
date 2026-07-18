@@ -39,6 +39,8 @@ import {
   type TranslationExecutionStatus,
   type TranslationProcessingStep,
 } from "@/lib/translation-worker-config";
+import { withDataFallback } from "@/lib/server-data";
+import { logError } from "@/lib/observability";
 
 export const translationLocales = [
   Locale.EN,
@@ -73,6 +75,12 @@ const assertDatabase = () => {
 
 export const getTranslationServiceState = (provider?: string) => getTranslationProviderState(provider);
 
+const emptyTranslationDashboard = () => ({
+  totalProducts: 0,
+  coverage: Object.fromEntries(translationLocales.map((locale) => [locale, { ready: 0, review: 0, missing: 0 }])) as Record<TranslationLocale, { ready: number; review: number; missing: number }>,
+  jobs: [],
+});
+
 const executionStatusWhere = (status?: TranslationExecutionStatus): Prisma.ProductTranslationJobWhereInput | undefined => {
   switch (status) {
     case "PENDING": return { status: TranslationJobStatus.PENDING, startedAt: null };
@@ -91,15 +99,11 @@ const executionStatusWhere = (status?: TranslationExecutionStatus): Prisma.Produ
 
 export async function getTranslationDashboard(status?: TranslationExecutionStatus) {
   if (!isDatabaseConfigured()) {
-    return {
-      totalProducts: 0,
-      coverage: Object.fromEntries(translationLocales.map((locale) => [locale, { ready: 0, review: 0, missing: 0 }])) as Record<TranslationLocale, { ready: number; review: number; missing: number }>,
-      jobs: [],
-    };
+    return emptyTranslationDashboard();
   }
 
   const prisma = getPrisma();
-  const [totalProducts, grouped, jobs] = await Promise.all([
+  const result = await withDataFallback("translations.dashboard", () => Promise.all([
     prisma.product.count(),
     prisma.productTranslation.groupBy({
       by: ["locale", "status"],
@@ -141,7 +145,9 @@ export async function getTranslationDashboard(status?: TranslationExecutionStatu
         requestedBy: { select: { name: true, email: true } },
       },
     }),
-  ]);
+  ]), null, { status });
+  if (!result) return emptyTranslationDashboard();
+  const [totalProducts, grouped, jobs] = result;
 
   const coverage = Object.fromEntries(translationLocales.map((locale) => {
     const rows = grouped.filter((row) => row.locale === locale);
@@ -158,7 +164,7 @@ export async function getTranslationDashboard(status?: TranslationExecutionStatu
 export async function getTranslationProductOptions(query = "") {
   if (!isDatabaseConfigured()) return [];
   const contains = query.trim();
-  return getPrisma().product.findMany({
+  return withDataFallback("translations.product-options", () => getPrisma().product.findMany({
     where: contains
       ? { OR: [
           { sku: { contains, mode: "insensitive" } },
@@ -175,7 +181,7 @@ export async function getTranslationProductOptions(query = "") {
       kind: true,
       translations: { where: { locale: { in: [...translationLocales] } }, select: { locale: true, title: true, status: true } },
     },
-  });
+  }), [], { query: contains });
 }
 
 export async function createProductTranslationJob(input: CreateTranslationJobInput) {
@@ -254,7 +260,7 @@ export async function createProductTranslationJob(input: CreateTranslationJobInp
 
 export async function getProductTranslationJob(id: string) {
   if (!isDatabaseConfigured()) return null;
-  return getPrisma().productTranslationJob.findUnique({
+  return withDataFallback("translations.job-detail", () => getPrisma().productTranslationJob.findUnique({
     where: { id },
     select: {
       id: true,
@@ -343,7 +349,7 @@ export async function getProductTranslationJob(id: string) {
         },
       },
     },
-  });
+  }), null, { id });
 }
 
 const saveGeneratedTranslation = async (
@@ -751,7 +757,7 @@ const startTranslationItemHeartbeat = (
   workerId: string,
 ) => {
   const beat = () => updateTranslationItemStep(jobId, itemId, executionId, workerId, "CALL_MODEL")
-    .catch((error) => console.error("Translation heartbeat failed", error instanceof Error ? error.message : error));
+    .catch((error) => logError("Translation heartbeat failed", { operation: "translation.heartbeat", jobId, itemId, executionId, workerId }, error));
   const timer = setInterval(() => void beat(), translationWorkerConfig.heartbeatIntervalMs);
   return () => clearInterval(timer);
 };

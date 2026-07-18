@@ -44,7 +44,7 @@ export async function ProductsPage({ locale, categorySlug }: { locale: Locale; c
           {category?.coverImage ? (
             <div
               className="absolute inset-0 bg-cover bg-center opacity-20"
-              style={{ backgroundImage: `url(${JSON.stringify(category.coverImage)})` }}
+              style={{ backgroundImage: `url(${JSON.stringify(category.coverImage)}), url("/media/placeholder.svg")` }}
             />
           ) : null}
           <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">

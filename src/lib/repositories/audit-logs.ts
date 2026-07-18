@@ -1,5 +1,7 @@
 import { Prisma } from "@/generated/prisma/client";
 import { getPrisma, isDatabaseConfigured } from "@/lib/db";
+import { withDataFallback } from "@/lib/server-data";
+import { logError } from "@/lib/observability";
 
 export type AuditLogEntry = {
   id: string;
@@ -49,7 +51,7 @@ export async function safeWriteAuditLog(input: AuditLogInput) {
   try {
     return await writeAuditLog(input);
   } catch (error) {
-    console.error("Audit log write failed", error instanceof Error ? error.message : error);
+    logError("Audit log write failed", { operation: "audit-log.write", action: input.action, entityType: input.entityType, entityId: input.entityId }, error);
     return null;
   }
 }
@@ -57,7 +59,7 @@ export async function safeWriteAuditLog(input: AuditLogInput) {
 export async function getEntityAuditLogs(entityType: string, entityId: string): Promise<AuditLogEntry[]> {
   if (!isDatabaseConfigured()) return [];
 
-  return getPrisma().auditLog.findMany({
+  return withDataFallback("audit-logs.entity-list", () => getPrisma().auditLog.findMany({
     where: { entityType, entityId },
     orderBy: { createdAt: "desc" },
     take: 30,
@@ -75,5 +77,5 @@ export async function getEntityAuditLogs(entityType: string, entityId: string): 
         },
       },
     },
-  });
+  }), [], { entityType, entityId });
 }

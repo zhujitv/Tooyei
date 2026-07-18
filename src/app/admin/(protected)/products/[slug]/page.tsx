@@ -414,7 +414,7 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
       <header className="mt-4 grid gap-5 border-b border-[#E5E7EB] pb-6 lg:grid-cols-[1fr_auto] lg:items-end">
         <div className="flex min-w-0 items-start gap-4">
           <div className="relative hidden size-20 shrink-0 overflow-hidden rounded-xl border border-[#E5E7EB] bg-[#F8FAFC] sm:block">
-            {primaryMedia?.kind === "IMAGE" ? <div role="img" aria-label={primaryMedia.alt || zhTranslation?.title || product.sku} className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${JSON.stringify(primaryMedia.url)})` }} /> : <div className="absolute inset-0 grid place-items-center"><ImageIcon className="size-6 text-zinc-700" /></div>}
+            {primaryMedia?.kind === "IMAGE" ? <div role="img" aria-label={primaryMedia.alt || zhTranslation?.title || product.sku} className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${JSON.stringify(primaryMedia.url)}), url("/media/placeholder.svg")` }} /> : <div className="absolute inset-0 grid place-items-center"><ImageIcon className="size-6 text-zinc-700" /></div>}
           </div>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">

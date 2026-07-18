@@ -8,6 +8,7 @@ import {
 import { products as sampleProducts, type LocalizedText, type Product, type ProductMediaItem } from "@/lib/content";
 import { getPrisma, isDatabaseConfigured } from "@/lib/db";
 import { locales, type Locale } from "@/lib/site";
+import { withDataFallback } from "@/lib/server-data";
 
 const publicCategoryWhere: Prisma.CategoryWhereInput = {
   isActive: true,
@@ -103,14 +104,23 @@ const localizedText = <T extends { locale: DatabaseLocale }>(
   translations: T[],
   read: (translation: T) => string,
 ): LocalizedText => {
+  const readSafe = (translation?: T) => {
+    if (!translation) return "";
+    try {
+      const value = read(translation);
+      return typeof value === "string" ? value.trim() : "";
+    } catch {
+      return "";
+    }
+  };
   const chinese = translations.find(({ locale }) => locale === DatabaseLocale.ZH);
   const english = translations.find(({ locale }) => locale === DatabaseLocale.EN);
-  const fallback = english ? read(english) : chinese ? read(chinese) : "";
+  const fallback = readSafe(english) || readSafe(chinese);
 
   return Object.fromEntries(
     locales.map((locale) => {
       const translation = translations.find(({ locale: value }) => value === databaseLocale[locale]);
-      return [locale, translation ? read(translation) : fallback];
+      return [locale, readSafe(translation) || fallback];
     }),
   ) as LocalizedText;
 };
@@ -254,7 +264,7 @@ export async function getPublishedProducts(filters: { categorySlug?: string } = 
       : records;
   }
 
-  const records = await getPrisma().product.findMany({
+  const records = await withDataFallback<DatabaseProduct[] | null>("products.published.list", () => getPrisma().product.findMany({
     where: {
       status: ContentStatus.PUBLISHED,
       translations: { some: { locale: DatabaseLocale.ZH, status: TranslationStatus.PUBLISHED } },
@@ -274,7 +284,11 @@ export async function getPublishedProducts(filters: { categorySlug?: string } = 
     },
     include: productInclude,
     orderBy: [{ featured: "desc" }, { sortOrder: "asc" }, { createdAt: "desc" }],
-  });
+  }), null, { categorySlug: filters.categorySlug });
+  if (!records) {
+    const samples = sampleProducts.map(withSampleCategory);
+    return filters.categorySlug ? samples.filter((product) => product.primaryCategory?.slug === filters.categorySlug) : samples;
+  }
 
   return records.map(toProduct);
 }
@@ -285,22 +299,26 @@ export async function getPublishedProduct(slug: string): Promise<Product | undef
     return product ? withSampleCategory(product) : undefined;
   }
 
-  const record = await getPrisma().product.findFirst({
+  const record = await withDataFallback<DatabaseProduct | null>("products.published.detail", () => getPrisma().product.findFirst({
     where: { slug, status: ContentStatus.PUBLISHED, AND: [visibleCategoryClause] },
     include: productInclude,
-  });
+  }), null, { slug });
+  if (!record) {
+    const sample = sampleProducts.find((item) => item.slug === slug);
+    return sample ? withSampleCategory(sample) : undefined;
+  }
 
-  return record ? toProduct(record) : undefined;
+  return toProduct(record);
 }
 
 export async function getPublishedProductSlugs(): Promise<string[]> {
   if (!isDatabaseConfigured()) return sampleProducts.map(({ slug }) => slug);
 
-  const records = await getPrisma().product.findMany({
+  const records = await withDataFallback("products.published.slugs", () => getPrisma().product.findMany({
     where: { status: ContentStatus.PUBLISHED, AND: [visibleCategoryClause] },
     select: { slug: true },
     orderBy: { sortOrder: "asc" },
-  });
+  }), () => sampleProducts.map(({ slug }) => ({ slug })));
 
   return records.map(({ slug }) => slug);
 }

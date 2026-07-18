@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800" role="img" aria-label="Image unavailable">
+  <rect width="1200" height="800" fill="#F1F5F9"/>
+  <path d="M435 500l105-115 72 75 80-92 128 132H435z" fill="#CBD5E1"/>
+  <circle cx="505" cy="310" r="42" fill="#CBD5E1"/>
+  <rect x="360" y="220" width="480" height="360" rx="28" fill="none" stroke="#94A3B8" stroke-width="16"/>
+  <text x="600" y="650" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="30" fill="#64748B">TOOYEI</text>
+</svg>
