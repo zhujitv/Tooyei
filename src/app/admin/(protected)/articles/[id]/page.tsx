@@ -3,14 +3,16 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Bot, CheckCircle2, ExternalLink, FileText, Languages, TriangleAlert } from "lucide-react";
 import { ArticleKind, ContentStatus, Locale, TranslationStatus } from "@/generated/prisma/client";
-import { articleContentToEditor } from "@/lib/article-content";
 import { validateArticleSource } from "@/lib/article-publication";
+import { ArticleContentEditor } from "@/components/article-content-editor";
+import { ArticleImageField } from "@/components/article-image-field";
+import { ArticleSeoFields } from "@/components/article-seo-fields";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import type { MediaAssetOption } from "@/lib/media-asset-types";
 import { getAdminArticle } from "@/lib/repositories/admin-articles";
 import { articleTranslationLocales } from "@/lib/repositories/article-translation-jobs";
 import { getTranslationProviderState } from "@/lib/translation-providers/config";
@@ -35,6 +37,26 @@ const jobStatusLabel: Record<string, string> = {
   PENDING: "待处理", RUNNING: "执行中", COMPLETED: "已完成", PARTIAL_FAILED: "部分失败", FAILED: "失败",
 };
 
+type AdminArticleRecord = NonNullable<Awaited<ReturnType<typeof getAdminArticle>>>;
+
+const toMediaAssetOption = (asset: NonNullable<AdminArticleRecord["coverAsset"]>): MediaAssetOption => ({
+  id: asset.id,
+  url: asset.url,
+  pathname: asset.pathname,
+  filename: asset.originalFilename || asset.pathname.split("/").pop() || "文章封面",
+  mimeType: asset.mimeType,
+  sizeBytes: asset.sizeBytes,
+  width: asset.width,
+  height: asset.height,
+  assetType: asset.assetType,
+  storageProvider: asset.storageProvider,
+  uploadedAt: asset.uploadedAt?.toISOString() ?? null,
+  createdAt: asset.createdAt.toISOString(),
+  orphaned: false,
+  referenceCount: 1,
+  references: [],
+});
+
 export default async function ArticleDetailPage({
   params,
   searchParams,
@@ -50,6 +72,7 @@ export default async function ArticleDetailPage({
   if (!article) notFound();
   const selected = article.selectedTranslation;
   const english = article.englishTranslation;
+  const blobConfigured = Boolean(process.env.BLOB_READ_WRITE_TOKEN);
   const sourceValidation = validateArticleSource(english);
   const localeStatus = (locale: (typeof articleTranslationLocales)[number]) =>
     article.translations.find((translation) => translation.locale === locale)?.status ?? TranslationStatus.MISSING;
@@ -68,7 +91,7 @@ export default async function ArticleDetailPage({
         <form action={saveArticleCoreAction} className="admin-card p-5">
           <input type="hidden" name="id" value={article.id} />
           <div><h2 className="text-sm font-semibold text-[#172033]">发布与基础设置</h2><p className="mt-1 text-xs text-[#667085]">公开发布要求英文版本完整且已经发布；其他语言可独立审核上线。</p></div>
-          <div className="mt-5 grid gap-4 md:grid-cols-2"><div className="space-y-1.5"><Label htmlFor="slug">URL Slug</Label><Input id="slug" name="slug" required defaultValue={article.slug} /></div><div className="space-y-1.5"><Label htmlFor="kind">类型</Label><select id="kind" name="kind" defaultValue={article.kind} className="admin-select h-10 w-full px-3">{Object.values(ArticleKind).map((kind) => <option key={kind} value={kind}>{kind}</option>)}</select></div><div className="space-y-1.5"><Label htmlFor="status">文章状态</Label><select id="status" name="status" defaultValue={article.status} className="admin-select h-10 w-full px-3">{Object.values(ContentStatus).map((status) => <option key={status} value={status}>{status}</option>)}</select></div><div className="space-y-1.5"><Label htmlFor="authorName">作者</Label><Input id="authorName" name="authorName" defaultValue={article.authorName ?? ""} /></div><div className="space-y-1.5 md:col-span-2"><Label htmlFor="coverImage">封面图片 URL</Label><Input id="coverImage" name="coverImage" defaultValue={article.coverImage ?? ""} /></div></div>
+          <div className="mt-5 grid gap-4 md:grid-cols-2"><div className="space-y-1.5"><Label htmlFor="slug">URL Slug</Label><Input id="slug" name="slug" required defaultValue={article.slug} /></div><div className="space-y-1.5"><Label htmlFor="kind">类型</Label><select id="kind" name="kind" defaultValue={article.kind} className="admin-select h-10 w-full px-3">{Object.values(ArticleKind).map((kind) => <option key={kind} value={kind}>{kind}</option>)}</select></div><div className="space-y-1.5"><Label htmlFor="status">文章状态</Label><select id="status" name="status" defaultValue={article.status} className="admin-select h-10 w-full px-3">{Object.values(ContentStatus).map((status) => <option key={status} value={status}>{status}</option>)}</select></div><div className="space-y-1.5"><Label htmlFor="authorName">作者</Label><Input id="authorName" name="authorName" defaultValue={article.authorName ?? ""} /></div><div className="space-y-1.5 md:col-span-2"><Label>文章封面</Label><ArticleImageField initialAsset={article.coverAsset ? toMediaAssetOption(article.coverAsset) : null} legacyUrl={article.coverImage} serviceConfigured={blobConfigured} /></div></div>
           <label className="mt-4 flex items-center gap-2 text-sm text-[#475467]"><input type="checkbox" name="featured" defaultChecked={article.featured} className="size-4 rounded border-[#D0D5DD]" />推荐文章</label>
           {!sourceValidation.ok ? <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">英文源仍缺少：{sourceValidation.missingFields.join("、")}</p> : null}
           <div className="mt-5 flex justify-end"><Button type="submit" className="bg-[#172033] text-white hover:bg-[#27334a]">保存基础设置</Button></div>
@@ -82,7 +105,7 @@ export default async function ArticleDetailPage({
 
       <section className="mt-5 admin-card overflow-hidden">
         <div className="border-b border-[#E4E7EC] px-5 pt-5"><div className="flex items-start gap-3"><Languages className="mt-0.5 size-4 text-[#667085]" /><div><h2 className="text-sm font-semibold text-[#172033]">九语言内容与 SEO</h2><p className="mt-1 text-xs text-[#667085]">语言回退仅用于公开浏览；后台始终显示真实缺失状态。</p></div></div><nav className="mt-5 flex gap-1 overflow-x-auto" aria-label="文章语言">{articleTranslationLocales.map((locale) => { const active = locale === selectedLocale; const status = localeStatus(locale); return <Link key={locale} href={`/admin/articles/${article.id}?locale=${locale}`} className={`min-w-24 border-b-2 px-3 py-3 text-center text-xs font-medium ${active ? "border-[#172033] text-[#172033]" : "border-transparent text-[#667085] hover:text-[#344054]"}`}><span className="block text-base">{localeMeta[locale][0]}</span><span className="mt-1 block">{localeMeta[locale][1]}</span><span className={`mt-1 block text-[10px] ${status === TranslationStatus.PUBLISHED ? "text-emerald-700" : status === TranslationStatus.MISSING ? "text-rose-600" : "text-amber-700"}`}>{statusLabel[status]}</span></Link>; })}</nav></div>
-        <form action={saveArticleTranslationAction} className="p-5"><input type="hidden" name="articleId" value={article.id} /><input type="hidden" name="locale" value={selectedLocale} /><div className="flex flex-col gap-3 border-b border-[#EAECF0] pb-5 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-sm font-semibold text-[#172033]">{localeMeta[selectedLocale][0]} {localeMeta[selectedLocale][1]}</p><p className="mt-1 text-xs text-[#98A2B3]">{selected ? `最后更新 ${selected.updatedAt.toLocaleString("zh-CN")}` : "该语言内容尚未创建"}</p></div><div className="w-full space-y-1.5 sm:w-48"><Label htmlFor="translationStatus">内容状态</Label><select id="translationStatus" name="status" defaultValue={selected?.status ?? TranslationStatus.NEEDS_REVIEW} className="admin-select h-10 w-full px-3"><option value="NEEDS_REVIEW">待审核</option><option value="MACHINE_DRAFT">机器草稿</option><option value="PUBLISHED">已发布</option></select></div></div><div className="mt-5 space-y-4"><div className="space-y-1.5"><Label htmlFor="title">标题</Label><Input id="title" name="title" required defaultValue={selected?.title ?? ""} maxLength={240} /></div><div className="space-y-1.5"><Label htmlFor="excerpt">摘要</Label><Textarea id="excerpt" name="excerpt" rows={3} defaultValue={selected?.excerpt ?? ""} maxLength={1200} /></div><div className="space-y-1.5"><Label htmlFor="contentText">正文</Label><Textarea id="contentText" name="contentText" rows={20} defaultValue={articleContentToEditor(selected?.content)} className="font-mono text-sm leading-6" /><p className="text-xs text-[#98A2B3]">支持 ## 标题、### 小标题、- 列表、&gt; 引用；请用空行分隔内容块。</p></div><div className="grid gap-4 md:grid-cols-2"><div className="space-y-1.5"><Label htmlFor="seoTitle">SEO 标题</Label><Input id="seoTitle" name="seoTitle" defaultValue={selected?.seoTitle ?? ""} maxLength={180} /></div><div className="space-y-1.5"><Label htmlFor="seoDescription">SEO 描述</Label><Textarea id="seoDescription" name="seoDescription" rows={3} defaultValue={selected?.seoDescription ?? ""} maxLength={500} /></div></div></div><div className="mt-5 flex justify-end"><Button type="submit" className="bg-[#172033] text-white hover:bg-[#27334a]">保存 {localeMeta[selectedLocale][2]} 内容</Button></div></form>
+        <form action={saveArticleTranslationAction} className="p-5"><input type="hidden" name="articleId" value={article.id} /><input type="hidden" name="locale" value={selectedLocale} /><div className="flex flex-col gap-3 border-b border-[#EAECF0] pb-5 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-sm font-semibold text-[#172033]">{localeMeta[selectedLocale][0]} {localeMeta[selectedLocale][1]}</p><p className="mt-1 text-xs text-[#98A2B3]">{selected ? `最后更新 ${selected.updatedAt.toLocaleString("zh-CN")}` : "该语言内容尚未创建"}</p></div><div className="w-full space-y-1.5 sm:w-48"><Label htmlFor="translationStatus">内容状态</Label><select id="translationStatus" name="status" defaultValue={selected?.status ?? TranslationStatus.NEEDS_REVIEW} className="admin-select h-10 w-full px-3"><option value="NEEDS_REVIEW">待审核</option><option value="MACHINE_DRAFT">机器草稿</option><option value="PUBLISHED">已发布</option></select></div></div><div className="mt-5"><ArticleSeoFields initialTitle={selected?.title} initialExcerpt={selected?.excerpt} initialSeoTitle={selected?.seoTitle} initialSeoDescription={selected?.seoDescription} locale={selectedLocale} /></div><div className="mt-7 border-t border-[#EAECF0] pt-6"><div className="mb-4"><h3 className="text-sm font-semibold text-[#172033]">结构化正文</h3><p className="mt-1 text-xs text-[#667085]">按内容块编辑和排序，图片可直接上传或从媒体中心复用。</p></div><ArticleContentEditor key={`${article.id}-${selectedLocale}-${selected?.updatedAt.toISOString() || "new"}`} initialContent={selected?.content} locale={selectedLocale} serviceConfigured={blobConfigured} /></div><div className="mt-5 flex justify-end"><Button type="submit" className="bg-[#172033] text-white hover:bg-[#27334a]">保存 {localeMeta[selectedLocale][2]} 内容</Button></div></form>
       </section>
 
       <section className="mt-5 admin-card p-5"><h2 className="text-sm font-semibold text-[#172033]">最近翻译任务</h2>{article.translationJobs.length ? <div className="mt-4 divide-y divide-[#EAECF0]">{article.translationJobs.map((job) => <article key={job.id} className="grid gap-3 py-3 text-xs md:grid-cols-[1fr_130px_100px_1.2fr] md:items-center"><div><p className="font-medium text-[#344054]">{job.provider}</p><p className="mt-0.5 font-mono text-[10px] text-[#98A2B3]">{job.model}</p></div><Badge variant="outline" className="w-fit border-[#D0D5DD] bg-white text-[#667085]">{jobStatusLabel[job.status] ?? job.status}</Badge><p className="text-[#667085]">{job.completedItems}/{job.totalItems} 完成</p><p className="truncate text-rose-600">{job.lastError || "无错误"}</p></article>)}</div> : <p className="mt-3 text-xs text-[#98A2B3]">尚未创建文章翻译任务。</p>}</section>

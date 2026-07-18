@@ -23,6 +23,15 @@ test("article publication reports readable missing fields", () => {
   assert.deepEqual(result.missingFields, ["title", "content", "seoTitle"]);
 });
 
+test("article images require SEO-friendly alternative text before publishing", () => {
+  const result = validateArticleSource({
+    ...complete,
+    content: { version: 1, blocks: [{ id: "image-1", type: "image", text: "", assetId: "asset-1", url: "https://example.com/a.jpg", alt: "" }] },
+  });
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.missingFields, ["imageAlt"]);
+});
+
 test("article locale fallback is current locale then English then Chinese", () => {
   assert.equal(resolveArticleLocale(["de", "en", "zh"], "de"), "de");
   assert.equal(resolveArticleLocale(["en", "zh"], "fr"), "en");

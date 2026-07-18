@@ -43,6 +43,14 @@ export async function InsightArticlePage({ locale, slug }: { locale: Locale; slu
             {!article.hasExactTranslation ? <div className="mb-9 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900"><Languages className="mt-1 size-4 shrink-0" /><p>{labels.fallbackNotice}</p></div> : null}
             <div className="article-prose">
               {article.content.blocks.map((block) => {
+                if (block.type === "image" && block.url) return (
+                  <figure key={block.id} className="article-media-block">
+                    <div className="relative overflow-hidden rounded-xl bg-slate-100" style={{ aspectRatio: `${block.width || 16}/${block.height || 9}` }}>
+                      <Image src={block.url} alt={block.alt || article.title} fill sizes="(max-width: 768px) 100vw, 768px" className="object-cover" />
+                    </div>
+                    {block.caption ? <figcaption>{block.caption}</figcaption> : null}
+                  </figure>
+                );
                 if (block.type === "heading") return block.level === 3 ? <h3 key={block.id}>{block.text}</h3> : <h2 key={block.id}>{block.text}</h2>;
                 if (block.type === "quote") return <blockquote key={block.id}>{block.text}</blockquote>;
                 if (block.type === "list") return <ul key={block.id}>{block.text.split("\n").filter(Boolean).map((item, index) => <li key={`${block.id}-${index}`}>{item}</li>)}</ul>;

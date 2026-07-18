@@ -8,14 +8,16 @@ export type ArticleSourceFields = {
   seoDescription?: string | null;
 };
 
-export const articleRequiredFields = ["title", "excerpt", "content", "seoTitle", "seoDescription"] as const;
+export const articleRequiredFields = ["title", "excerpt", "content", "imageAlt", "seoTitle", "seoDescription"] as const;
 export type ArticleRequiredField = (typeof articleRequiredFields)[number];
 
 export function validateArticleSource(source: ArticleSourceFields | null | undefined) {
   const missingFields: ArticleRequiredField[] = [];
   if (!source?.title?.trim()) missingFields.push("title");
   if (!source?.excerpt?.trim()) missingFields.push("excerpt");
-  if (!normalizeArticleContent(source?.content).blocks.length) missingFields.push("content");
+  const content = normalizeArticleContent(source?.content);
+  if (!content.blocks.length) missingFields.push("content");
+  if (content.blocks.some((block) => block.type === "image" && !block.alt?.trim())) missingFields.push("imageAlt");
   if (!source?.seoTitle?.trim()) missingFields.push("seoTitle");
   if (!source?.seoDescription?.trim()) missingFields.push("seoDescription");
   return {

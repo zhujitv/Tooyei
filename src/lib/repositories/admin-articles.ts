@@ -82,6 +82,12 @@ export async function getAdminArticle(id: string, selectedLocale: Locale = Local
       prisma.article.findUnique({
         where: { id },
         include: {
+          coverAsset: {
+            select: {
+              id: true, url: true, pathname: true, originalFilename: true, mimeType: true, sizeBytes: true,
+              width: true, height: true, assetType: true, storageProvider: true, uploadedAt: true, createdAt: true,
+            },
+          },
           translations: {
             orderBy: { locale: "asc" },
             select: { id: true, locale: true, status: true, title: true, publishedAt: true, updatedAt: true },

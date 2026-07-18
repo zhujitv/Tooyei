@@ -112,7 +112,11 @@ export async function generateArticleTranslation(input: {
       seoDescription: source.seoDescription?.trim() || "",
     },
     media: [],
-    features: content.blocks.map((block) => ({ id: block.id, title: "", description: block.text })),
+    features: content.blocks.map((block) => ({
+      id: block.id,
+      title: block.type === "image" ? block.alt || "" : "",
+      description: block.type === "image" ? block.caption || "" : block.text,
+    })),
     specifications: [],
     applications: [],
     downloads: [],
@@ -145,6 +149,12 @@ export async function generateArticleTranslation(input: {
   const warnings = [...generated.warnings];
   const translatedBlocks = content.blocks.map((block) => {
     const row = translatedFeatures.find((item) => readTranslationString(item, ["id"]) === block.id);
+    if (block.type === "image") {
+      const alt = row ? readTranslationString(row, ["title"]).trim() : "";
+      const caption = row ? readTranslationString(row, ["description"]).trim() : "";
+      if (!alt) warnings.push(`正文图片 ${block.id} 缺少替代文本译文。`);
+      return { ...block, alt, caption, text: caption || alt };
+    }
     const text = row ? readTranslationString(row, ["description", "title"]).trim() : "";
     if (!text) warnings.push(`正文块 ${block.id} 缺少译文。`);
     return { ...block, text };

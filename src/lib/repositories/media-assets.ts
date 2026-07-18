@@ -13,6 +13,8 @@ const assetInclude = {
   applications: { select: { id: true, product: { select: { slug: true, sku: true } } } },
   downloads: { select: { id: true, product: { select: { slug: true, sku: true } } } },
   categoryCovers: { select: { id: true, slug: true } },
+  articleCovers: { select: { id: true, slug: true } },
+  articleMedia: { select: { article: { select: { id: true, slug: true } } } },
 } satisfies Prisma.MediaAssetInclude;
 
 type AssetRecord = Prisma.MediaAssetGetPayload<{ include: typeof assetInclude }>;
@@ -25,6 +27,8 @@ const serializeAsset = (asset: AssetRecord, legacyCategoryCovers: LegacyCategory
     ...asset.applications.map((application) => ({ type: "应用场景", id: application.id, label: `${application.product.sku} · ${application.product.slug}` })),
     ...asset.downloads.map((download) => ({ type: "下载资料", id: download.id, label: `${download.product.sku} · ${download.product.slug}` })),
     ...asset.categoryCovers.map((category) => ({ type: "栏目封面", id: category.id, label: category.slug })),
+    ...asset.articleCovers.map((article) => ({ type: "文章封面", id: article.id, label: article.slug })),
+    ...asset.articleMedia.map(({ article }) => ({ type: "文章正文", id: article.id, label: article.slug })),
     ...legacyCategoryCovers.filter((category) => category.coverImage === asset.url).map((category) => ({ type: "历史栏目封面", id: category.id, label: category.slug })),
   ];
   const uniqueReferences = references.filter((reference, index) => references.findIndex((item) => item.type === reference.type && item.id === reference.id) === index);

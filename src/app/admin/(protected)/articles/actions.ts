@@ -4,12 +4,18 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { ArticleKind, ContentStatus, Locale, Prisma, TranslationStatus } from "@/generated/prisma/client";
-import { articleContentFromEditor, articleReadingMinutes } from "@/lib/article-content";
+import { articleContentFromEditor, articleReadingMinutes, parseArticleContentJson } from "@/lib/article-content";
 import { normalizeArticleCoverImage } from "@/lib/article-cover";
 import { articleSlugPattern, validateArticleSource } from "@/lib/article-publication";
 import { requireProductManagerSession, requireTranslationManagerSession } from "@/lib/admin-auth";
 import { getPrisma, isDatabaseConfigured } from "@/lib/db";
 import { safeWriteAuditLog } from "@/lib/repositories/audit-logs";
+import {
+  refreshRemovedArticleAssets,
+  resolveArticleContentAssets,
+  resolveArticleCoverAsset,
+  syncArticleContentAssetReferences,
+} from "@/lib/repositories/article-assets";
 import {
   articleTranslationLocales,
   createArticleTranslationJob,
@@ -24,6 +30,7 @@ const articleCoreSchema = z.object({
   kind: z.enum(ArticleKind),
   status: z.enum(ContentStatus),
   featured: z.boolean(),
+  coverAssetId: z.string().trim().max(120).optional().transform((value) => value || null),
   coverImage: z.union([
     z.literal(""),
     z.url().max(2048).refine((value) => Boolean(normalizeArticleCoverImage(value)), "封面图片域名不受支持，请使用 Vercel Blob 或站内图片。"),
@@ -37,7 +44,8 @@ const translationSchema = z.object({
   status: z.enum(TranslationStatus),
   title: z.string().trim().min(1).max(240),
   excerpt: z.string().trim().max(1200),
-  contentText: z.string().max(100_000),
+  contentText: z.string().max(100_000).optional().default(""),
+  contentJson: z.string().max(250_000).optional(),
   seoTitle: z.string().trim().max(180),
   seoDescription: z.string().trim().max(500),
 });
@@ -45,6 +53,9 @@ const translationSchema = z.object({
 const requireDatabase = () => {
   if (!isDatabaseConfigured()) throw new Error("DATABASE_URL 尚未配置，无法保存文章。");
 };
+
+const parseEditorContent = (value: { contentJson?: string; contentText: string }) =>
+  value.contentJson?.trim() ? parseArticleContentJson(value.contentJson) : articleContentFromEditor(value.contentText);
 
 const revalidateArticlePaths = (slug?: string) => {
   revalidatePath("/admin/content");
@@ -72,30 +83,41 @@ export async function createArticleAction(formData: FormData) {
     requireDatabase();
     const core = articleCoreSchema.safeParse({
       slug: formData.get("slug"), kind: formData.get("kind"), status: ContentStatus.DRAFT,
-      featured: formData.get("featured") === "on", coverImage: formData.get("coverImage") || "", authorName: formData.get("authorName") || undefined,
+      featured: formData.get("featured") === "on", coverAssetId: formData.get("coverAssetId") || "",
+      coverImage: formData.get("coverImage") || "", authorName: formData.get("authorName") || undefined,
     });
     const english = translationSchema.safeParse({
       articleId: "new", locale: Locale.EN, status: TranslationStatus.NEEDS_REVIEW,
       title: formData.get("title"), excerpt: formData.get("excerpt") || "", contentText: formData.get("contentText") || "",
+      contentJson: formData.get("contentJson") || undefined,
       seoTitle: formData.get("seoTitle") || "", seoDescription: formData.get("seoDescription") || "",
     });
     if (!core.success) throw new Error(core.error.issues[0]?.message || "请检查文章基础信息。");
     if (!english.success) throw new Error(english.error.issues[0]?.message || "请检查英文文章内容。");
-    const content = articleContentFromEditor(english.data.contentText);
+    const content = parseEditorContent(english.data);
     const validation = validateArticleSource({ ...english.data, content });
     if (!validation.ok) throw new Error(`英文内容缺少：${validation.missingFields.join("、")}`);
-    const article = await getPrisma().article.create({
-      data: {
-        slug: core.data.slug, kind: core.data.kind, status: ContentStatus.DRAFT,
-        featured: core.data.featured, coverImage: core.data.coverImage, authorName: core.data.authorName,
-        translations: { create: {
-          locale: Locale.EN, status: TranslationStatus.NEEDS_REVIEW,
-          title: english.data.title, excerpt: english.data.excerpt, content,
-          seoTitle: english.data.seoTitle, seoDescription: english.data.seoDescription,
-          readingMinutes: articleReadingMinutes(content),
-        } },
-      },
-      select: { id: true, slug: true },
+    const article = await getPrisma().$transaction(async (transaction) => {
+      const [cover, resolvedContent] = await Promise.all([
+        resolveArticleCoverAsset(transaction, core.data.coverAssetId, core.data.coverImage),
+        resolveArticleContentAssets(transaction, content),
+      ]);
+      const created = await transaction.article.create({
+        data: {
+          slug: core.data.slug, kind: core.data.kind, status: ContentStatus.DRAFT,
+          featured: core.data.featured, coverImage: cover.coverImage, coverAssetId: cover.coverAssetId, authorName: core.data.authorName,
+          translations: { create: {
+            locale: Locale.EN, status: TranslationStatus.NEEDS_REVIEW,
+            title: english.data.title, excerpt: english.data.excerpt, content: resolvedContent,
+            seoTitle: english.data.seoTitle, seoDescription: english.data.seoDescription,
+            readingMinutes: articleReadingMinutes(resolvedContent),
+          } },
+        },
+        select: { id: true, slug: true },
+      });
+      if (cover.coverAssetId) await transaction.mediaAsset.update({ where: { id: cover.coverAssetId }, data: { orphanedAt: null } });
+      await syncArticleContentAssetReferences(transaction, created.id);
+      return created;
     });
     await safeWriteAuditLog({ actorEmail: session.email, action: "article.created", entityType: "Article", entityId: article.id, metadata: { slug: article.slug } });
     revalidateArticlePaths(article.slug);
@@ -114,12 +136,14 @@ export async function saveArticleCoreAction(formData: FormData) {
     requireDatabase();
     const parsed = articleCoreSchema.safeParse({
       id, slug: formData.get("slug"), kind: formData.get("kind"), status: formData.get("status"),
-      featured: formData.get("featured") === "on", coverImage: formData.get("coverImage") || "", authorName: formData.get("authorName") || undefined,
+      featured: formData.get("featured") === "on", coverAssetId: formData.get("coverAssetId") || "",
+      coverImage: formData.get("coverImage") || "", authorName: formData.get("authorName") || undefined,
     });
     if (!parsed.success) throw new Error(parsed.error.issues[0]?.message || "请检查文章基础信息。");
     const { currentSlug, updated } = await getPrisma().$transaction(async (transaction) => {
       const current = await transaction.article.findUnique({ where: { id }, include: { translations: { where: { locale: Locale.EN } } } });
       if (!current) throw new Error("文章不存在或已经删除。");
+      const cover = await resolveArticleCoverAsset(transaction, parsed.data.coverAssetId, parsed.data.coverImage);
       let english: (typeof current.translations)[number] | undefined = current.translations[0];
       if (english) {
         await transaction.$queryRaw`SELECT "id" FROM "ArticleTranslation" WHERE "id" = ${english.id} FOR SHARE`;
@@ -135,10 +159,12 @@ export async function saveArticleCoreAction(formData: FormData) {
         where: { id },
         data: {
           slug: parsed.data.slug, kind: parsed.data.kind, status: parsed.data.status,
-          featured: parsed.data.featured, coverImage: parsed.data.coverImage, authorName: parsed.data.authorName,
+          featured: parsed.data.featured, coverImage: cover.coverImage, coverAssetId: cover.coverAssetId, authorName: parsed.data.authorName,
           publishedAt: parsed.data.status === ContentStatus.PUBLISHED ? current.publishedAt ?? new Date() : current.publishedAt,
         },
       });
+      if (cover.coverAssetId) await transaction.mediaAsset.update({ where: { id: cover.coverAssetId }, data: { orphanedAt: null } });
+      if (current.coverAssetId !== cover.coverAssetId) await refreshRemovedArticleAssets(transaction, [current.coverAssetId]);
       return { currentSlug: current.slug, updated: next };
     });
     await safeWriteAuditLog({ actorEmail: session.email, action: "article.updated", entityType: "Article", entityId: id, metadata: { slug: updated.slug, status: updated.status } });
@@ -160,39 +186,44 @@ export async function saveArticleTranslationAction(formData: FormData) {
     requireDatabase();
     const parsed = translationSchema.safeParse({
       articleId, locale, status: formData.get("status"), title: formData.get("title"), excerpt: formData.get("excerpt") || "",
-      contentText: formData.get("contentText") || "", seoTitle: formData.get("seoTitle") || "", seoDescription: formData.get("seoDescription") || "",
+      contentText: formData.get("contentText") || "", contentJson: formData.get("contentJson") || undefined,
+      seoTitle: formData.get("seoTitle") || "", seoDescription: formData.get("seoDescription") || "",
     });
     if (!parsed.success) throw new Error(parsed.error.issues[0]?.message || "请检查文章语言内容。");
     if (parsed.data.status === TranslationStatus.MISSING) throw new Error("已有内容不能保存为“缺失”，请使用待审核或已发布状态。");
-    const content = articleContentFromEditor(parsed.data.contentText);
+    const content = parseEditorContent(parsed.data);
     const validation = validateArticleSource({ ...parsed.data, content });
     if (parsed.data.status === TranslationStatus.PUBLISHED && !validation.ok) {
       throw new Error(`发布前请补全：${validation.missingFields.join("、")}`);
     }
-    const article = await getPrisma().article.findUnique({
-      where: { id: articleId },
-      select: { status: true, slug: true, translations: { where: { locale: parsed.data.locale }, select: { publishedAt: true } } },
-    });
-    if (!article) throw new Error("文章不存在或已经删除。");
-    if (parsed.data.locale === Locale.EN && article.status === ContentStatus.PUBLISHED && parsed.data.status !== TranslationStatus.PUBLISHED) {
-      throw new Error("文章整体已发布；如需撤下英文版本，请先将文章状态改为草稿或归档。");
-    }
-    const preservedPublishedAt = article.translations[0]?.publishedAt ?? (parsed.data.status === TranslationStatus.PUBLISHED ? new Date() : null);
-    await getPrisma().articleTranslation.upsert({
-      where: { articleId_locale: { articleId, locale: parsed.data.locale } },
-      update: {
-        title: parsed.data.title, excerpt: parsed.data.excerpt, content,
-        seoTitle: parsed.data.seoTitle, seoDescription: parsed.data.seoDescription,
-        readingMinutes: articleReadingMinutes(content),
-        status: parsed.data.status,
-        publishedAt: preservedPublishedAt,
-      },
-      create: {
-        articleId, locale: parsed.data.locale, title: parsed.data.title, excerpt: parsed.data.excerpt, content,
-        seoTitle: parsed.data.seoTitle, seoDescription: parsed.data.seoDescription, status: parsed.data.status,
-        readingMinutes: articleReadingMinutes(content),
-        publishedAt: parsed.data.status === TranslationStatus.PUBLISHED ? new Date() : null,
-      },
+    const article = await getPrisma().$transaction(async (transaction) => {
+      const [current, resolvedContent] = await Promise.all([
+        transaction.article.findUnique({
+          where: { id: articleId },
+          select: { status: true, slug: true, translations: { where: { locale: parsed.data.locale }, select: { publishedAt: true } } },
+        }),
+        resolveArticleContentAssets(transaction, content),
+      ]);
+      if (!current) throw new Error("文章不存在或已经删除。");
+      if (parsed.data.locale === Locale.EN && current.status === ContentStatus.PUBLISHED && parsed.data.status !== TranslationStatus.PUBLISHED) {
+        throw new Error("文章整体已发布；如需撤下英文版本，请先将文章状态改为草稿或归档。");
+      }
+      const preservedPublishedAt = current.translations[0]?.publishedAt ?? (parsed.data.status === TranslationStatus.PUBLISHED ? new Date() : null);
+      await transaction.articleTranslation.upsert({
+        where: { articleId_locale: { articleId, locale: parsed.data.locale } },
+        update: {
+          title: parsed.data.title, excerpt: parsed.data.excerpt, content: resolvedContent,
+          seoTitle: parsed.data.seoTitle, seoDescription: parsed.data.seoDescription,
+          readingMinutes: articleReadingMinutes(resolvedContent), status: parsed.data.status, publishedAt: preservedPublishedAt,
+        },
+        create: {
+          articleId, locale: parsed.data.locale, title: parsed.data.title, excerpt: parsed.data.excerpt, content: resolvedContent,
+          seoTitle: parsed.data.seoTitle, seoDescription: parsed.data.seoDescription, status: parsed.data.status,
+          readingMinutes: articleReadingMinutes(resolvedContent), publishedAt: parsed.data.status === TranslationStatus.PUBLISHED ? new Date() : null,
+        },
+      });
+      await syncArticleContentAssetReferences(transaction, articleId);
+      return current;
     });
     await safeWriteAuditLog({ actorEmail: session.email, action: "article.translation.saved", entityType: "Article", entityId: articleId, metadata: { locale: parsed.data.locale, status: parsed.data.status } });
     revalidateArticlePaths(article.slug);
