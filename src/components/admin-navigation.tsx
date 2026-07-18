@@ -13,7 +13,7 @@ import {
   Menu,
   MessageSquare,
   Package,
-  Share2,
+  Settings,
   Users,
 } from "lucide-react";
 import { logoutAction } from "@/app/admin/login/actions";
@@ -36,7 +36,7 @@ const navItems = [
   { href: "/admin/media", label: "媒体中心", icon: Images },
   { href: "/admin/inquiries", label: "询盘", icon: MessageSquare },
   { href: "/admin/users", label: "团队与权限", icon: Users },
-  { href: "/admin/settings/social", label: "社媒管理", icon: Share2 },
+  { href: "/admin/settings", label: "系统设置", icon: Settings },
 ] as const;
 
 const isActivePath = (pathname: string, href: string) => pathname === href || pathname.startsWith(`${href}/`);

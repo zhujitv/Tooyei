@@ -28,7 +28,8 @@ import { Button } from "@/components/ui/button";
 import { capabilitiesCopy } from "@/lib/capabilities";
 import { getPublicCategoryTree } from "@/lib/repositories/categories";
 import { getPublishedProducts } from "@/lib/repositories/products";
-import { localizedPath, siteConfig, toContentLocale, type ContentLocale, type Locale } from "@/lib/site";
+import { getPublicSiteSettings } from "@/lib/repositories/site-settings";
+import { localizedPath, toContentLocale, type ContentLocale, type Locale } from "@/lib/site";
 
 type HomeCopy = {
   hero: { eyebrow: string; title: string; body: string; primary: string; secondary: string };
@@ -293,11 +294,11 @@ export async function HomePage({ locale }: { locale: Locale }) {
   const t = homeCopy[contentLocale];
   const auxiliary = homeAuxCopy[contentLocale];
   const capabilityLabels = capabilitiesCopy[locale];
-  const [products, categories] = await Promise.all([getPublishedProducts(), getPublicCategoryTree(locale)]);
+  const [products, categories, settings] = await Promise.all([getPublishedProducts(), getPublicCategoryTree(locale), getPublicSiteSettings()]);
 
   return (
     <div className="site-shell">
-      <SiteHeader locale={locale} initialCategories={categories} />
+      <SiteHeader locale={locale} initialCategories={categories} initialSettings={settings} />
       <main>
         <section className="brand-hero relative isolate min-h-[560px] overflow-hidden bg-[var(--navy)] text-white lg:min-h-[640px]">
           <Image
@@ -616,7 +617,7 @@ export async function HomePage({ locale }: { locale: Locale }) {
                 <Link href={localizedPath(locale, "/contact")}>{t.cta.action}<ArrowUpRight className="size-4" /></Link>
               </Button>
               <div className="mt-5 space-y-1 text-sm text-white/60">
-                <a href={`mailto:${siteConfig.email}`} className="block min-h-11 py-3 transition-colors hover:text-white">{siteConfig.email}</a>
+                <a href={`mailto:${settings.email}`} className="block min-h-11 py-3 transition-colors hover:text-white">{settings.email}</a>
                 <SocialLinks showLabels linkClassName="min-h-11 justify-start text-white/60 hover:text-white" />
               </div>
             </div>

@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/sheet";
 import { SocialLinks } from "@/components/social-links";
 import type { PublicCategoryNode } from "@/lib/repositories/categories";
+import type { PublicSiteSettings } from "@/lib/repositories/site-settings";
 import { languageMarkers, languageNames, localizedPath, locales, siteConfig, toContentLocale, type ContentLocale, type Locale } from "@/lib/site";
 import { cn } from "@/lib/utils";
 import { fetchWithRetry } from "@/lib/fetch-with-retry";
@@ -173,11 +174,27 @@ function Brand({ locale, inverted = false }: { locale: Locale; inverted?: boolea
   );
 }
 
-export function SiteHeader({ locale, initialCategories = [] }: { locale: Locale; initialCategories?: PublicCategoryNode[] }) {
+export function SiteHeader({ locale, initialCategories = [], initialSettings }: { locale: Locale; initialCategories?: PublicCategoryNode[]; initialSettings?: PublicSiteSettings }) {
   const pathname = usePathname();
   const labels = headerCopy[toContentLocale(locale)];
   const neutralPath = pathname.replace(/^\/(en|de|fr|es|ru|ja|it|ar|zh)(?=\/|$)/, "") || "/";
   const [categories, setCategories] = useState<PublicCategoryNode[]>(initialCategories);
+  const [settings, setSettings] = useState<PublicSiteSettings>(initialSettings ?? {
+    siteName: siteConfig.name,
+    legalName: siteConfig.legalName,
+    description: siteConfig.description,
+    siteUrl: siteConfig.url,
+    defaultSeoTitle: "Tooyei 专业地板制造商",
+    defaultSeoDescription: "工厂直供 SPC、WPC、LVT 与强化地板，为批发、商业和 OEM 项目提供稳定品质与出口服务。",
+    email: siteConfig.email,
+    phone: siteConfig.phone,
+    whatsappDisplay: siteConfig.whatsappDisplay,
+    address: "",
+    timezone: "Asia/Shanghai",
+    defaultLocale: "zh",
+    allowIndexing: true,
+    maintenanceMode: false,
+  });
   const [activeSection, setActiveSection] = useState("");
   const [megaOpen, setMegaOpen] = useState(false);
   const [mobileProductsOpen, setMobileProductsOpen] = useState(false);
@@ -192,6 +209,18 @@ export function SiteHeader({ locale, initialCategories = [] }: { locale: Locale;
     const explicitLocale = pathname.match(/^\/(en|de|fr|es|ru|ja|it|ar|zh)(?=\/|$)/)?.[1];
     if (explicitLocale === locale) persistLanguagePreference(locale);
   }, [locale, pathname]);
+
+  useEffect(() => {
+    if (initialSettings) return;
+    const controller = new AbortController();
+    fetchWithRetry("/api/site-settings", { cache: "no-store", signal: controller.signal, timeoutMs: 10_000 })
+      .then((response) => response.json())
+      .then((result: { ok?: boolean; settings?: PublicSiteSettings }) => {
+        if (result.ok && result.settings) setSettings(result.settings);
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [initialSettings]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -260,7 +289,7 @@ export function SiteHeader({ locale, initialCategories = [] }: { locale: Locale;
         <div className="mx-auto flex h-[30px] max-w-[90rem] items-center justify-between px-5 text-[0.62rem] font-medium uppercase tracking-[0.13em] text-white/65 lg:px-10">
           <span>{labels.utility}</span>
           <div className="flex items-center gap-3">
-            <a href={`mailto:${siteConfig.email}`} className="hidden transition-colors hover:text-[var(--gold)] sm:inline-flex">{siteConfig.email}</a>
+            <a href={`mailto:${settings.email}`} className="hidden transition-colors hover:text-[var(--gold)] sm:inline-flex">{settings.email}</a>
             <span className="hidden h-3 w-px bg-white/15 sm:block" />
             <SocialLinks linkClassName="size-7 min-h-0 text-white/60 hover:text-white" />
           </div>

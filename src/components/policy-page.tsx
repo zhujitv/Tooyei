@@ -4,15 +4,20 @@ import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { policies, type PolicyKind } from "@/config/policies";
 import { getPublicCategoryTree } from "@/lib/repositories/categories";
-import { localeDirection, localizedPath, type Locale } from "@/lib/site";
+import { getPublicSiteSettings } from "@/lib/repositories/site-settings";
+import { localeDirection, localizedPath, siteConfig, type Locale } from "@/lib/site";
 
 export async function PolicyPage({ kind, locale }: { kind: PolicyKind; locale: Locale }) {
   const policy = policies[locale][kind];
-  const categories = await getPublicCategoryTree(locale);
+  const [categories, settings] = await Promise.all([getPublicCategoryTree(locale), getPublicSiteSettings()]);
+  const renderBody = (body: string) =>
+    body
+      .replaceAll(siteConfig.email, settings.email)
+      .replaceAll(siteConfig.legalName, settings.legalName);
 
   return (
     <div className="site-shell" dir={localeDirection(locale)}>
-      <SiteHeader locale={locale} initialCategories={categories} />
+      <SiteHeader locale={locale} initialCategories={categories} initialSettings={settings} />
       <main>
         <section className="bg-[var(--navy)] text-white">
           <div className="mx-auto max-w-5xl px-5 py-20 lg:px-10 lg:py-28">
@@ -32,7 +37,7 @@ export async function PolicyPage({ kind, locale }: { kind: PolicyKind; locale: L
                 <section key={section.title} className="grid gap-4 border-b border-[var(--border)] py-8 md:grid-cols-[5rem_0.8fr_1.2fr]">
                   <span className="font-mono text-sm tracking-[0.15em] text-[var(--gold)]">0{index + 1}</span>
                   <h2 className="text-xl font-semibold tracking-[-0.01em] text-[var(--navy)]">{section.title}</h2>
-                  <p className="text-base leading-8 text-[var(--muted)]">{section.body}</p>
+                  <p className="text-base leading-8 text-[var(--muted)]">{renderBody(section.body)}</p>
                 </section>
               ))}
             </div>

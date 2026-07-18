@@ -4,7 +4,8 @@ import { Mail, MapPin, MessageCircle, Phone } from "lucide-react";
 import { SocialLinks } from "@/components/social-links";
 import { getPublicCategoryTree } from "@/lib/repositories/categories";
 import { getPublicSocialLinks } from "@/lib/repositories/social-links";
-import { localizedPath, siteConfig, toContentLocale, type ContentLocale, type Locale } from "@/lib/site";
+import { getPublicSiteSettings } from "@/lib/repositories/site-settings";
+import { localizedPath, toContentLocale, type ContentLocale, type Locale } from "@/lib/site";
 
 type FooterCopy = {
   description: string;
@@ -108,8 +109,9 @@ const footerLinkClass = "inline-flex min-h-11 items-center text-sm text-white/55
 
 export async function SiteFooter({ locale }: { locale: Locale }) {
   const labels = footerCopy[toContentLocale(locale)];
-  const [categories, socialLinks] = await Promise.all([getPublicCategoryTree(locale), getPublicSocialLinks()]);
+  const [categories, socialLinks, settings] = await Promise.all([getPublicCategoryTree(locale), getPublicSocialLinks(), getPublicSiteSettings()]);
   const whatsapp = socialLinks.find(({ key }) => key === "whatsapp");
+  const location = settings.address || labels.location;
 
   return (
     <footer className="bg-[#050c16] text-white">
@@ -160,20 +162,20 @@ export async function SiteFooter({ locale }: { locale: Locale }) {
           <div>
             <FooterHeading>{labels.contact}</FooterHeading>
             <div className="mt-5 space-y-1">
-              <a href={`mailto:${siteConfig.email}`} className={`${footerLinkClass} gap-3`}><Mail className="size-4 shrink-0 text-[var(--gold)]" />{siteConfig.email}</a>
-              <a href={`tel:${siteConfig.phone.replaceAll(" ", "")}`} className={`${footerLinkClass} gap-3`}><Phone className="size-4 shrink-0 text-[var(--gold)]" />{siteConfig.phone}</a>
+              <a href={`mailto:${settings.email}`} className={`${footerLinkClass} gap-3`}><Mail className="size-4 shrink-0 text-[var(--gold)]" />{settings.email}</a>
+              <a href={`tel:${settings.phone.replaceAll(" ", "")}`} className={`${footerLinkClass} gap-3`}><Phone className="size-4 shrink-0 text-[var(--gold)]" />{settings.phone}</a>
               {whatsapp?.href ? (
-                <a href={whatsapp.href} target="_blank" rel="noopener noreferrer" className={`${footerLinkClass} gap-3`} aria-label={`WhatsApp ${siteConfig.whatsappDisplay}`}>
+                <a href={whatsapp.href} target="_blank" rel="noopener noreferrer" className={`${footerLinkClass} gap-3`} aria-label={`WhatsApp ${settings.whatsappDisplay}`}>
                   <MessageCircle className="size-4 shrink-0 text-[var(--gold)]" />WhatsApp
                 </a>
               ) : null}
-              <p className="flex min-h-11 items-center gap-3 text-sm text-white/55"><MapPin className="size-4 shrink-0 text-[var(--gold)]" />{labels.location}</p>
+              <p className="flex min-h-11 items-center gap-3 text-sm text-white/55"><MapPin className="size-4 shrink-0 text-[var(--gold)]" />{location}</p>
             </div>
           </div>
         </div>
 
         <div className="flex flex-col gap-4 border-t border-white/10 py-6 text-[0.68rem] text-white/35 sm:flex-row sm:items-center sm:justify-between">
-          <p>© {new Date().getFullYear()} {siteConfig.legalName}</p>
+          <p>© {new Date().getFullYear()} {settings.legalName}</p>
           <div className="flex flex-wrap gap-x-5">
             <Link href={localizedPath(locale, "/privacy")} className="min-h-11 py-3 transition-colors hover:text-white">{labels.privacy}</Link>
             <Link href={localizedPath(locale, "/terms")} className="min-h-11 py-3 transition-colors hover:text-white">{labels.terms}</Link>

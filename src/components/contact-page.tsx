@@ -8,10 +8,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { getPublicSocialLinks } from "@/lib/repositories/social-links";
+import { getPublicSiteSettings } from "@/lib/repositories/site-settings";
 import type { Product } from "@/lib/content";
 import { copy, readLocalizedText } from "@/lib/content";
 import { getPublicCategoryTree } from "@/lib/repositories/categories";
-import { localizedPath, siteConfig, toContentLocale, type Locale } from "@/lib/site";
+import { localizedPath, toContentLocale, type Locale } from "@/lib/site";
 import { createInquiryAction } from "@/app/contact/actions";
 
 type ContactPageProps = {
@@ -153,7 +154,7 @@ const labels = {
 } as const;
 
 export async function ContactPage({ locale, products, selectedProductSlug, feedback }: ContactPageProps) {
-  const [categories, socialLinks] = await Promise.all([getPublicCategoryTree(locale), getPublicSocialLinks()]);
+  const [categories, socialLinks, settings] = await Promise.all([getPublicCategoryTree(locale), getPublicSocialLinks(), getPublicSiteSettings()]);
   const t = copy[toContentLocale(locale)];
   const formLabels = labels[toContentLocale(locale)];
   const selectedProduct = products.find((product) => product.slug === selectedProductSlug);
@@ -163,7 +164,7 @@ export async function ContactPage({ locale, products, selectedProductSlug, feedb
 
   return (
     <div className="site-shell">
-      <SiteHeader locale={locale} initialCategories={categories} />
+      <SiteHeader locale={locale} initialCategories={categories} initialSettings={settings} />
       <main>
         <section className="site-dark-panel">
           <div className="mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
@@ -277,7 +278,7 @@ export async function ContactPage({ locale, products, selectedProductSlug, feedb
                   {t.emailHelp}
                 </p>
                 <Button asChild className="site-primary-button">
-                  <a href={`mailto:${siteConfig.email}?subject=Flooring project enquiry`}><Mail /> {siteConfig.email}</a>
+                  <a href={`mailto:${settings.email}?subject=Flooring project enquiry`}><Mail /> {settings.email}</a>
                 </Button>
               </CardContent>
             </Card>
@@ -293,7 +294,7 @@ export async function ContactPage({ locale, products, selectedProductSlug, feedb
                   </a>
                 </Button>
                 <p className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
-                  <Phone className="size-4" /> {siteConfig.phone}
+                  <Phone className="size-4" /> {settings.phone}
                 </p>
               </CardContent>
             </Card> : null}

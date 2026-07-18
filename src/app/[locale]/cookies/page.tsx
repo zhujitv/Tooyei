@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { PolicyPage } from "@/components/policy-page";
 import { policies } from "@/config/policies";
 import { safeMetadata } from "@/lib/metadata";
+import { getPublicSiteSettings } from "@/lib/repositories/site-settings";
 import { isLocale, localizedAlternates, localizedPath, siteConfig, type Locale } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +19,7 @@ const resolveLocale = async (params: PageProps["params"]): Promise<Locale | null
 export async function generateMetadata({ params }: PageProps) {
   return safeMetadata("policy.cookies.metadata", async () => {
     const locale = await resolveLocale(params);
+    const settings = await getPublicSiteSettings();
     const policy = locale ? policies[locale].cookies : policies.zh.cookies;
     return {
       title: `${policy.title} | TOOYEI`,
@@ -29,7 +31,7 @@ export async function generateMetadata({ params }: PageProps) {
       openGraph: {
         title: `${policy.title} | TOOYEI`,
         description: policy.description,
-        url: new URL(locale ? localizedPath(locale, "/cookies") : "/cookies", siteConfig.url).toString(),
+        url: new URL(locale ? localizedPath(locale, "/cookies") : "/cookies", settings.siteUrl || siteConfig.url).toString(),
       },
     };
   }, {
