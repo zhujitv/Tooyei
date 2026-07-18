@@ -1,17 +1,13 @@
 import { NextResponse } from "next/server";
 import { runNextProductTranslationWorkerPass } from "@/lib/repositories/product-translation-jobs";
 import { apiError } from "@/lib/api-response";
+import { isCronAuthorizationValid } from "@/lib/cron-auth";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
-const authorized = (request: Request) => {
-  const secret = process.env.CRON_SECRET?.trim();
-  return Boolean(secret) && request.headers.get("authorization") === `Bearer ${secret}`;
-};
-
 export async function GET(request: Request) {
-  if (!authorized(request)) {
+  if (!isCronAuthorizationValid(request.headers.get("authorization"), process.env.CRON_SECRET)) {
     return apiError(request, { code: "UNAUTHORIZED", message: "Unauthorized", status: 401, operation: "cron.translation-worker" });
   }
 

@@ -532,3 +532,49 @@ html[lang="zh-CN"] .site-shell [class~="text-[0.68rem]"] {
 .admin-root details > summary::-webkit-details-marker {
   display: none;
 }
+
+.article-prose {
+  color: #344054;
+  font-size: 1.0625rem;
+  line-height: 1.9;
+}
+
+.article-prose > * + * {
+  margin-top: 1.5rem;
+}
+
+.article-prose h2,
+.article-prose h3 {
+  color: var(--navy);
+  font-weight: 650;
+  letter-spacing: -0.035em;
+  line-height: 1.25;
+}
+
+.article-prose h2 {
+  margin-top: 3.25rem;
+  font-size: clamp(1.75rem, 3vw, 2.25rem);
+}
+
+.article-prose h3 {
+  margin-top: 2.5rem;
+  font-size: 1.45rem;
+}
+
+.article-prose ul {
+  list-style: disc;
+  padding-inline-start: 1.5rem;
+}
+
+.article-prose li + li {
+  margin-top: 0.55rem;
+}
+
+.article-prose blockquote {
+  border-inline-start: 3px solid var(--gold);
+  background: var(--ivory);
+  padding: 1.25rem 1.5rem;
+  color: var(--navy);
+  font-size: 1.15rem;
+  font-weight: 550;
+}

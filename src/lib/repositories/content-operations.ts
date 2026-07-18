@@ -48,10 +48,15 @@ export async function getContentOperationsSummary(): Promise<ContentOperationsSu
       prisma.productTranslation.findMany({
         select: { locale: true, status: true },
       }),
+      prisma.articleTranslation.findMany({
+        select: { locale: true, status: true },
+      }),
     ]), null);
 
   if (!result) return sampleSummary();
-  const [productCount, articleCount, faqCount, newInquiryCount, translationRecords] = result;
+  const [productCount, articleCount, faqCount, newInquiryCount, productTranslationRecords, articleTranslationRecords] = result;
+  const translationRecords = [...productTranslationRecords, ...articleTranslationRecords];
+  const translatableContentCount = productCount + articleCount;
 
   const progressFor = (locale: ContentLocale): LocaleProgress => {
     const databaseLocale = {
@@ -75,7 +80,7 @@ export async function getContentOperationsSummary(): Promise<ContentOperationsSu
       published: count(TranslationStatus.PUBLISHED),
       review: count(TranslationStatus.NEEDS_REVIEW),
       machineDraft: count(TranslationStatus.MACHINE_DRAFT),
-      missing: count(TranslationStatus.MISSING),
+      missing: Math.max(0, translatableContentCount - count(TranslationStatus.PUBLISHED) - count(TranslationStatus.NEEDS_REVIEW) - count(TranslationStatus.MACHINE_DRAFT)),
     };
   };
 

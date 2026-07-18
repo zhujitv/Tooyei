@@ -36,7 +36,7 @@ const headerCopy: Record<
     productSystems: string;
     contactLead: string;
     contactHelp: string;
-    nav: Record<"products" | "capabilities" | "applications" | "oem" | "support" | "about" | "contact", string>;
+    nav: Record<"products" | "capabilities" | "insights" | "applications" | "oem" | "support" | "about" | "contact", string>;
   }
 > = {
   zh: {
@@ -50,7 +50,7 @@ const headerCopy: Record<
     productSystems: "产品系统",
     contactLead: "开始项目咨询",
     contactHelp: "告诉我们产品、规格、数量与目标市场",
-    nav: { products: "产品中心", capabilities: "制造与质量", applications: "应用场景", oem: "OEM / ODM", support: "采购支持", about: "公司介绍", contact: "联系我们" },
+    nav: { products: "产品中心", capabilities: "制造与质量", insights: "专业洞察", applications: "应用场景", oem: "OEM / ODM", support: "采购支持", about: "公司介绍", contact: "联系我们" },
   },
   en: {
     utility: "Professional flooring systems · Global export",
@@ -63,7 +63,7 @@ const headerCopy: Record<
     productSystems: "Product systems",
     contactLead: "Start a project",
     contactHelp: "Share your product, specification, volume and target market",
-    nav: { products: "Products", capabilities: "Capabilities", applications: "Applications", oem: "OEM / ODM", support: "Sourcing Support", about: "About", contact: "Contact" },
+    nav: { products: "Products", capabilities: "Capabilities", insights: "Insights", applications: "Applications", oem: "OEM / ODM", support: "Sourcing Support", about: "About", contact: "Contact" },
   },
   de: {
     utility: "Professionelle Bodensysteme · Weltweiter Export",
@@ -76,7 +76,7 @@ const headerCopy: Record<
     productSystems: "Produktsysteme",
     contactLead: "Projekt starten",
     contactHelp: "Produkt, Spezifikation, Menge und Zielmarkt mitteilen",
-    nav: { products: "Produkte", capabilities: "Fertigung & Qualität", applications: "Anwendungen", oem: "OEM / ODM", support: "Einkaufssupport", about: "Unternehmen", contact: "Kontakt" },
+    nav: { products: "Produkte", capabilities: "Fertigung & Qualität", insights: "Wissen", applications: "Anwendungen", oem: "OEM / ODM", support: "Einkaufssupport", about: "Unternehmen", contact: "Kontakt" },
   },
   fr: {
     utility: "Systèmes de sol professionnels · Export mondial",
@@ -89,7 +89,7 @@ const headerCopy: Record<
     productSystems: "Systèmes de produits",
     contactLead: "Démarrer un projet",
     contactHelp: "Indiquez le produit, les spécifications, le volume et le marché",
-    nav: { products: "Produits", capabilities: "Fabrication & qualité", applications: "Applications", oem: "OEM / ODM", support: "Aide à l’achat", about: "Entreprise", contact: "Contact" },
+    nav: { products: "Produits", capabilities: "Fabrication & qualité", insights: "Analyses", applications: "Applications", oem: "OEM / ODM", support: "Aide à l’achat", about: "Entreprise", contact: "Contact" },
   },
   es: {
     utility: "Sistemas de suelo · Exportación global",
@@ -102,7 +102,7 @@ const headerCopy: Record<
     productSystems: "Sistemas de producto",
     contactLead: "Iniciar un proyecto",
     contactHelp: "Comparta producto, especificaciones, volumen y mercado",
-    nav: { products: "Productos", capabilities: "Fabricación y calidad", applications: "Aplicaciones", oem: "OEM / ODM", support: "Soporte", about: "Empresa", contact: "Contacto" },
+    nav: { products: "Productos", capabilities: "Fabricación y calidad", insights: "Ideas", applications: "Aplicaciones", oem: "OEM / ODM", support: "Soporte", about: "Empresa", contact: "Contacto" },
   },
   ru: {
     utility: "Профессиональные напольные системы · Экспорт по всему миру",
@@ -115,7 +115,7 @@ const headerCopy: Record<
     productSystems: "Системы покрытий",
     contactLead: "Начать проект",
     contactHelp: "Укажите продукт, характеристики, объём и целевой рынок",
-    nav: { products: "Продукция", capabilities: "Производство и качество", applications: "Применение", oem: "OEM / ODM", support: "Поддержка закупок", about: "О компании", contact: "Контакты" },
+    nav: { products: "Продукция", capabilities: "Производство и качество", insights: "Материалы", applications: "Применение", oem: "OEM / ODM", support: "Поддержка закупок", about: "О компании", contact: "Контакты" },
   },
   ja: {
     utility: "プロフェッショナル床材 · グローバル輸出",
@@ -128,7 +128,7 @@ const headerCopy: Record<
     productSystems: "製品システム",
     contactLead: "プロジェクトを開始",
     contactHelp: "製品、仕様、数量、対象市場をお知らせください",
-    nav: { products: "製品", capabilities: "製造・品質", applications: "用途", oem: "OEM / ODM", support: "調達サポート", about: "会社情報", contact: "お問い合わせ" },
+    nav: { products: "製品", capabilities: "製造・品質", insights: "インサイト", applications: "用途", oem: "OEM / ODM", support: "調達サポート", about: "会社情報", contact: "お問い合わせ" },
   },
   it: {
     utility: "Sistemi di pavimentazione professionali · Export globale",
@@ -141,7 +141,7 @@ const headerCopy: Record<
     productSystems: "Sistemi di prodotto",
     contactLead: "Avvia un progetto",
     contactHelp: "Indica prodotto, specifiche, volume e mercato",
-    nav: { products: "Prodotti", capabilities: "Produzione e qualità", applications: "Applicazioni", oem: "OEM / ODM", support: "Supporto acquisti", about: "Azienda", contact: "Contatti" },
+    nav: { products: "Prodotti", capabilities: "Produzione e qualità", insights: "Approfondimenti", applications: "Applicazioni", oem: "OEM / ODM", support: "Supporto acquisti", about: "Azienda", contact: "Contatti" },
   },
   ar: {
     utility: "أنظمة أرضيات احترافية · تصدير عالمي",
@@ -154,12 +154,13 @@ const headerCopy: Record<
     productSystems: "أنظمة المنتجات",
     contactLead: "ابدأ مشروعاً",
     contactHelp: "شارك المنتج والمواصفات والكمية والسوق المستهدف",
-    nav: { products: "المنتجات", capabilities: "التصنيع والجودة", applications: "التطبيقات", oem: "OEM / ODM", support: "دعم التوريد", about: "عن الشركة", contact: "اتصل بنا" },
+    nav: { products: "المنتجات", capabilities: "التصنيع والجودة", insights: "المعرفة", applications: "التطبيقات", oem: "OEM / ODM", support: "دعم التوريد", about: "عن الشركة", contact: "اتصل بنا" },
   },
 };
 
 const sectionItems = [
   { key: "capabilities", href: "/capabilities", section: undefined },
+  { key: "insights", href: "/insights", section: undefined },
   { key: "applications", href: "/#applications", section: "applications" },
   { key: "oem", href: "/#oem", section: "oem" },
   { key: "about", href: "/#about", section: "about" },
@@ -269,8 +270,7 @@ export function SiteHeader({ locale, initialCategories = [], initialSettings }: 
 
   const desktopNavLink = (item: (typeof sectionItems)[number]) => {
     const active =
-      (item.key === "contact" && neutralPath.startsWith("/contact")) ||
-      (item.key === "capabilities" && neutralPath.startsWith("/capabilities")) ||
+      (!item.section && neutralPath.startsWith(item.href)) ||
       (neutralPath === "/" && item.section === activeSection);
     return (
       <Link key={item.key} href={localizedPath(locale, item.href)} aria-current={active ? "page" : undefined} className={cn("group relative inline-flex min-h-11 items-center text-[0.8rem] font-semibold text-[var(--muted)] transition-colors hover:text-[var(--navy)]", active && "text-[var(--navy)]")}>
@@ -364,8 +364,7 @@ export function SiteHeader({ locale, initialCategories = [], initialSettings }: 
                   ) : null}
                   {sectionItems.map((item, index) => {
                     const active =
-                      (item.key === "contact" && neutralPath.startsWith("/contact")) ||
-                      (item.key === "capabilities" && neutralPath.startsWith("/capabilities")) ||
+                      (!item.section && neutralPath.startsWith(item.href)) ||
                       (neutralPath === "/" && item.section === activeSection);
                     return <SheetClose key={item.key} asChild><Link href={localizedPath(locale, item.href)} aria-current={active ? "page" : undefined} className="group flex min-h-14 items-center justify-between border-b border-white/10 py-3 text-lg font-medium text-white"><span className="flex items-center gap-4"><span className="font-mono text-[0.62rem] tracking-[0.16em] text-[var(--gold)]">0{index + 2}</span>{labels.nav[item.key]}</span><ArrowUpRight className="size-4 text-white/35 transition group-hover:text-[var(--gold)]" /></Link></SheetClose>;
                   })}

@@ -6,6 +6,10 @@
       "schedule": "* * * * *"
     },
     {
+      "path": "/api/cron/article-translation-worker",
+      "schedule": "* * * * *"
+    },
+    {
       "path": "/api/cron/media-cleanup",
       "schedule": "0 3 * * *"
     }

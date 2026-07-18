@@ -12,6 +12,7 @@ import {
   LogOut,
   Menu,
   MessageSquare,
+  Newspaper,
   Package,
   Settings,
   Users,
@@ -31,6 +32,7 @@ import { cn } from "@/lib/utils";
 const navItems = [
   { href: "/admin/content", label: "工作台", icon: LayoutDashboard },
   { href: "/admin/products", label: "产品", icon: Package },
+  { href: "/admin/articles", label: "文章与 SEO", icon: Newspaper },
   { href: "/admin/translations", label: "翻译中心", icon: Languages },
   { href: "/admin/categories", label: "产品栏目", icon: FolderTree },
   { href: "/admin/media", label: "媒体中心", icon: Images },

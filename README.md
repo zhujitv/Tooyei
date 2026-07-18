@@ -72,6 +72,17 @@ continues one item per scheduled invocation when the page is closed. Configure
 a heartbeat every 30 seconds, locks older than five minutes are recovered, and
 retryable failures are persisted for retries after 10, 30 and 120 seconds.
 
+The multilingual content and SEO growth center at `/admin/articles` manages
+English-source articles and reviewed translations for all nine public locales.
+Article translation jobs reuse the same provider registry and preserve their
+provider/model metadata, while `/api/cron/article-translation-worker` processes
+the durable article queue. Public routes live at `/{locale}/insights` and
+`/{locale}/insights/{slug}`. Only complete, explicitly published translations
+are indexed; temporary English/Chinese fallbacks remain readable but are
+`noindex` until their requested locale is reviewed and published. Published
+locale URLs are added to the sitemap with hreflang alternates and Article plus
+Breadcrumb structured data.
+
 The legacy catalogue migration discovers all product URLs from the existing
 Tooyei sitemap and exports English, Spanish and German content, product images
 and specifications. Newly discovered records remain drafts with translations

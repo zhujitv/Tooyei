@@ -152,23 +152,23 @@ enum AdminRole {
 }
 
 model Category {
-  id           String                @id @default(cuid())
-  slug         String                @unique
-  kind         ProductKind
-  status       ContentStatus         @default(DRAFT)
-  isActive     Boolean               @default(true)
-  coverImage   String?
-  coverAssetId String?
-  coverAsset   MediaAsset?           @relation("CategoryCoverAsset", fields: [coverAssetId], references: [id], onDelete: SetNull)
-  sortOrder    Int                   @default(0)
-  parentId     String?
-  parent       Category?             @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
-  children     Category[]            @relation("CategoryTree")
-  translations CategoryTranslation[]
-  products     Product[]
+  id                 String                @id @default(cuid())
+  slug               String                @unique
+  kind               ProductKind
+  status             ContentStatus         @default(DRAFT)
+  isActive           Boolean               @default(true)
+  coverImage         String?
+  coverAssetId       String?
+  coverAsset         MediaAsset?           @relation("CategoryCoverAsset", fields: [coverAssetId], references: [id], onDelete: SetNull)
+  sortOrder          Int                   @default(0)
+  parentId           String?
+  parent             Category?             @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children           Category[]            @relation("CategoryTree")
+  translations       CategoryTranslation[]
+  products           Product[]
   productAssignments ProductCategory[]
-  createdAt    DateTime              @default(now())
-  updatedAt    DateTime              @updatedAt
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
 
   @@index([isActive, sortOrder])
   @@index([status, sortOrder])
@@ -195,28 +195,28 @@ model CategoryTranslation {
 }
 
 model Product {
-  id             String                 @id @default(cuid())
-  slug           String                 @unique
-  sku            String                 @unique
-  kind           ProductKind
-  status         ContentStatus          @default(DRAFT)
-  featured       Boolean                @default(false)
-  sortOrder      Int                    @default(0)
-  categoryId     String
-  category       Category               @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  id                  String                      @id @default(cuid())
+  slug                String                      @unique
+  sku                 String                      @unique
+  kind                ProductKind
+  status              ContentStatus               @default(DRAFT)
+  featured            Boolean                     @default(false)
+  sortOrder           Int                         @default(0)
+  categoryId          String
+  category            Category                    @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   categoryAssignments ProductCategory[]
-  primaryImageId String?
-  primaryImage   MediaAsset?            @relation("ProductPrimaryImage", fields: [primaryImageId], references: [id], onDelete: SetNull)
-  translations   ProductTranslation[]
-  features       ProductFeature[]
-  specifications ProductSpecification[]
-  media          ProductMedia[]
-  applications   ProductApplication[]
-  downloads      ProductDownload[]
-  inquiries      InquiryProduct[]
+  primaryImageId      String?
+  primaryImage        MediaAsset?                 @relation("ProductPrimaryImage", fields: [primaryImageId], references: [id], onDelete: SetNull)
+  translations        ProductTranslation[]
+  features            ProductFeature[]
+  specifications      ProductSpecification[]
+  media               ProductMedia[]
+  applications        ProductApplication[]
+  downloads           ProductDownload[]
+  inquiries           InquiryProduct[]
   translationJobItems ProductTranslationJobItem[]
-  createdAt      DateTime               @default(now())
-  updatedAt      DateTime               @updatedAt
+  createdAt           DateTime                    @default(now())
+  updatedAt           DateTime                    @updatedAt
 
   @@index([status, featured, sortOrder])
   @@index([categoryId])
@@ -255,40 +255,40 @@ model ProductTranslation {
 }
 
 model ProductTranslationJob {
-  id             String                   @id @default(cuid())
-  status         TranslationJobStatus     @default(PENDING)
-  sourceLocale   Locale
-  targetLocales  Locale[]
-  provider       String                   @default("openai-responses")
-  model          String
-  totalItems     Int                      @default(0)
-  completedItems Int                      @default(0)
-  failedItems    Int                      @default(0)
-  skippedItems   Int                      @default(0)
-  cancelledItems Int                     @default(0)
-  qaPassedItems  Int                      @default(0)
-  qaWarningItems Int                      @default(0)
-  qaFailedItems  Int                      @default(0)
-  needsReviewItems Int                    @default(0)
-  promptTokens   Int?
+  id               String                      @id @default(cuid())
+  status           TranslationJobStatus        @default(PENDING)
+  sourceLocale     Locale
+  targetLocales    Locale[]
+  provider         String                      @default("openai-responses")
+  model            String
+  totalItems       Int                         @default(0)
+  completedItems   Int                         @default(0)
+  failedItems      Int                         @default(0)
+  skippedItems     Int                         @default(0)
+  cancelledItems   Int                         @default(0)
+  qaPassedItems    Int                         @default(0)
+  qaWarningItems   Int                         @default(0)
+  qaFailedItems    Int                         @default(0)
+  needsReviewItems Int                         @default(0)
+  promptTokens     Int?
   completionTokens Int?
-  totalTokens    Int?
-  lastError      String?
-  executionId    String?                  @unique
-  lockedAt       DateTime?
-  lockedBy       String?
-  heartbeatAt    DateTime?
-  contentTypes   String[]                 @default(["PRODUCT", "MEDIA_ALT", "MEDIA_CAPTION", "FEATURE_TITLE", "FEATURE_DESCRIPTION", "SPEC_LABEL", "SPEC_VALUE", "APPLICATION_TITLE", "APPLICATION_DESCRIPTION", "DOWNLOAD_TITLE", "SEO"])
-  requestedById  String?
-  requestedBy    AdminUser?               @relation(fields: [requestedById], references: [id], onDelete: SetNull)
-  items          ProductTranslationJobItem[]
-  logs           ProductTranslationLog[]
-  createdAt      DateTime                 @default(now())
-  startedAt      DateTime?
-  completedAt    DateTime?
-  cancelledAt    DateTime?
-  closedAt       DateTime?
-  updatedAt      DateTime                 @updatedAt
+  totalTokens      Int?
+  lastError        String?
+  executionId      String?                     @unique
+  lockedAt         DateTime?
+  lockedBy         String?
+  heartbeatAt      DateTime?
+  contentTypes     String[]                    @default(["PRODUCT", "MEDIA_ALT", "MEDIA_CAPTION", "FEATURE_TITLE", "FEATURE_DESCRIPTION", "SPEC_LABEL", "SPEC_VALUE", "APPLICATION_TITLE", "APPLICATION_DESCRIPTION", "DOWNLOAD_TITLE", "SEO"])
+  requestedById    String?
+  requestedBy      AdminUser?                  @relation(fields: [requestedById], references: [id], onDelete: SetNull)
+  items            ProductTranslationJobItem[]
+  logs             ProductTranslationLog[]
+  createdAt        DateTime                    @default(now())
+  startedAt        DateTime?
+  completedAt      DateTime?
+  cancelledAt      DateTime?
+  closedAt         DateTime?
+  updatedAt        DateTime                    @updatedAt
 
   @@index([status, createdAt])
   @@index([status, heartbeatAt])
@@ -296,48 +296,48 @@ model ProductTranslationJob {
 }
 
 model ProductTranslationJobItem {
-  id           String                   @id @default(cuid())
-  jobId        String
-  job          ProductTranslationJob    @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  productId    String
-  product      Product                  @relation(fields: [productId], references: [id], onDelete: Restrict)
-  productSlug  String
-  productSku   String
-  sourceLocale Locale
-  targetLocale Locale
-  status       TranslationJobItemStatus @default(PENDING)
-  inputHash    String?
-  responseId   String?
-  output       Json?
-  warnings     Json?
-  errorType    String?
-  errorMessage String?
-  rawResponse  String?                  @db.Text
-  promptTokens Int?
-  completionTokens Int?
-  totalTokens  Int?
-  attemptCount Int                      @default(0)
-  retryCount   Int                      @default(0)
-  currentRunAttemptCount Int            @default(0)
-  qaStatus     String?
-  qaIssues     Json?
-  qaErrorCount Int                      @default(0)
-  qaWarningCount Int                    @default(0)
-  qaAttemptCount Int                    @default(0)
-  qaVersion    String?
-  lastQaAt     DateTime?
-  savedAt      DateTime?
-  durationMs   Int?
-  contentTypes String[]                 @default(["PRODUCT", "MEDIA_ALT", "MEDIA_CAPTION", "FEATURE_TITLE", "FEATURE_DESCRIPTION", "SPEC_LABEL", "SPEC_VALUE", "APPLICATION_TITLE", "APPLICATION_DESCRIPTION", "DOWNLOAD_TITLE", "SEO"])
-  processingStep String                 @default("QUEUED")
-  heartbeatAt DateTime?
-  nextAttemptAt DateTime?
-  workerId     String?
-  logs         ProductTranslationLog[]
-  createdAt    DateTime                 @default(now())
-  startedAt    DateTime?
-  completedAt  DateTime?
-  updatedAt    DateTime                 @updatedAt
+  id                     String                   @id @default(cuid())
+  jobId                  String
+  job                    ProductTranslationJob    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  productId              String
+  product                Product                  @relation(fields: [productId], references: [id], onDelete: Restrict)
+  productSlug            String
+  productSku             String
+  sourceLocale           Locale
+  targetLocale           Locale
+  status                 TranslationJobItemStatus @default(PENDING)
+  inputHash              String?
+  responseId             String?
+  output                 Json?
+  warnings               Json?
+  errorType              String?
+  errorMessage           String?
+  rawResponse            String?                  @db.Text
+  promptTokens           Int?
+  completionTokens       Int?
+  totalTokens            Int?
+  attemptCount           Int                      @default(0)
+  retryCount             Int                      @default(0)
+  currentRunAttemptCount Int                      @default(0)
+  qaStatus               String?
+  qaIssues               Json?
+  qaErrorCount           Int                      @default(0)
+  qaWarningCount         Int                      @default(0)
+  qaAttemptCount         Int                      @default(0)
+  qaVersion              String?
+  lastQaAt               DateTime?
+  savedAt                DateTime?
+  durationMs             Int?
+  contentTypes           String[]                 @default(["PRODUCT", "MEDIA_ALT", "MEDIA_CAPTION", "FEATURE_TITLE", "FEATURE_DESCRIPTION", "SPEC_LABEL", "SPEC_VALUE", "APPLICATION_TITLE", "APPLICATION_DESCRIPTION", "DOWNLOAD_TITLE", "SEO"])
+  processingStep         String                   @default("QUEUED")
+  heartbeatAt            DateTime?
+  nextAttemptAt          DateTime?
+  workerId               String?
+  logs                   ProductTranslationLog[]
+  createdAt              DateTime                 @default(now())
+  startedAt              DateTime?
+  completedAt            DateTime?
+  updatedAt              DateTime                 @updatedAt
 
   @@unique([jobId, productId, targetLocale])
   @@index([jobId, status, createdAt])
@@ -389,11 +389,11 @@ model ProductFeature {
 }
 
 model ProductFeatureTranslation {
-  id        String         @id @default(cuid())
-  featureId String
-  feature   ProductFeature @relation(fields: [featureId], references: [id], onDelete: Cascade)
-  locale    Locale
-  value     String
+  id          String         @id @default(cuid())
+  featureId   String
+  feature     ProductFeature @relation(fields: [featureId], references: [id], onDelete: Cascade)
+  locale      Locale
+  value       String
   description String?
 
   @@unique([featureId, locale])
@@ -429,32 +429,32 @@ model ProductSpecificationTranslation {
 }
 
 model MediaAsset {
-  id          String         @id @default(cuid())
-  kind        MediaKind      @default(IMAGE)
-  assetType   AssetType      @default(OTHER)
-  pathname    String         @unique
-  url         String
+  id               String               @id @default(cuid())
+  kind             MediaKind            @default(IMAGE)
+  assetType        AssetType            @default(OTHER)
+  pathname         String               @unique
+  url              String
   originalFilename String?
-  alt         String?
-  mimeType    String
-  width       Int?
-  height      Int?
-  sizeBytes   Int?
-  checksum    String?
-  storageProvider StorageProvider @default(EXTERNAL)
-  uploadedAt  DateTime?
-  orphanedAt  DateTime?
-  deletedAt   DateTime?
-  blobDeletedAt DateTime?
-  uploadedById String?
-  uploadedBy  AdminUser?     @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
-  products    ProductMedia[]
-  primaryFor  Product[]      @relation("ProductPrimaryImage")
-  applications ProductApplication[] @relation("ProductApplicationImage")
-  downloads   ProductDownload[] @relation("ProductDownloadAsset")
-  categoryCovers Category[]  @relation("CategoryCoverAsset")
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  alt              String?
+  mimeType         String
+  width            Int?
+  height           Int?
+  sizeBytes        Int?
+  checksum         String?
+  storageProvider  StorageProvider      @default(EXTERNAL)
+  uploadedAt       DateTime?
+  orphanedAt       DateTime?
+  deletedAt        DateTime?
+  blobDeletedAt    DateTime?
+  uploadedById     String?
+  uploadedBy       AdminUser?           @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  products         ProductMedia[]
+  primaryFor       Product[]            @relation("ProductPrimaryImage")
+  applications     ProductApplication[] @relation("ProductApplicationImage")
+  downloads        ProductDownload[]    @relation("ProductDownloadAsset")
+  categoryCovers   Category[]           @relation("CategoryCoverAsset")
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
 
   @@index([assetType, createdAt])
   @@index([storageProvider, orphanedAt, deletedAt])
@@ -462,18 +462,18 @@ model MediaAsset {
 }
 
 model ProductMedia {
-  productId String
-  product   Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
-  assetId   String
-  asset     MediaAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  role      ProductMediaRole @default(GALLERY)
-  alt       String?
-  caption   String?
+  productId    String
+  product      Product                   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  assetId      String
+  asset        MediaAsset                @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  role         ProductMediaRole          @default(GALLERY)
+  alt          String?
+  caption      String?
   translations ProductMediaTranslation[]
-  visible   Boolean    @default(true)
-  sortOrder Int        @default(0)
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  visible      Boolean                   @default(true)
+  sortOrder    Int                       @default(0)
+  createdAt    DateTime                  @default(now())
+  updatedAt    DateTime                  @updatedAt
 
   @@id([productId, assetId])
   @@index([productId, sortOrder])
@@ -549,16 +549,21 @@ model ProductDownloadTranslation {
 }
 
 model Article {
-  id           String               @id @default(cuid())
-  slug         String               @unique
-  kind         ArticleKind          @default(NEWS)
-  status       ContentStatus        @default(DRAFT)
-  publishedAt  DateTime?
-  translations ArticleTranslation[]
-  createdAt    DateTime             @default(now())
-  updatedAt    DateTime             @updatedAt
+  id              String                  @id @default(cuid())
+  slug            String                  @unique
+  kind            ArticleKind             @default(NEWS)
+  status          ContentStatus           @default(DRAFT)
+  featured        Boolean                 @default(false)
+  coverImage      String?
+  authorName      String?
+  publishedAt     DateTime?
+  translations    ArticleTranslation[]
+  translationJobs ArticleTranslationJob[]
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
 
   @@index([status, publishedAt])
+  @@index([status, featured, publishedAt])
 }
 
 model ArticleTranslation {
@@ -572,12 +577,77 @@ model ArticleTranslation {
   content        Json
   seoTitle       String?
   seoDescription String?
+  readingMinutes Int               @default(1)
   publishedAt    DateTime?
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 
   @@unique([articleId, locale])
   @@index([locale, status])
+}
+
+model ArticleTranslationJob {
+  id               String                      @id @default(cuid())
+  articleId        String
+  article          Article                     @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  status           TranslationJobStatus        @default(PENDING)
+  sourceLocale     Locale                      @default(EN)
+  targetLocales    Locale[]
+  provider         String
+  model            String
+  totalItems       Int                         @default(0)
+  completedItems   Int                         @default(0)
+  failedItems      Int                         @default(0)
+  promptTokens     Int?
+  completionTokens Int?
+  totalTokens      Int?
+  lastError        String?
+  executionId      String?                     @unique
+  lockedAt         DateTime?
+  lockedBy         String?
+  heartbeatAt      DateTime?
+  requestedById    String?
+  requestedBy      AdminUser?                  @relation(fields: [requestedById], references: [id], onDelete: SetNull)
+  items            ArticleTranslationJobItem[]
+  createdAt        DateTime                    @default(now())
+  startedAt        DateTime?
+  completedAt      DateTime?
+  updatedAt        DateTime                    @updatedAt
+
+  @@index([status, createdAt])
+  @@index([status, heartbeatAt])
+  @@index([articleId, createdAt])
+  @@index([requestedById, createdAt])
+}
+
+model ArticleTranslationJobItem {
+  id               String                   @id @default(cuid())
+  jobId            String
+  job              ArticleTranslationJob    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  targetLocale     Locale
+  status           TranslationJobItemStatus @default(PENDING)
+  inputHash        String?
+  responseId       String?
+  output           Json?
+  warnings         Json?
+  errorType        String?
+  errorMessage     String?                  @db.Text
+  rawResponse      String?                  @db.Text
+  promptTokens     Int?
+  completionTokens Int?
+  totalTokens      Int?
+  attemptCount     Int                      @default(0)
+  nextAttemptAt    DateTime?
+  workerId         String?
+  heartbeatAt      DateTime?
+  startedAt        DateTime?
+  completedAt      DateTime?
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+
+  @@unique([jobId, targetLocale])
+  @@index([jobId, status, createdAt])
+  @@index([status, nextAttemptAt, createdAt])
 }
 
 model Faq {
@@ -608,25 +678,25 @@ model FaqTranslation {
 }
 
 model Inquiry {
-  id              String          @id @default(cuid())
-  status          InquiryStatus   @default(NEW)
-  name            String
-  email           String
-  phone           String?
-  company         String?
-  country         String?
-  message         String
-  locale          Locale          @default(EN)
-  sourcePath      String?
-  utmSource       String?
-  utmMedium       String?
-  utmCampaign     String?
-  assignedToId    String?
-  assignedTo      AdminUser?      @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
-  products        InquiryProduct[]
-  notes           InquiryNote[]
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  id           String           @id @default(cuid())
+  status       InquiryStatus    @default(NEW)
+  name         String
+  email        String
+  phone        String?
+  company      String?
+  country      String?
+  message      String
+  locale       Locale           @default(EN)
+  sourcePath   String?
+  utmSource    String?
+  utmMedium    String?
+  utmCampaign  String?
+  assignedToId String?
+  assignedTo   AdminUser?       @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+  products     InquiryProduct[]
+  notes        InquiryNote[]
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
 
   @@index([status, createdAt])
   @@index([email])
@@ -660,13 +730,13 @@ model InquiryNote {
 }
 
 model Redirect {
-  id         String   @id @default(cuid())
-  source     String   @unique
+  id          String   @id @default(cuid())
+  source      String   @unique
   destination String
-  permanent  Boolean  @default(true)
-  active     Boolean  @default(true)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  permanent   Boolean  @default(true)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@index([active])
 }
@@ -720,20 +790,21 @@ model RateLimitCounter {
 }
 
 model AdminUser {
-  id           String         @id @default(cuid())
-  email        String         @unique
-  name         String
-  passwordHash String
-  role         AdminRole      @default(EDITOR)
-  active       Boolean        @default(true)
-  inquiries    Inquiry[]
-  inquiryNotes InquiryNote[]
-  sessions     AdminSession[]
-  auditLogs    AuditLog[]
-  translationJobs ProductTranslationJob[]
-  uploadedAssets MediaAsset[]
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  id                     String                  @id @default(cuid())
+  email                  String                  @unique
+  name                   String
+  passwordHash           String
+  role                   AdminRole               @default(EDITOR)
+  active                 Boolean                 @default(true)
+  inquiries              Inquiry[]
+  inquiryNotes           InquiryNote[]
+  sessions               AdminSession[]
+  auditLogs              AuditLog[]
+  translationJobs        ProductTranslationJob[]
+  articleTranslationJobs ArticleTranslationJob[]
+  uploadedAssets         MediaAsset[]
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
 }
 
 model AdminSession {

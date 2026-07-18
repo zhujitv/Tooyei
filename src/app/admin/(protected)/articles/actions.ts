@@ -1,0 +1,229 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { z } from "zod";
+import { ArticleKind, ContentStatus, Locale, Prisma, TranslationStatus } from "@/generated/prisma/client";
+import { articleContentFromEditor, articleReadingMinutes } from "@/lib/article-content";
+import { normalizeArticleCoverImage } from "@/lib/article-cover";
+import { articleSlugPattern, validateArticleSource } from "@/lib/article-publication";
+import { requireProductManagerSession, requireTranslationManagerSession } from "@/lib/admin-auth";
+import { getPrisma, isDatabaseConfigured } from "@/lib/db";
+import { safeWriteAuditLog } from "@/lib/repositories/audit-logs";
+import {
+  articleTranslationLocales,
+  createArticleTranslationJob,
+} from "@/lib/repositories/article-translation-jobs";
+import { contentLocales, localizedPath } from "@/lib/site";
+import { productTranslationProviderId } from "@/lib/translation-providers/types";
+
+const optionalText = z.string().trim().max(5000).optional().transform((value) => value || null);
+const articleCoreSchema = z.object({
+  id: z.string().min(1).optional(),
+  slug: z.string().trim().min(2).max(160).regex(articleSlugPattern, "Slug 只能使用小写字母、数字和连字符。"),
+  kind: z.enum(ArticleKind),
+  status: z.enum(ContentStatus),
+  featured: z.boolean(),
+  coverImage: z.union([
+    z.literal(""),
+    z.url().max(2048).refine((value) => Boolean(normalizeArticleCoverImage(value)), "封面图片域名不受支持，请使用 Vercel Blob 或站内图片。"),
+    z.string().regex(/^\/[A-Za-z0-9_./-]+$/),
+  ]).transform((value) => value || null),
+  authorName: optionalText,
+});
+const translationSchema = z.object({
+  articleId: z.string().min(1),
+  locale: z.enum(articleTranslationLocales),
+  status: z.enum(TranslationStatus),
+  title: z.string().trim().min(1).max(240),
+  excerpt: z.string().trim().max(1200),
+  contentText: z.string().max(100_000),
+  seoTitle: z.string().trim().max(180),
+  seoDescription: z.string().trim().max(500),
+});
+
+const requireDatabase = () => {
+  if (!isDatabaseConfigured()) throw new Error("DATABASE_URL 尚未配置，无法保存文章。");
+};
+
+const revalidateArticlePaths = (slug?: string) => {
+  revalidatePath("/admin/content");
+  revalidatePath("/admin/articles");
+  revalidatePath("/sitemap.xml");
+  revalidatePath("/insights");
+  for (const locale of contentLocales) {
+    revalidatePath(localizedPath(locale, "/insights"));
+    if (slug) revalidatePath(localizedPath(locale, `/insights/${slug}`));
+  }
+  if (slug) revalidatePath(`/insights/${slug}`);
+};
+
+const errorRedirect = (path: string, error: unknown): never => {
+  const message = error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002"
+    ? "URL Slug 已存在，请更换后重试。"
+    : error instanceof Error ? error.message : "操作失败。";
+  redirect(`${path}${path.includes("?") ? "&" : "?"}error=${encodeURIComponent(message.slice(0, 220))}`);
+};
+
+export async function createArticleAction(formData: FormData) {
+  const session = await requireProductManagerSession();
+  let destination = "/admin/articles";
+  try {
+    requireDatabase();
+    const core = articleCoreSchema.safeParse({
+      slug: formData.get("slug"), kind: formData.get("kind"), status: ContentStatus.DRAFT,
+      featured: formData.get("featured") === "on", coverImage: formData.get("coverImage") || "", authorName: formData.get("authorName") || undefined,
+    });
+    const english = translationSchema.safeParse({
+      articleId: "new", locale: Locale.EN, status: TranslationStatus.NEEDS_REVIEW,
+      title: formData.get("title"), excerpt: formData.get("excerpt") || "", contentText: formData.get("contentText") || "",
+      seoTitle: formData.get("seoTitle") || "", seoDescription: formData.get("seoDescription") || "",
+    });
+    if (!core.success) throw new Error(core.error.issues[0]?.message || "请检查文章基础信息。");
+    if (!english.success) throw new Error(english.error.issues[0]?.message || "请检查英文文章内容。");
+    const content = articleContentFromEditor(english.data.contentText);
+    const validation = validateArticleSource({ ...english.data, content });
+    if (!validation.ok) throw new Error(`英文内容缺少：${validation.missingFields.join("、")}`);
+    const article = await getPrisma().article.create({
+      data: {
+        slug: core.data.slug, kind: core.data.kind, status: ContentStatus.DRAFT,
+        featured: core.data.featured, coverImage: core.data.coverImage, authorName: core.data.authorName,
+        translations: { create: {
+          locale: Locale.EN, status: TranslationStatus.NEEDS_REVIEW,
+          title: english.data.title, excerpt: english.data.excerpt, content,
+          seoTitle: english.data.seoTitle, seoDescription: english.data.seoDescription,
+          readingMinutes: articleReadingMinutes(content),
+        } },
+      },
+      select: { id: true, slug: true },
+    });
+    await safeWriteAuditLog({ actorEmail: session.email, action: "article.created", entityType: "Article", entityId: article.id, metadata: { slug: article.slug } });
+    revalidateArticlePaths(article.slug);
+    destination = `/admin/articles/${article.id}?saved=created`;
+  } catch (error) {
+    errorRedirect("/admin/articles/new", error);
+  }
+  redirect(destination);
+}
+
+export async function saveArticleCoreAction(formData: FormData) {
+  const session = await requireProductManagerSession();
+  const id = String(formData.get("id") || "");
+  let destination = `/admin/articles/${id}`;
+  try {
+    requireDatabase();
+    const parsed = articleCoreSchema.safeParse({
+      id, slug: formData.get("slug"), kind: formData.get("kind"), status: formData.get("status"),
+      featured: formData.get("featured") === "on", coverImage: formData.get("coverImage") || "", authorName: formData.get("authorName") || undefined,
+    });
+    if (!parsed.success) throw new Error(parsed.error.issues[0]?.message || "请检查文章基础信息。");
+    const { currentSlug, updated } = await getPrisma().$transaction(async (transaction) => {
+      const current = await transaction.article.findUnique({ where: { id }, include: { translations: { where: { locale: Locale.EN } } } });
+      if (!current) throw new Error("文章不存在或已经删除。");
+      let english: (typeof current.translations)[number] | undefined = current.translations[0];
+      if (english) {
+        await transaction.$queryRaw`SELECT "id" FROM "ArticleTranslation" WHERE "id" = ${english.id} FOR SHARE`;
+        english = await transaction.articleTranslation.findUnique({ where: { id: english.id } }) ?? undefined;
+      }
+      if (parsed.data.status === ContentStatus.PUBLISHED) {
+        const validation = validateArticleSource(english);
+        if (!english || !validation.ok) throw new Error(`发布前请补全英文内容：${validation.missingFields.join("、") || "英文内容未创建"}`);
+        if (english.status !== TranslationStatus.PUBLISHED) throw new Error("发布文章前，请先把英文版本设为“已发布”。");
+        if (!english.publishedAt) await transaction.articleTranslation.update({ where: { id: english.id }, data: { publishedAt: new Date() } });
+      }
+      const next = await transaction.article.update({
+        where: { id },
+        data: {
+          slug: parsed.data.slug, kind: parsed.data.kind, status: parsed.data.status,
+          featured: parsed.data.featured, coverImage: parsed.data.coverImage, authorName: parsed.data.authorName,
+          publishedAt: parsed.data.status === ContentStatus.PUBLISHED ? current.publishedAt ?? new Date() : current.publishedAt,
+        },
+      });
+      return { currentSlug: current.slug, updated: next };
+    });
+    await safeWriteAuditLog({ actorEmail: session.email, action: "article.updated", entityType: "Article", entityId: id, metadata: { slug: updated.slug, status: updated.status } });
+    revalidateArticlePaths(currentSlug);
+    revalidateArticlePaths(updated.slug);
+    destination = `/admin/articles/${id}?saved=core`;
+  } catch (error) {
+    errorRedirect(`/admin/articles/${id}`, error);
+  }
+  redirect(destination);
+}
+
+export async function saveArticleTranslationAction(formData: FormData) {
+  const session = await requireProductManagerSession();
+  const articleId = String(formData.get("articleId") || "");
+  const locale = String(formData.get("locale") || "EN");
+  let destination = `/admin/articles/${articleId}?locale=${encodeURIComponent(locale)}`;
+  try {
+    requireDatabase();
+    const parsed = translationSchema.safeParse({
+      articleId, locale, status: formData.get("status"), title: formData.get("title"), excerpt: formData.get("excerpt") || "",
+      contentText: formData.get("contentText") || "", seoTitle: formData.get("seoTitle") || "", seoDescription: formData.get("seoDescription") || "",
+    });
+    if (!parsed.success) throw new Error(parsed.error.issues[0]?.message || "请检查文章语言内容。");
+    if (parsed.data.status === TranslationStatus.MISSING) throw new Error("已有内容不能保存为“缺失”，请使用待审核或已发布状态。");
+    const content = articleContentFromEditor(parsed.data.contentText);
+    const validation = validateArticleSource({ ...parsed.data, content });
+    if (parsed.data.status === TranslationStatus.PUBLISHED && !validation.ok) {
+      throw new Error(`发布前请补全：${validation.missingFields.join("、")}`);
+    }
+    const article = await getPrisma().article.findUnique({
+      where: { id: articleId },
+      select: { status: true, slug: true, translations: { where: { locale: parsed.data.locale }, select: { publishedAt: true } } },
+    });
+    if (!article) throw new Error("文章不存在或已经删除。");
+    if (parsed.data.locale === Locale.EN && article.status === ContentStatus.PUBLISHED && parsed.data.status !== TranslationStatus.PUBLISHED) {
+      throw new Error("文章整体已发布；如需撤下英文版本，请先将文章状态改为草稿或归档。");
+    }
+    const preservedPublishedAt = article.translations[0]?.publishedAt ?? (parsed.data.status === TranslationStatus.PUBLISHED ? new Date() : null);
+    await getPrisma().articleTranslation.upsert({
+      where: { articleId_locale: { articleId, locale: parsed.data.locale } },
+      update: {
+        title: parsed.data.title, excerpt: parsed.data.excerpt, content,
+        seoTitle: parsed.data.seoTitle, seoDescription: parsed.data.seoDescription,
+        readingMinutes: articleReadingMinutes(content),
+        status: parsed.data.status,
+        publishedAt: preservedPublishedAt,
+      },
+      create: {
+        articleId, locale: parsed.data.locale, title: parsed.data.title, excerpt: parsed.data.excerpt, content,
+        seoTitle: parsed.data.seoTitle, seoDescription: parsed.data.seoDescription, status: parsed.data.status,
+        readingMinutes: articleReadingMinutes(content),
+        publishedAt: parsed.data.status === TranslationStatus.PUBLISHED ? new Date() : null,
+      },
+    });
+    await safeWriteAuditLog({ actorEmail: session.email, action: "article.translation.saved", entityType: "Article", entityId: articleId, metadata: { locale: parsed.data.locale, status: parsed.data.status } });
+    revalidateArticlePaths(article.slug);
+    destination = `/admin/articles/${articleId}?locale=${parsed.data.locale}&saved=translation`;
+  } catch (error) {
+    errorRedirect(`/admin/articles/${articleId}?locale=${encodeURIComponent(locale)}`, error);
+  }
+  redirect(destination);
+}
+
+export async function createArticleTranslationJobAction(formData: FormData) {
+  const session = await requireTranslationManagerSession();
+  const articleId = String(formData.get("articleId") || "");
+  let destination = `/admin/articles/${articleId}`;
+  try {
+    const parsed = z.object({
+      articleId: z.string().min(1),
+      targetLocales: z.array(z.enum(articleTranslationLocales)).min(1),
+    }).safeParse({ articleId, targetLocales: formData.getAll("targetLocales") });
+    if (!parsed.success) throw new Error("请至少选择一种目标语言。");
+    const job = await createArticleTranslationJob({
+      articleId: parsed.data.articleId,
+      actorEmail: session.email,
+      provider: productTranslationProviderId,
+      targetLocales: parsed.data.targetLocales,
+    });
+    await safeWriteAuditLog({ actorEmail: session.email, action: "article.translation-job.created", entityType: "ArticleTranslationJob", entityId: job.id, metadata: { articleId, totalItems: job.totalItems } });
+    revalidatePath("/admin/articles");
+    destination = `/admin/articles/${articleId}?saved=translation-job`;
+  } catch (error) {
+    errorRedirect(`/admin/articles/${articleId}`, error);
+  }
+  redirect(destination);
+}
