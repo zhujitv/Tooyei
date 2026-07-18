@@ -31,12 +31,12 @@ jobs:
 
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
 
       - name: Install dependencies
@@ -46,7 +46,7 @@ jobs:
         run: npx vercel@56.2.1 pull --yes --environment=production --token="$VERCEL_TOKEN"
 
       - name: Verify source
-        run: npm run lint && npm run typecheck && npm run test:translation
+        run: npm run lint && npm run typecheck && npm test
 
       - name: Build production output
         run: npx vercel@56.2.1 build --prod --token="$VERCEL_TOKEN"
