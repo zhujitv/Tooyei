@@ -23,6 +23,7 @@ import {
 import { createProductTranslationJob, type TranslationLocale } from "@/lib/repositories/product-translation-jobs";
 import { contentLocales, localizedPath } from "@/lib/site";
 import { productTranslationProviderId } from "@/lib/translation-providers/types";
+import { isSpecificationValueTranslatable } from "@/lib/translation/quality";
 import {
   structuredTranslationContentTypes,
   type TranslationContentType,
@@ -362,14 +363,17 @@ export async function createProductStructuredTranslationJobAction(slug: string, 
     if (type === "FEATURE_TITLE") return product.features.some((item) => !item.translations?.[locale]?.title.trim());
     if (type === "FEATURE_DESCRIPTION") return product.features.some((item) => item.description.trim() && !item.translations?.[locale]?.description.trim());
     if (type === "SPEC_LABEL") return product.specifications.some((item) => !item.translations?.[locale]?.label.trim());
-    if (type === "SPEC_VALUE") return product.specifications.some((item) => !item.translations?.[locale]?.displayValue.trim());
+    if (type === "SPEC_VALUE") return product.specifications.some((item) => {
+      const sourceValue = item.translations?.en?.displayValue.trim() || item.value;
+      return isSpecificationValueTranslatable(sourceValue, item.unit) && !item.translations?.[locale]?.displayValue.trim();
+    });
     if (type === "APPLICATION_TITLE") return product.applications.some((item) => !item.translations?.[locale]?.title.trim());
     if (type === "APPLICATION_DESCRIPTION") return product.applications.some((item) => item.description.trim() && !item.translations?.[locale]?.description.trim());
     if (type === "DOWNLOAD_TITLE") return product.downloads.some((item) => !item.translations?.[locale]?.title.trim());
     return false;
   });
 
-  const targetContentLocales = contentLocales.filter((locale) => locale !== "zh" && (
+  const targetContentLocales = contentLocales.filter((locale) => locale !== "en" && (
     mode !== "MISSING_LANGUAGES" || isMissingForLocale(locale)
   ));
   if (!targetContentLocales.length) redirect(`/admin/products/${slug}?error=structured-translations-complete`);
@@ -379,7 +383,7 @@ export async function createProductStructuredTranslationJobAction(slug: string, 
     job = await createProductTranslationJob({
       actorEmail: session.email,
       provider: productTranslationProviderId,
-      sourceLocale: Locale.ZH,
+      sourceLocale: Locale.EN,
       targetLocales: targetContentLocales.map((locale) => contentLocaleToDatabaseLocale[locale]),
       scope: "NON_PUBLISHED",
       productIds: [product.id],

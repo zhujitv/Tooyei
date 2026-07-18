@@ -23,8 +23,9 @@ export function getTranslationItemExecutionStatus(input: {
   retryCount: number;
   nextAttemptAt?: Date | null;
 }): TranslationExecutionStatus {
-  if (input.status === "COMPLETED" || input.status === "SKIPPED") return "SUCCESS";
-  if (input.status === "FAILED") return "FAILED";
+  if (input.status === "COMPLETED" || input.status === "QA_PASSED" || input.status === "QA_WARNING" || input.status === "SKIPPED") return "SUCCESS";
+  if (input.status === "FAILED" || input.status === "QA_FAILED" || input.status === "NEEDS_REVIEW") return "FAILED";
+  if (input.status === "TRANSLATED") return "PROCESSING";
   if (input.status === "CANCELLED") return "CANCELLED";
   if (input.status === "RUNNING") return "PROCESSING";
   if (input.retryCount > 0 || input.nextAttemptAt) return "RETRYING";

@@ -9,12 +9,13 @@ import {
   closeProductTranslationJob,
   deleteProductTranslationJob,
   restoreProductTranslationJob,
+  revalidateProductTranslationJob,
   retryFailedProductTranslationJobItems,
 } from "@/lib/repositories/product-translation-jobs";
 import { apiError } from "@/lib/api-response";
 
 const idSchema = z.string().min(1).max(120);
-const mutationSchema = z.object({ action: z.enum(["STOP", "REQUEUE_FAILED", "CLOSE", "RESTORE"]) });
+const mutationSchema = z.object({ action: z.enum(["STOP", "REQUEUE_FAILED", "REVALIDATE_ALL", "CLOSE", "RESTORE"]) });
 
 const parseId = async (context: { params: Promise<{ id: string }> }) => {
   const { id } = await context.params;
@@ -39,6 +40,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       ? await cancelProductTranslationJob(parsedId.data)
       : parsed.data.action === "REQUEUE_FAILED"
         ? await retryFailedProductTranslationJobItems(parsedId.data)
+        : parsed.data.action === "REVALIDATE_ALL"
+          ? await revalidateProductTranslationJob(parsedId.data)
         : parsed.data.action === "CLOSE"
           ? await closeProductTranslationJob(parsedId.data)
           : await restoreProductTranslationJob(parsedId.data);

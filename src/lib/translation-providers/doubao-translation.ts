@@ -8,6 +8,14 @@ import {
   parseDoubaoTranslationDocument,
   type DoubaoTranslationSegment,
 } from "@/lib/translation-providers/doubao-translation-document";
+import {
+  protectTranslationText,
+  protectedPlaceholderInstruction,
+  restoreProtectedTerms,
+  validateProtectedPlaceholders,
+  validateRestoredTerms,
+} from "@/lib/translation/protected-terms";
+import { SEO_DESCRIPTION_LIMITS } from "@/lib/translation/quality";
 import { TranslationProviderRequestError } from "@/lib/translation-providers/types";
 import type {
   StructuredTranslationRequest,
@@ -70,43 +78,6 @@ const errorFromStatus = (status: number, message: string) => {
   );
 };
 
-const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-const protectGlossaryTerms = (
-  text: string,
-  terms: StructuredTranslationRequest["glossaryTerms"],
-) => {
-  const replacements: Array<{ marker: string; target: string }> = [];
-  let protectedText = text;
-  const relevant = (terms ?? [])
-    .filter((term) => term.source.trim() && term.target.trim())
-    .sort((left, right) => right.source.length - left.source.length);
-  for (const term of relevant) {
-    const pattern = new RegExp(escapeRegex(term.source), "giu");
-    if (!pattern.test(protectedText)) continue;
-    const marker = `__TOOYEI_TERM_${replacements.length}__`;
-    protectedText = protectedText.replace(pattern, marker);
-    replacements.push({ marker, target: term.target });
-  }
-  return { protectedText, replacements };
-};
-
-const restoreGlossaryTerms = (
-  text: string,
-  replacements: Array<{ marker: string; target: string }>,
-) => {
-  const warnings: string[] = [];
-  let restored = text;
-  for (const replacement of replacements) {
-    if (!restored.includes(replacement.marker)) {
-      warnings.push(`翻译模型未原样保留术语占位符 ${replacement.marker}，请人工核对该字段术语。`);
-      continue;
-    }
-    restored = restored.replaceAll(replacement.marker, replacement.target);
-  }
-  return { text: restored, warnings };
-};
-
 const parseConcurrency = () => {
   const value = Number(process.env.DOUBAO_TRANSLATION_CONCURRENCY);
   return Number.isFinite(value) ? Math.max(1, Math.min(8, Math.round(value))) : 6;
@@ -132,12 +103,21 @@ export class DoubaoTranslationProvider implements TranslationProvider {
 
   constructor(private readonly config: TranslationProviderConfig) {}
 
-  private async translateSegment(
-    segment: DoubaoTranslationSegment,
-    request: StructuredTranslationRequest,
-    signal: AbortSignal,
-  ): Promise<SegmentResult> {
-    const { protectedText, replacements } = protectGlossaryTerms(segment.text, request.glossaryTerms);
+  private async requestText({
+    text,
+    sourceLanguage,
+    targetLanguage,
+    instructions,
+    maxOutputTokens,
+    signal,
+  }: {
+    text: string;
+    sourceLanguage: string;
+    targetLanguage: string;
+    instructions: string;
+    maxOutputTokens: number;
+    signal: AbortSignal;
+  }) {
     const response = await fetchWithRetry(`${this.config.baseUrl}/responses`, {
       method: "POST",
       headers: {
@@ -146,10 +126,11 @@ export class DoubaoTranslationProvider implements TranslationProvider {
       },
       body: JSON.stringify(buildDoubaoTranslationRequestBody({
         model: this.config.model,
-        text: protectedText,
-        sourceLanguage: request.sourceLanguage!,
-        targetLanguage: request.targetLanguage!,
-        maxOutputTokens: request.maxOutputTokens,
+        text,
+        sourceLanguage,
+        targetLanguage,
+        maxOutputTokens,
+        instructions,
       })),
       signal,
       timeoutMs: this.config.timeoutMs,
@@ -165,19 +146,91 @@ export class DoubaoTranslationProvider implements TranslationProvider {
     if (payload.error?.message) {
       throw new TranslationProviderRequestError(payload.error.message, "PROVIDER_RESPONSE", false);
     }
-    const restored = restoreGlossaryTerms(responseText(payload), replacements);
+    return { payload, text: responseText(payload) };
+  }
+
+  private async translateSegment(
+    segment: DoubaoTranslationSegment,
+    request: StructuredTranslationRequest,
+    signal: AbortSignal,
+  ): Promise<SegmentResult> {
+    let protectedValue = protectTranslationText(segment.text, request.glossaryTerms);
+    const retryFeedback = request.retryFeedback?.length
+      ? ` The previous output failed validation for these reasons: ${request.retryFeedback.join(" ")} Regenerate and correct only these issues.`
+      : "";
+    let response = await this.requestText({
+      text: protectedValue.text,
+      sourceLanguage: request.sourceLanguage!,
+      targetLanguage: request.targetLanguage!,
+      instructions: `${protectedPlaceholderInstruction}${retryFeedback}`,
+      maxOutputTokens: request.maxOutputTokens,
+      signal,
+    });
+    const validateAndRestore = (translatedText: string) => {
+      const placeholderIssues = validateProtectedPlaceholders(translatedText, protectedValue);
+      if (placeholderIssues.length) {
+        throw new TranslationProviderRequestError(
+          `术语占位符校验失败：${placeholderIssues.map((entry) => entry.message).join(" ")}`,
+          "QA_VALIDATION",
+          true,
+        );
+      }
+      const restoredText = restoreProtectedTerms(translatedText, protectedValue);
+      const termIssues = validateRestoredTerms(restoredText, protectedValue);
+      if (termIssues.length) {
+        throw new TranslationProviderRequestError(
+          `受保护术语恢复失败：${termIssues.map((entry) => entry.message).join(" ")}`,
+          "QA_VALIDATION",
+          true,
+        );
+      }
+      return restoredText;
+    };
+    let translatedText = validateAndRestore(response.text);
+    const responses = [response.payload];
+    const targetLocale = request.targetLanguage!.toUpperCase();
+    const seoLimit = SEO_DESCRIPTION_LIMITS[targetLocale]?.max ?? segment.maxLength;
+    if (segment.key === "product.seoDescription" && translatedText.length > seoLimit) {
+      for (let rewriteAttempt = 0; rewriteAttempt < 2 && translatedText.length > seoLimit; rewriteAttempt += 1) {
+        protectedValue = protectTranslationText(translatedText, request.glossaryTerms);
+        response = await this.requestText({
+          text: protectedValue.text,
+          sourceLanguage: request.targetLanguage!,
+          targetLanguage: request.targetLanguage!,
+          instructions: [
+            "Rewrite the following SEO description in the target language.",
+            "Preserve the original meaning and all protected product terms.",
+            "Use one or two complete natural sentences and do not end mid-sentence.",
+            "Do not add unsupported claims.",
+            `Keep the result within ${seoLimit} characters.`,
+            protectedPlaceholderInstruction,
+          ].join(" "),
+          maxOutputTokens: request.maxOutputTokens,
+          signal,
+        });
+        responses.push(response.payload);
+        translatedText = validateAndRestore(response.text);
+      }
+    }
+    const usageValues = (field: "input_tokens" | "output_tokens" | "total_tokens") => responses
+      .map((payload) => payload.usage?.[field])
+      .filter((value): value is number => typeof value === "number");
+    const usageSum = (field: "input_tokens" | "output_tokens" | "total_tokens") => {
+      const values = usageValues(field);
+      return values.length ? values.reduce((sum, value) => sum + value, 0) : null;
+    };
     return {
       key: segment.key,
-      text: restored.text,
-      responseId: payload.id ?? null,
-      promptTokens: payload.usage?.input_tokens ?? null,
-      completionTokens: payload.usage?.output_tokens ?? null,
-      totalTokens: payload.usage?.total_tokens ?? (
-        payload.usage?.input_tokens !== undefined && payload.usage?.output_tokens !== undefined
-          ? payload.usage.input_tokens + payload.usage.output_tokens
+      text: translatedText,
+      responseId: responses.find((payload) => payload.id)?.id ?? null,
+      promptTokens: usageSum("input_tokens"),
+      completionTokens: usageSum("output_tokens"),
+      totalTokens: usageSum("total_tokens") ?? (
+        usageSum("input_tokens") !== null && usageSum("output_tokens") !== null
+          ? usageSum("input_tokens")! + usageSum("output_tokens")!
           : null
       ),
-      warnings: restored.warnings,
+      warnings: [],
     };
   }
 

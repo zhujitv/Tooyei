@@ -38,11 +38,11 @@ test("builds stable translation segments and reconstructs product JSON without t
   assert.equal(result.output.specifications[0]?.id, "spec-1");
 });
 
-test("clamps overlong SEO output and reports a review warning", () => {
+test("preserves overlong SEO output for rewrite or QA instead of truncating it", () => {
   const document = parseDoubaoTranslationDocument(sourceJson);
   const translations = new Map([["product.seoTitle", "x".repeat(90)]]);
   const result = buildDoubaoTranslationResult(document, translations);
-  assert.equal(result.output.product.seoTitle.length, 70);
+  assert.equal(result.output.product.seoTitle.length, 90);
   assert.ok(result.warnings.some((warning) => warning.includes("product.seoTitle")));
 });
 
@@ -65,4 +65,16 @@ test("builds the dedicated Responses API translation contract", () => {
   });
   assert.equal(body.input[0]?.content[0]?.text, "SPC flooring");
   assert.equal(body.max_output_tokens, 3000);
+});
+
+test("passes retry feedback as server-side instructions", () => {
+  const body = buildDoubaoTranslationRequestBody({
+    model: "doubao-seed-translation-250915",
+    text: "[[TERM_0]] flooring",
+    sourceLanguage: "en",
+    targetLanguage: "ar",
+    maxOutputTokens: 12000,
+    instructions: "Copy [[TERM_0]] exactly.",
+  });
+  assert.equal(body.instructions, "Copy [[TERM_0]] exactly.");
 });

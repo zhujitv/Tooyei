@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { contentLocales, languageNames, type ContentLocale } from "@/lib/site";
 import type { MediaAssetOption } from "@/lib/media-asset-types";
+import { isSpecificationValueTranslatable } from "@/lib/translation/quality";
 
 type MediaTranslations = Partial<Record<ContentLocale, { alt: string; caption: string }>>;
 type FeatureTranslations = Partial<Record<ContentLocale, { title: string; description: string }>>;
@@ -610,7 +611,7 @@ export function ProductStructuredContentEditor({
         <SectionHeader icon={Grid2X2} title="产品参数表" description="结构化保存厚度、尺寸、耐磨层、包装等参数。" count={specifications.length} />
         <LanguageCompletion rows={specifications.filter((row) => row.label.trim() && row.value.trim())} fields={[
           { key: "label", required: () => true },
-          { key: "displayValue", required: () => true },
+          { key: "displayValue", required: (row) => isSpecificationValueTranslatable(row.value, row.unit) },
         ]} />
         <div className="overflow-x-auto rounded-lg border border-white/[0.07]">
           <table className="w-full min-w-[860px] border-collapse text-left text-xs">

@@ -24,8 +24,9 @@ test("worker timing and structured content contract match the translation center
   assert.equal(translationWorkerConfig.providerTimeoutMs, 90_000);
   assert.equal(translationWorkerConfig.heartbeatIntervalMs, 30_000);
   assert.equal(translationWorkerConfig.staleWorkerMs, 300_000);
-  assert.equal(translationWorkerConfig.maxRetries, 3);
-  assert.deepEqual(translationWorkerConfig.retryDelaysMs, [10_000, 30_000, 120_000]);
+  assert.equal(translationWorkerConfig.maxAttempts, 3);
+  assert.equal(translationWorkerConfig.maxRetries, 2);
+  assert.deepEqual(translationWorkerConfig.retryDelaysMs, [10_000, 30_000]);
   assert.deepEqual(translationContentTypes, [
     "PRODUCT",
     "MEDIA_ALT",

@@ -29,6 +29,7 @@ export type StructuredTranslationRequest = {
   sourceLanguage?: string;
   targetLanguage?: string;
   glossaryTerms?: Array<{ source: string; target: string }>;
+  retryFeedback?: string[];
 };
 
 export type StructuredTranslationResult = {
@@ -46,7 +47,8 @@ export type TranslationProviderErrorType =
   | "NETWORK"
   | "PROVIDER_5XX"
   | "PROVIDER_4XX"
-  | "PROVIDER_RESPONSE";
+  | "PROVIDER_RESPONSE"
+  | "QA_VALIDATION";
 
 export class TranslationProviderRequestError extends Error {
   readonly name = "TranslationProviderRequestError";

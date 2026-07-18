@@ -12,12 +12,15 @@ import {
 import { getPrisma, isDatabaseConfigured } from "@/lib/db";
 import {
   generateProductTranslation,
+  productTranslationOutputSchema,
   productTranslationPromptVersion,
+  SOURCE_LOCALE,
   TranslationBusinessError,
+  TranslationQualityError,
   TranslationResponseValidationError,
   type ProductTranslationOutput,
 } from "@/lib/product-translation-service";
-import { TranslationResponseParseError } from "@/lib/translation-response-parser";
+import { normalizeTranslationResult, TranslationResponseParseError } from "@/lib/translation-response-parser";
 import {
   canDeleteTranslationJob,
   deriveRestoredTranslationJobStatus,
@@ -31,6 +34,14 @@ import {
   TranslationProviderRequestError,
   type TranslationProviderId,
 } from "@/lib/translation-providers/types";
+import {
+  isSpecificationValueTranslatable,
+  TRANSLATION_QA_VERSION,
+  validateProductTranslation,
+  type TranslationQaDocument,
+  type TranslationQaIssue,
+  type TranslationQaResult,
+} from "@/lib/translation/quality";
 import {
   hasTranslationContentType,
   translationContentTypes,
@@ -85,7 +96,7 @@ const executionStatusWhere = (status?: TranslationExecutionStatus): Prisma.Produ
   switch (status) {
     case "PENDING": return { status: TranslationJobStatus.PENDING, startedAt: null };
     case "QUEUED": return { status: TranslationJobStatus.PENDING, startedAt: { not: null } };
-    case "PROCESSING": return { status: TranslationJobStatus.RUNNING, items: { some: { status: TranslationJobItemStatus.RUNNING } } };
+    case "PROCESSING": return { status: TranslationJobStatus.RUNNING, items: { some: { status: { in: [TranslationJobItemStatus.RUNNING, TranslationJobItemStatus.TRANSLATED] } } } };
     case "RETRYING": return { OR: [
       { status: TranslationJobStatus.PAUSED },
       { status: TranslationJobStatus.RUNNING, items: { some: { status: TranslationJobItemStatus.PENDING, retryCount: { gt: 0 } } } },
@@ -126,6 +137,10 @@ export async function getTranslationDashboard(status?: TranslationExecutionStatu
         failedItems: true,
         skippedItems: true,
         cancelledItems: true,
+        qaPassedItems: true,
+        qaWarningItems: true,
+        qaFailedItems: true,
+        needsReviewItems: true,
         promptTokens: true,
         completionTokens: true,
         totalTokens: true,
@@ -186,11 +201,12 @@ export async function getTranslationProductOptions(query = "") {
 
 export async function createProductTranslationJob(input: CreateTranslationJobInput) {
   assertDatabase();
+  if (input.sourceLocale !== SOURCE_LOCALE) throw new Error("产品翻译任务必须以英文（EN）作为唯一源语言。");
   const service = getTranslationProviderState(input.provider);
   if (!service.configured || !service.provider || !service.model) {
     throw new Error(service.error || "翻译 Provider 配置无效。");
   }
-  const targetLocales = Array.from(new Set(input.targetLocales)).filter((locale) => locale !== input.sourceLocale);
+  const targetLocales = Array.from(new Set(input.targetLocales)).filter((locale) => locale !== SOURCE_LOCALE);
   if (!targetLocales.length) throw new Error("请至少选择一种不同于源语言的目标语言。");
   const contentTypes = Array.from(new Set(input.contentTypes?.length ? input.contentTypes : translationContentTypes));
   const translatesMainRecord = contentTypes.some((type) => type === "PRODUCT" || type === "SEO");
@@ -208,7 +224,7 @@ export async function createProductTranslationJob(input: CreateTranslationJobInp
       ...(input.productIds?.length ? { id: { in: Array.from(new Set(input.productIds)) } } : {}),
       translations: {
         some: {
-          locale: input.sourceLocale,
+          locale: SOURCE_LOCALE,
           status: { not: TranslationStatus.MISSING },
           title: { not: "" },
           summary: { not: "" },
@@ -222,11 +238,31 @@ export async function createProductTranslationJob(input: CreateTranslationJobInp
       slug: true,
       sku: true,
       translations: {
-        where: { locale: { in: targetLocales } },
-        select: { locale: true, status: true },
+        where: { locale: { in: [SOURCE_LOCALE, ...targetLocales] } },
+        select: { locale: true, status: true, title: true, summary: true, seoTitle: true, seoDescription: true },
       },
+      media: { select: { assetId: true, alt: true, translations: { where: { locale: SOURCE_LOCALE }, select: { locale: true, alt: true } } } },
+      features: { select: { id: true, translations: { where: { locale: SOURCE_LOCALE }, select: { locale: true, value: true } } } },
+      specifications: { select: { id: true, translations: { where: { locale: SOURCE_LOCALE }, select: { locale: true, label: true } } } },
+      applications: { select: { id: true, translations: { where: { locale: SOURCE_LOCALE }, select: { locale: true, title: true } } } },
+      downloads: { select: { id: true, translations: { where: { locale: SOURCE_LOCALE }, select: { locale: true, title: true } } } },
     },
   });
+
+  const missingEnglishSource = products.flatMap((product) => {
+    const missing: string[] = [];
+    const main = product.translations.find(({ locale }) => locale === SOURCE_LOCALE);
+    if (hasTranslationContentType(contentTypes, "SEO") && (!main?.seoTitle?.trim() || !main.seoDescription?.trim())) missing.push("SEO");
+    if (hasTranslationContentType(contentTypes, "MEDIA_ALT") && product.media.some((row) => !(row.translations[0]?.alt ?? row.alt ?? "").trim())) missing.push("媒体 ALT");
+    if (hasTranslationContentType(contentTypes, "FEATURE_TITLE") && product.features.some((row) => !row.translations[0]?.value.trim())) missing.push("卖点标题");
+    if (hasTranslationContentType(contentTypes, "SPEC_LABEL") && product.specifications.some((row) => !row.translations[0]?.label.trim())) missing.push("参数名称");
+    if (hasTranslationContentType(contentTypes, "APPLICATION_TITLE") && product.applications.some((row) => !row.translations[0]?.title.trim())) missing.push("应用场景标题");
+    if (hasTranslationContentType(contentTypes, "DOWNLOAD_TITLE") && product.downloads.some((row) => !row.translations[0]?.title.trim())) missing.push("下载资料标题");
+    return missing.length ? [`${product.sku}：${Array.from(new Set(missing)).join("、")}`] : [];
+  });
+  if (missingEnglishSource.length) {
+    throw new Error(`以下产品缺少本次任务所需的英文源字段，已阻止创建任务：${missingEnglishSource.slice(0, 5).join("；")}${missingEnglishSource.length > 5 ? `；另有 ${missingEnglishSource.length - 5} 个产品` : ""}`);
+  }
 
   const items = products.flatMap((product) => targetLocales.flatMap((targetLocale) => {
     const current = product.translations.find(({ locale }) => locale === targetLocale);
@@ -245,14 +281,14 @@ export async function createProductTranslationJob(input: CreateTranslationJobInp
 
   return prisma.productTranslationJob.create({
     data: {
-      sourceLocale: input.sourceLocale,
+      sourceLocale: SOURCE_LOCALE,
       targetLocales,
       provider: service.provider,
       model: service.model,
       contentTypes,
       totalItems: items.length,
       requestedById: actor.id,
-      items: { create: items.map((item) => ({ ...item, contentTypes })) },
+      items: { create: items.map((item) => ({ ...item, sourceLocale: SOURCE_LOCALE, contentTypes })) },
     },
     select: { id: true, totalItems: true },
   });
@@ -274,6 +310,10 @@ export async function getProductTranslationJob(id: string) {
       failedItems: true,
       skippedItems: true,
       cancelledItems: true,
+      qaPassedItems: true,
+      qaWarningItems: true,
+      qaFailedItems: true,
+      needsReviewItems: true,
       promptTokens: true,
       completionTokens: true,
       totalTokens: true,
@@ -295,9 +335,18 @@ export async function getProductTranslationJob(id: string) {
           productId: true,
           productSlug: true,
           productSku: true,
+          sourceLocale: true,
           targetLocale: true,
           status: true,
           warnings: true,
+          qaStatus: true,
+          qaIssues: true,
+          qaErrorCount: true,
+          qaWarningCount: true,
+          qaAttemptCount: true,
+          qaVersion: true,
+          lastQaAt: true,
+          savedAt: true,
           errorType: true,
           errorMessage: true,
           rawResponse: true,
@@ -335,6 +384,8 @@ export async function getProductTranslationJob(id: string) {
               promptTokens: true,
               completionTokens: true,
               totalTokens: true,
+              qaCodes: true,
+              qaStatus: true,
               createdAt: true,
             },
           },
@@ -342,8 +393,13 @@ export async function getProductTranslationJob(id: string) {
             select: {
               translations: {
                 where: { locale: { in: [...translationLocales] } },
-                select: { locale: true, title: true, status: true },
+                select: { locale: true, title: true, summary: true, seoTitle: true, seoDescription: true, status: true },
               },
+              media: { select: { visible: true, translations: { select: { locale: true, alt: true, caption: true } } } },
+              features: { select: { visible: true, translations: { select: { locale: true, value: true, description: true } } } },
+              specifications: { select: { visible: true, value: true, unit: true, translations: { select: { locale: true, label: true, displayValue: true } } } },
+              applications: { select: { visible: true, translations: { select: { locale: true, title: true, description: true, imageAlt: true } } } },
+              downloads: { select: { visible: true, translations: { select: { locale: true, title: true, description: true } } } },
             },
           },
         },
@@ -458,6 +514,219 @@ const saveGeneratedTranslation = async (
   });
 };
 
+const loadTranslationQaDocument = async (
+  productId: string,
+  locale: Locale,
+  contentTypes: readonly string[],
+): Promise<TranslationQaDocument | null> => {
+  const sourceDocument = locale === SOURCE_LOCALE;
+  const locales = sourceDocument ? [SOURCE_LOCALE] : [SOURCE_LOCALE, locale];
+  const product = await getPrisma().product.findUnique({
+    where: { id: productId },
+    select: {
+      translations: { where: { locale: { in: locales } } },
+      media: {
+        orderBy: { sortOrder: "asc" },
+        select: { assetId: true, alt: true, caption: true, translations: { where: { locale: { in: locales } } } },
+      },
+      features: {
+        orderBy: { sortOrder: "asc" },
+        select: { id: true, translations: { where: { locale: { in: locales } } } },
+      },
+      specifications: {
+        orderBy: { sortOrder: "asc" },
+        select: { id: true, group: true, value: true, unit: true, translations: { where: { locale: { in: locales } } } },
+      },
+      applications: {
+        orderBy: { sortOrder: "asc" },
+        select: { id: true, translations: { where: { locale: { in: locales } } } },
+      },
+      downloads: {
+        orderBy: { sortOrder: "asc" },
+        select: { id: true, translations: { where: { locale: { in: locales } } } },
+      },
+    },
+  });
+  if (!product) return null;
+  const main = product.translations.find((translation) => translation.locale === locale);
+  const exact = <T extends { locale: Locale }>(rows: T[], target = locale) => rows.find((row) => row.locale === target);
+  return {
+    product: {
+      title: hasTranslationContentType(contentTypes, "PRODUCT") ? main?.title ?? "" : "",
+      summary: hasTranslationContentType(contentTypes, "PRODUCT") ? main?.summary ?? "" : "",
+      seoTitle: hasTranslationContentType(contentTypes, "SEO") ? main?.seoTitle ?? "" : "",
+      seoDescription: hasTranslationContentType(contentTypes, "SEO") ? main?.seoDescription ?? "" : "",
+    },
+    media: contentTypes.some((type) => type === "MEDIA_ALT" || type === "MEDIA_CAPTION")
+      ? product.media.map((row) => {
+          const translation = exact(row.translations);
+          return {
+            id: row.assetId,
+            alt: translation?.alt ?? (sourceDocument ? row.alt ?? "" : ""),
+            caption: translation?.caption ?? (sourceDocument ? row.caption ?? "" : ""),
+          };
+        })
+      : [],
+    features: contentTypes.some((type) => type === "FEATURE" || type === "FEATURE_TITLE" || type === "FEATURE_DESCRIPTION")
+      ? product.features.map((row) => {
+          const translation = exact(row.translations);
+          return { id: row.id, title: translation?.value ?? "", description: translation?.description ?? "" };
+        })
+      : [],
+    specifications: contentTypes.some((type) => type === "SPECIFICATION" || type === "SPEC_LABEL" || type === "SPEC_VALUE")
+      ? product.specifications.map((row) => {
+          const translation = exact(row.translations);
+          const english = exact(row.translations, SOURCE_LOCALE);
+          const sourceValue = english?.displayValue?.trim() || row.value;
+          const translateValue = isSpecificationValueTranslatable(sourceValue, row.unit);
+          return {
+            id: row.id,
+            group: translation?.group ?? (sourceDocument ? row.group ?? "" : ""),
+            label: translation?.label ?? "",
+            displayValue: translation?.displayValue?.trim() || (sourceDocument || !translateValue ? row.value : ""),
+          };
+        })
+      : [],
+    applications: contentTypes.some((type) => type === "APPLICATION" || type === "APPLICATION_TITLE" || type === "APPLICATION_DESCRIPTION")
+      ? product.applications.map((row) => {
+          const translation = exact(row.translations);
+          return { id: row.id, title: translation?.title ?? "", description: translation?.description ?? "", imageAlt: translation?.imageAlt ?? "" };
+        })
+      : [],
+    downloads: contentTypes.some((type) => type === "DOWNLOAD" || type === "DOWNLOAD_TITLE")
+      ? product.downloads.map((row) => {
+          const translation = exact(row.translations);
+          return { id: row.id, title: translation?.title ?? "", description: translation?.description ?? "" };
+        })
+      : [],
+  };
+};
+
+const loadTranslationQaSource = (productId: string, contentTypes: readonly string[]) =>
+  loadTranslationQaDocument(productId, SOURCE_LOCALE, contentTypes);
+
+const needsReviewQa = (field: string, message: string): TranslationQaResult => {
+  const entry: TranslationQaIssue = { code: "LEGACY_QA_UNAVAILABLE", severity: "ERROR", field, message };
+  return {
+    status: "NEEDS_REVIEW",
+    passed: false,
+    retryable: false,
+    issues: [entry],
+    errors: [entry],
+    warnings: [],
+    retryInstructions: [],
+  };
+};
+
+export async function revalidateProductTranslationJobItem(jobId: string, itemId: string) {
+  assertDatabase();
+  const prisma = getPrisma();
+  const item = await prisma.productTranslationJobItem.findFirst({
+    where: { id: itemId, jobId },
+    select: {
+      id: true,
+      jobId: true,
+      productId: true,
+      targetLocale: true,
+      status: true,
+      output: true,
+      contentTypes: true,
+      attemptCount: true,
+      completedAt: true,
+      savedAt: true,
+      job: { select: { provider: true, model: true } },
+    },
+  });
+  if (!item) throw new Error("翻译任务项不存在。");
+  if (item.status === TranslationJobItemStatus.RUNNING || item.status === TranslationJobItemStatus.TRANSLATED) throw new Error("执行中的项目不能重新质检。");
+
+  const startedAt = new Date();
+  const source = await loadTranslationQaSource(item.productId, item.contentTypes);
+  const shouldReadSavedTranslation = Boolean(item.savedAt) || item.status === TranslationJobItemStatus.COMPLETED;
+  const savedTarget = shouldReadSavedTranslation
+    ? await loadTranslationQaDocument(item.productId, item.targetLocale, item.contentTypes)
+    : null;
+  const parsedSnapshot = !shouldReadSavedTranslation && item.output
+    ? productTranslationOutputSchema.safeParse(normalizeTranslationResult(item.output))
+    : null;
+  const qa: TranslationQaResult = !source
+    ? needsReviewQa("product", "产品已不存在，无法重建英文源内容进行质检。")
+    : shouldReadSavedTranslation && savedTarget
+      ? validateProductTranslation({ source, target: savedTarget, targetLocale: item.targetLocale, contentTypes: item.contentTypes })
+      : !parsedSnapshot
+        ? needsReviewQa("output", "旧版任务没有保存可重新质检的结构化输出，需要人工审核或重新翻译。")
+        : !parsedSnapshot.success
+          ? needsReviewQa("output", `旧版输出结构不兼容新版 QA：${parsedSnapshot.error.message}`)
+          : validateProductTranslation({ source, target: parsedSnapshot.data, targetLocale: item.targetLocale, contentTypes: item.contentTypes });
+  const finishedAt = new Date();
+  const status = qa.status === "QA_PASSED"
+    ? TranslationJobItemStatus.QA_PASSED
+    : qa.status === "QA_WARNING"
+      ? TranslationJobItemStatus.QA_WARNING
+      : qa.status === "NEEDS_REVIEW"
+        ? TranslationJobItemStatus.NEEDS_REVIEW
+        : TranslationJobItemStatus.QA_FAILED;
+
+  await prisma.$transaction([
+    prisma.productTranslationJobItem.update({
+      where: { id: item.id },
+      data: {
+        status,
+        qaStatus: qa.status,
+        qaIssues: qa.issues as Prisma.InputJsonValue,
+        qaErrorCount: qa.errors.length,
+        qaWarningCount: qa.warnings.length,
+        qaAttemptCount: { increment: 1 },
+        qaVersion: TRANSLATION_QA_VERSION,
+        lastQaAt: finishedAt,
+        savedAt: item.savedAt ?? (item.status === TranslationJobItemStatus.COMPLETED ? item.completedAt : null),
+        processingStep: qa.passed ? "DONE" : "FAILED",
+        errorType: qa.passed ? null : "QA_VALIDATION",
+        errorMessage: qa.passed ? null : qa.errors.map((entry) => entry.message).join(" ").slice(0, 1_200),
+      },
+    }),
+    prisma.productTranslationLog.create({
+      data: {
+        jobId,
+        itemId: item.id,
+        provider: item.job.provider,
+        model: item.job.model,
+        targetLocale: item.targetLocale,
+        promptVersion: `${productTranslationPromptVersion}:revalidate`,
+        attemptNumber: item.attemptCount,
+        errorType: qa.passed ? null : "QA_VALIDATION",
+        errorMessage: qa.passed ? null : qa.errors.map((entry) => entry.message).join(" ").slice(0, 1_200),
+        requestStartedAt: startedAt,
+        requestFinishedAt: finishedAt,
+        durationMs: finishedAt.getTime() - startedAt.getTime(),
+        qaCodes: qa.issues.map((entry) => entry.code),
+        qaStatus: qa.status,
+      },
+    }),
+  ]);
+  await refreshProductTranslationJobSummary(jobId);
+  return qa;
+}
+
+export async function revalidateProductTranslationJob(jobId: string) {
+  assertDatabase();
+  const items = await getPrisma().productTranslationJobItem.findMany({
+    where: { jobId, status: { notIn: [TranslationJobItemStatus.RUNNING, TranslationJobItemStatus.TRANSLATED, TranslationJobItemStatus.PENDING] } },
+    orderBy: { createdAt: "asc" },
+    select: { id: true },
+  });
+  if (!items.length) throw new Error("任务没有可重新质检的项目。");
+  const results = [];
+  for (const item of items) results.push(await revalidateProductTranslationJobItem(jobId, item.id));
+  return {
+    count: results.length,
+    passed: results.filter((result) => result.status === "QA_PASSED").length,
+    warning: results.filter((result) => result.status === "QA_WARNING").length,
+    failed: results.filter((result) => result.status === "QA_FAILED").length,
+    needsReview: results.filter((result) => result.status === "NEEDS_REVIEW").length,
+  };
+}
+
 const rawResponseLimit = 64_000;
 const executionStatuses = [
   TranslationJobStatus.PENDING,
@@ -483,6 +752,8 @@ type TranslationFailure = {
   promptTokens: number | null;
   completionTokens: number | null;
   totalTokens: number | null;
+  qa: TranslationQaResult | null;
+  output: ProductTranslationOutput | null;
 };
 
 const classifyTranslationFailure = (error: unknown): TranslationFailure => {
@@ -497,9 +768,39 @@ const classifyTranslationFailure = (error: unknown): TranslationFailure => {
       promptTokens: null,
       completionTokens: null,
       totalTokens: null,
+      qa: error.errorType === "QA_VALIDATION" ? {
+        status: "QA_FAILED",
+        passed: false,
+        retryable: true,
+        issues: [{ code: "PLACEHOLDER_VALIDATION_FAILED", severity: "ERROR", field: "provider", message }],
+        errors: [{ code: "PLACEHOLDER_VALIDATION_FAILED", severity: "ERROR", field: "provider", message }],
+        warnings: [],
+        retryInstructions: [message],
+      } : null,
+      output: null,
+    };
+  }
+  if (error instanceof TranslationQualityError) {
+    return {
+      errorType: error.errorType,
+      errorMessage: message,
+      retryable: error.retryable,
+      rawResponse: limitRawResponse(error.rawResponse),
+      responseId: error.responseId,
+      promptTokens: error.promptTokens,
+      completionTokens: error.completionTokens,
+      totalTokens: error.totalTokens,
+      qa: error.qa,
+      output: error.output,
     };
   }
   if (error instanceof TranslationResponseParseError || error instanceof TranslationResponseValidationError) {
+    const qaIssue: TranslationQaIssue = {
+      code: "RESPONSE_FORMAT_INVALID",
+      severity: "ERROR",
+      field: "response",
+      message,
+    };
     return {
       errorType: error.errorType,
       errorMessage: message,
@@ -509,6 +810,16 @@ const classifyTranslationFailure = (error: unknown): TranslationFailure => {
       promptTokens: error.promptTokens,
       completionTokens: error.completionTokens,
       totalTokens: error.totalTokens,
+      qa: {
+        status: "QA_FAILED",
+        passed: false,
+        retryable: true,
+        issues: [qaIssue],
+        errors: [qaIssue],
+        warnings: [],
+        retryInstructions: [message],
+      },
+      output: null,
     };
   }
   if (error instanceof TranslationBusinessError) {
@@ -521,6 +832,8 @@ const classifyTranslationFailure = (error: unknown): TranslationFailure => {
       promptTokens: null,
       completionTokens: null,
       totalTokens: null,
+      qa: null,
+      output: null,
     };
   }
   return {
@@ -532,6 +845,8 @@ const classifyTranslationFailure = (error: unknown): TranslationFailure => {
     promptTokens: null,
     completionTokens: null,
     totalTokens: null,
+    qa: null,
+    output: null,
   };
 };
 
@@ -552,15 +867,20 @@ export async function refreshProductTranslationJobSummary(jobId: string) {
   if (!job) throw new Error("翻译任务不存在。");
 
   const count = (status: TranslationJobItemStatus) => aggregates.find((row) => row.status === status)?._count._all ?? 0;
-  const completedItems = count(TranslationJobItemStatus.COMPLETED);
+  const legacyCompletedItems = count(TranslationJobItemStatus.COMPLETED);
+  const qaPassedItems = count(TranslationJobItemStatus.QA_PASSED);
+  const qaWarningItems = count(TranslationJobItemStatus.QA_WARNING);
+  const qaFailedItems = count(TranslationJobItemStatus.QA_FAILED);
+  const needsReviewItems = count(TranslationJobItemStatus.NEEDS_REVIEW);
+  const completedItems = legacyCompletedItems + qaPassedItems + qaWarningItems;
   const failedItems = count(TranslationJobItemStatus.FAILED);
   const skippedItems = count(TranslationJobItemStatus.SKIPPED);
   const cancelledItems = count(TranslationJobItemStatus.CANCELLED);
   const pendingItems = count(TranslationJobItemStatus.PENDING);
-  const runningItems = count(TranslationJobItemStatus.RUNNING);
+  const runningItems = count(TranslationJobItemStatus.RUNNING) + count(TranslationJobItemStatus.TRANSLATED);
   const remaining = pendingItems + runningItems;
   const successfulItems = completedItems + skippedItems;
-  const unsuccessfulItems = failedItems + cancelledItems;
+  const unsuccessfulItems = failedItems + qaFailedItems + needsReviewItems + cancelledItems;
   const preserveStatus = job.status === TranslationJobStatus.CANCELLED || job.status === TranslationJobStatus.CLOSED;
   const status = preserveStatus
     ? job.status
@@ -585,6 +905,10 @@ export async function refreshProductTranslationJobSummary(jobId: string) {
       failedItems,
       skippedItems,
       cancelledItems,
+      qaPassedItems,
+      qaWarningItems,
+      qaFailedItems,
+      needsReviewItems,
       promptTokens: sum("promptTokens"),
       completionTokens: sum("completionTokens"),
       totalTokens: sum("totalTokens"),
@@ -602,6 +926,10 @@ export async function refreshProductTranslationJobSummary(jobId: string) {
       failedItems: true,
       skippedItems: true,
       cancelledItems: true,
+      qaPassedItems: true,
+      qaWarningItems: true,
+      qaFailedItems: true,
+      needsReviewItems: true,
       promptTokens: true,
       completionTokens: true,
       totalTokens: true,
@@ -639,7 +967,7 @@ export async function startProductTranslationJobExecution(jobId: string, actorEm
     if (!service.configured) throw new Error(service.error || "该任务的翻译 Provider 尚未配置完整。");
 
     const runningItems = await tx.productTranslationJobItem.count({
-      where: { jobId, status: TranslationJobItemStatus.RUNNING },
+      where: { jobId, status: { in: [TranslationJobItemStatus.RUNNING, TranslationJobItemStatus.TRANSLATED] } },
     });
     if (runningItems) throw new Error("任务仍有正在处理的项目，请等待完成或先停止任务。");
 
@@ -649,8 +977,8 @@ export async function startProductTranslationJobExecution(jobId: string, actorEm
       where: {
         jobId,
         OR: [
-          { status: TranslationJobItemStatus.FAILED },
-          { errorType: "TIMEOUT", status: { notIn: [TranslationJobItemStatus.COMPLETED, TranslationJobItemStatus.SKIPPED] } },
+          { status: { in: [TranslationJobItemStatus.FAILED, TranslationJobItemStatus.QA_FAILED, TranslationJobItemStatus.NEEDS_REVIEW] } },
+          { errorType: "TIMEOUT", status: { notIn: [TranslationJobItemStatus.COMPLETED, TranslationJobItemStatus.QA_PASSED, TranslationJobItemStatus.QA_WARNING, TranslationJobItemStatus.SKIPPED] } },
         ],
       },
       data: {
@@ -662,6 +990,7 @@ export async function startProductTranslationJobExecution(jobId: string, actorEm
         completedAt: null,
         retryCount: 0,
         currentRunAttemptCount: 0,
+        qaStatus: null,
         nextAttemptAt: null,
         heartbeatAt: null,
         workerId: null,
@@ -735,10 +1064,15 @@ const updateTranslationItemStep = async (
   step: TranslationProcessingStep,
 ) => {
   const now = new Date();
+  const activeStatuses = [TranslationJobItemStatus.RUNNING, TranslationJobItemStatus.TRANSLATED];
   await Promise.all([
     getPrisma().productTranslationJobItem.updateMany({
-      where: { id: itemId, jobId, status: TranslationJobItemStatus.RUNNING, workerId },
-      data: { processingStep: step, heartbeatAt: now },
+      where: { id: itemId, jobId, status: { in: activeStatuses }, workerId },
+      data: {
+        status: step === "QUALITY_CHECK" ? TranslationJobItemStatus.TRANSLATED : undefined,
+        processingStep: step,
+        heartbeatAt: now,
+      },
     }),
     getPrisma().productTranslationJob.updateMany({
       where: { id: jobId, status: TranslationJobStatus.RUNNING, executionId },
@@ -753,8 +1087,19 @@ const startTranslationItemHeartbeat = (
   executionId: string,
   workerId: string,
 ) => {
-  const beat = () => updateTranslationItemStep(jobId, itemId, executionId, workerId, "CALL_MODEL")
-    .catch((error) => logError("Translation heartbeat failed", { operation: "translation.heartbeat", jobId, itemId, executionId, workerId }, error));
+  const beat = () => {
+    const now = new Date();
+    return Promise.all([
+      getPrisma().productTranslationJobItem.updateMany({
+        where: { id: itemId, jobId, status: { in: [TranslationJobItemStatus.RUNNING, TranslationJobItemStatus.TRANSLATED] }, workerId },
+        data: { heartbeatAt: now },
+      }),
+      getPrisma().productTranslationJob.updateMany({
+        where: { id: jobId, status: TranslationJobStatus.RUNNING, executionId },
+        data: { heartbeatAt: now, lockedAt: now },
+      }),
+    ]).catch((error) => logError("Translation heartbeat failed", { operation: "translation.heartbeat", jobId, itemId, executionId, workerId }, error));
+  };
   const timer = setInterval(() => void beat(), translationWorkerConfig.heartbeatIntervalMs);
   return () => clearInterval(timer);
 };
@@ -786,7 +1131,17 @@ export async function processNextProductTranslationJobItem(jobId: string, execut
     const candidate = await tx.productTranslationJobItem.findFirst({
       where: { jobId, ...dueItemWhere(now) },
       orderBy: { createdAt: "asc" },
-      select: { id: true, productId: true, productSlug: true, targetLocale: true, retryCount: true, contentTypes: true },
+      select: {
+        id: true,
+        productId: true,
+        productSlug: true,
+        sourceLocale: true,
+        targetLocale: true,
+        retryCount: true,
+        contentTypes: true,
+        errorMessage: true,
+        qaIssues: true,
+      },
     });
     if (!candidate) return null;
     const workerId = randomUUID();
@@ -802,6 +1157,7 @@ export async function processNextProductTranslationJobItem(jobId: string, execut
         completedAt: null,
         errorType: null,
         errorMessage: null,
+        qaStatus: null,
       },
     });
     if (!claimed.count) return null;
@@ -809,7 +1165,7 @@ export async function processNextProductTranslationJobItem(jobId: string, execut
       where: { id: jobId },
       data: { lockedAt: now, heartbeatAt: now, lastError: null },
     });
-    return { ...candidate, workerId, sourceLocale: job.sourceLocale, provider: job.provider, model: job.model };
+    return { ...candidate, workerId, sourceLocale: candidate.sourceLocale ?? job.sourceLocale, provider: job.provider, model: job.model };
   });
 
   if (!item) {
@@ -849,11 +1205,23 @@ export async function processNextProductTranslationJobItem(jobId: string, execut
   const stopHeartbeat = startTranslationItemHeartbeat(jobId, item.id, executionId, item.workerId);
 
   try {
+    const previousQaIssues = Array.isArray(item.qaIssues)
+      ? item.qaIssues.flatMap((entry) => {
+          if (!entry || typeof entry !== "object" || Array.isArray(entry)) return [];
+          const row = entry as Record<string, unknown>;
+          return row.severity === "ERROR" && typeof row.message === "string"
+            ? [`${typeof row.field === "string" ? `${row.field}: ` : ""}${row.message}`]
+            : [];
+        })
+      : [];
+    const retryFeedback = previousQaIssues.length
+      ? previousQaIssues
+      : item.errorMessage ? [item.errorMessage] : undefined;
     const generated = await generateProductTranslation(
       item.productId,
       item.sourceLocale,
       item.targetLocale,
-      { provider: item.provider, model: item.model, contentTypes: item.contentTypes },
+      { provider: item.provider, model: item.model, contentTypes: item.contentTypes, retryFeedback },
       (step) => updateTranslationItemStep(jobId, item.id, executionId, item.workerId, step),
     );
     await updateTranslationItemStep(jobId, item.id, executionId, item.workerId, "SAVE_RESULT");
@@ -877,12 +1245,18 @@ export async function processNextProductTranslationJobItem(jobId: string, execut
           promptTokens: generated.promptTokens,
           completionTokens: generated.completionTokens,
           totalTokens: generated.totalTokens,
+          qaCodes: generated.qa.issues.map((entry) => entry.code),
+          qaStatus: generated.qa.status,
         },
       }),
       prisma.productTranslationJobItem.update({
         where: { id: item.id },
         data: {
-          status: saved.skipped ? TranslationJobItemStatus.SKIPPED : TranslationJobItemStatus.COMPLETED,
+          status: saved.skipped
+            ? TranslationJobItemStatus.SKIPPED
+            : generated.qa.status === "QA_WARNING"
+              ? TranslationJobItemStatus.QA_WARNING
+              : TranslationJobItemStatus.QA_PASSED,
           processingStep: "DONE",
           workerId: null,
           heartbeatAt: requestFinishedAt,
@@ -891,6 +1265,14 @@ export async function processNextProductTranslationJobItem(jobId: string, execut
           responseId: generated.responseId,
           output: generated.output as Prisma.InputJsonValue,
           warnings: generated.warnings as Prisma.InputJsonValue,
+          qaStatus: generated.qa.status,
+          qaIssues: generated.qa.issues as Prisma.InputJsonValue,
+          qaErrorCount: generated.qa.errors.length,
+          qaWarningCount: generated.qa.warnings.length,
+          qaAttemptCount: { increment: 1 },
+          qaVersion: generated.qaVersion,
+          lastQaAt: requestFinishedAt,
+          savedAt: saved.skipped ? null : requestFinishedAt,
           rawResponse: limitRawResponse(generated.rawResponse),
           promptTokens: generated.promptTokens,
           completionTokens: generated.completionTokens,
@@ -921,6 +1303,9 @@ export async function processNextProductTranslationJobItem(jobId: string, execut
     const nextAttemptAt = retryDelayMs === null || retryDelayMs === undefined
       ? null
       : new Date(requestFinishedAt.getTime() + retryDelayMs);
+    const terminalFailureStatus = failure.qa
+      ? failure.retryable ? TranslationJobItemStatus.QA_FAILED : TranslationJobItemStatus.NEEDS_REVIEW
+      : TranslationJobItemStatus.FAILED;
 
     await prisma.$transaction([
       prisma.productTranslationLog.create({
@@ -941,18 +1326,29 @@ export async function processNextProductTranslationJobItem(jobId: string, execut
           promptTokens: failure.promptTokens,
           completionTokens: failure.completionTokens,
           totalTokens: failure.totalTokens,
+          qaCodes: failure.qa?.issues.map((entry) => entry.code) ?? [],
+          qaStatus: failure.qa?.status ?? null,
         },
       }),
       prisma.productTranslationJobItem.update({
         where: { id: item.id },
         data: {
-          status: canRetry ? TranslationJobItemStatus.PENDING : TranslationJobItemStatus.FAILED,
+          status: canRetry ? TranslationJobItemStatus.PENDING : terminalFailureStatus,
           processingStep: canRetry ? "RETRY_WAIT" : "FAILED",
           workerId: null,
           heartbeatAt: requestFinishedAt,
           nextAttemptAt,
           retryCount: canRetry ? { increment: 1 } : undefined,
           responseId: failure.responseId,
+          output: failure.output ? failure.output as Prisma.InputJsonValue : undefined,
+          qaStatus: failure.qa?.status,
+          qaIssues: failure.qa ? failure.qa.issues as Prisma.InputJsonValue : undefined,
+          qaErrorCount: failure.qa?.errors.length ?? 0,
+          qaWarningCount: failure.qa?.warnings.length ?? 0,
+          qaAttemptCount: failure.qa ? { increment: 1 } : undefined,
+          qaVersion: failure.qa ? TRANSLATION_QA_VERSION : undefined,
+          lastQaAt: failure.qa ? requestFinishedAt : undefined,
+          savedAt: null,
           errorType: failure.errorType,
           errorMessage: failure.errorMessage,
           rawResponse: failure.rawResponse,
@@ -1005,7 +1401,7 @@ export async function recoverStaleProductTranslationWorkers(now = new Date()) {
   for (const job of staleJobs) {
     await prisma.$transaction(async (tx) => {
       const items = await tx.productTranslationJobItem.findMany({
-        where: { jobId: job.id, status: TranslationJobItemStatus.RUNNING },
+        where: { jobId: job.id, status: { in: [TranslationJobItemStatus.RUNNING, TranslationJobItemStatus.TRANSLATED] } },
         select: { id: true, retryCount: true },
       });
       for (const item of items) {
@@ -1083,7 +1479,10 @@ export async function retryFailedProductTranslationJobItems(jobId: string) {
     if (job.status === TranslationJobStatus.RUNNING) throw new Error("执行中的任务不能重新排队，请先停止任务。");
     if (job.status === TranslationJobStatus.CLOSED) throw new Error("已关闭任务不能重新排队，请先恢复任务。");
     const result = await tx.productTranslationJobItem.updateMany({
-      where: { jobId, status: TranslationJobItemStatus.FAILED },
+      where: {
+        jobId,
+        status: { in: [TranslationJobItemStatus.FAILED, TranslationJobItemStatus.QA_FAILED, TranslationJobItemStatus.NEEDS_REVIEW] },
+      },
       data: {
         status: TranslationJobItemStatus.PENDING,
         processingStep: "QUEUED",
@@ -1096,6 +1495,7 @@ export async function retryFailedProductTranslationJobItems(jobId: string) {
         completedAt: null,
         retryCount: 0,
         currentRunAttemptCount: 0,
+        qaStatus: null,
         durationMs: null,
       },
     });
@@ -1115,6 +1515,53 @@ export async function retryFailedProductTranslationJobItems(jobId: string) {
       });
     }
     return result;
+  });
+}
+
+export async function retryProductTranslationJobItem(jobId: string, itemId: string) {
+  assertDatabase();
+  const prisma = getPrisma();
+  return prisma.$transaction(async (tx) => {
+    const job = await tx.productTranslationJob.findUnique({ where: { id: jobId }, select: { status: true } });
+    if (!job) throw new Error("翻译任务不存在。");
+    if (job.status === TranslationJobStatus.RUNNING) throw new Error("执行中的任务不能重新排队，请先停止任务。");
+    if (job.status === TranslationJobStatus.CLOSED) throw new Error("已关闭任务不能重新排队，请先恢复任务。");
+    const result = await tx.productTranslationJobItem.updateMany({
+      where: {
+        id: itemId,
+        jobId,
+        status: { in: [TranslationJobItemStatus.FAILED, TranslationJobItemStatus.QA_FAILED, TranslationJobItemStatus.NEEDS_REVIEW] },
+      },
+      data: {
+        status: TranslationJobItemStatus.PENDING,
+        processingStep: "QUEUED",
+        workerId: null,
+        heartbeatAt: null,
+        nextAttemptAt: null,
+        errorType: null,
+        errorMessage: null,
+        startedAt: null,
+        completedAt: null,
+        retryCount: 0,
+        currentRunAttemptCount: 0,
+        qaStatus: null,
+        durationMs: null,
+      },
+    });
+    if (!result.count) throw new Error("只有执行失败、质检失败或需人工审核的项目可以重新翻译。");
+    await tx.productTranslationJob.update({
+      where: { id: jobId },
+      data: {
+        status: TranslationJobStatus.PENDING,
+        completedAt: null,
+        lastError: null,
+        executionId: null,
+        lockedAt: null,
+        lockedBy: null,
+        heartbeatAt: null,
+      },
+    });
+    return { count: result.count };
   });
 }
 
@@ -1144,7 +1591,7 @@ export async function closeProductTranslationJob(jobId: string) {
     if (job.status === TranslationJobStatus.RUNNING) throw new Error("执行中的任务不能关闭，请先停止任务。");
     if (job.status === TranslationJobStatus.CLOSED) return { closed: true };
     const runningItems = await tx.productTranslationJobItem.count({
-      where: { jobId, status: TranslationJobItemStatus.RUNNING },
+      where: { jobId, status: { in: [TranslationJobItemStatus.RUNNING, TranslationJobItemStatus.TRANSLATED] } },
     });
     if (runningItems) throw new Error("当前单项仍在完成中，请稍后再关闭任务。");
     await tx.productTranslationJob.update({
@@ -1181,6 +1628,10 @@ export async function restoreProductTranslationJob(jobId: string) {
       pending,
       running: count(TranslationJobItemStatus.RUNNING),
       completed: count(TranslationJobItemStatus.COMPLETED),
+      qaPassed: count(TranslationJobItemStatus.QA_PASSED),
+      qaWarning: count(TranslationJobItemStatus.QA_WARNING),
+      qaFailed: count(TranslationJobItemStatus.QA_FAILED),
+      needsReview: count(TranslationJobItemStatus.NEEDS_REVIEW),
       failed,
       skipped: count(TranslationJobItemStatus.SKIPPED),
       cancelled: count(TranslationJobItemStatus.CANCELLED),
@@ -1200,7 +1651,7 @@ export async function deleteProductTranslationJob(jobId: string) {
     const job = await tx.productTranslationJob.findUnique({ where: { id: jobId }, select: { status: true } });
     if (!job) throw new Error("翻译任务不存在。");
     const runningItems = await tx.productTranslationJobItem.count({
-      where: { jobId, status: TranslationJobItemStatus.RUNNING },
+      where: { jobId, status: { in: [TranslationJobItemStatus.RUNNING, TranslationJobItemStatus.TRANSLATED] } },
     });
     if (!canDeleteTranslationJob(job.status, runningItems)) {
       throw new Error(job.status === TranslationJobStatus.RUNNING

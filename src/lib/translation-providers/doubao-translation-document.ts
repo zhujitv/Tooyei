@@ -70,25 +70,6 @@ export function listDoubaoTranslationSegments(document: DoubaoTranslationDocumen
   return segments;
 }
 
-const fitText = (value: string, maxLength: number) => {
-  const trimmed = value.trim();
-  if (trimmed.length <= maxLength) return { value: trimmed, truncated: false };
-  const candidate = trimmed.slice(0, maxLength).trimEnd();
-  const boundary = Math.max(
-    candidate.lastIndexOf(" "),
-    candidate.lastIndexOf("。"),
-    candidate.lastIndexOf("；"),
-    candidate.lastIndexOf("，"),
-    candidate.lastIndexOf("."),
-    candidate.lastIndexOf(";"),
-    candidate.lastIndexOf(","),
-  );
-  const safe = boundary >= Math.floor(maxLength * 0.72)
-    ? candidate.slice(0, boundary).trimEnd()
-    : candidate;
-  return { value: safe.replace(/[\s,，;；:：-]+$/u, ""), truncated: true };
-};
-
 export function buildDoubaoTranslationResult(
   document: DoubaoTranslationDocument,
   translations: ReadonlyMap<string, string>,
@@ -96,9 +77,9 @@ export function buildDoubaoTranslationResult(
   const warnings: string[] = [];
   const translated = (key: string, fallback: string, maxLength: number) => {
     if (!fallback.trim()) return "";
-    const fitted = fitText(translations.get(key) ?? fallback, maxLength);
-    if (fitted.truncated) warnings.push(`${key} 的译文超过 ${maxLength} 字符，已在安全边界截断，请人工复核。`);
-    return fitted.value;
+    const value = (translations.get(key) ?? fallback).trim();
+    if (value.length > maxLength) warnings.push(`${key} 的译文超过 ${maxLength} 字符；已保留完整译文并交由 QA 阻止发布，未执行硬截断。`);
+    return value;
   };
   const mapItems = <T extends keyof Omit<typeof sectionFields, "product">>(section: T) =>
     document[section].map((item, index) => ({
@@ -134,14 +115,17 @@ export const buildDoubaoTranslationRequestBody = ({
   sourceLanguage,
   targetLanguage,
   maxOutputTokens,
+  instructions,
 }: {
   model: string;
   text: string;
   sourceLanguage: string;
   targetLanguage: string;
   maxOutputTokens: number;
+  instructions?: string;
 }) => ({
   model,
+  ...(instructions ? { instructions } : {}),
   input: [{
     role: "user",
     content: [{

@@ -211,10 +211,9 @@ export default async function TranslationCenterPage({
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <Label htmlFor="source-locale" className="admin-label">源语言</Label>
-                <select id="source-locale" name="sourceLocale" defaultValue="EN" className="admin-select h-10 w-full px-3">
-                  {translationLocales.map((locale) => <option key={locale} value={locale}>{localeMeta[locale][0]} {localeMeta[locale][1]}</option>)}
-                </select>
+                <Label htmlFor="source-locale" className="admin-label">唯一源语言</Label>
+                <input type="hidden" name="sourceLocale" value="EN" />
+                <div id="source-locale" className="admin-field flex h-10 items-center px-3 text-sm text-[#344054]">🇬🇧 英语（固定）</div>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="scope" className="admin-label">生成范围</Label>
@@ -228,14 +227,14 @@ export default async function TranslationCenterPage({
             <fieldset>
               <legend className="admin-label">目标语言</legend>
               <div className="mt-2 grid gap-2 sm:grid-cols-3">
-                {translationLocales.map((locale) => (
+                {translationLocales.filter((locale) => locale !== "EN").map((locale) => (
                   <label key={locale} className="flex cursor-pointer items-center gap-2 rounded-lg border border-[#E4E7EC] bg-[#FCFCFD] px-3 py-2.5 text-sm text-[#344054] transition-colors hover:bg-white">
-                    <input type="checkbox" name="targetLocales" value={locale} defaultChecked={locale !== "EN"} className="admin-checkbox" />
+                    <input type="checkbox" name="targetLocales" value={locale} defaultChecked className="admin-checkbox" />
                     <span>{localeMeta[locale][0]} {localeMeta[locale][1]}</span>
                   </label>
                 ))}
               </div>
-              <p className="mt-2 text-xs text-[#98A2B3]">执行时会自动排除与源语言相同的选项。</p>
+              <p className="mt-2 text-xs text-[#98A2B3]">所有目标语言统一从英文源字段生成，前台内容回退规则不参与翻译生成。</p>
             </fieldset>
 
             <div className="grid gap-4 sm:grid-cols-2">
@@ -290,7 +289,7 @@ export default async function TranslationCenterPage({
           </div>
           <div className="grid gap-3 bg-[#F8FAFC] p-4">
             {dashboard.jobs.map((job) => {
-              const finished = job.completedItems + job.failedItems + job.skippedItems + job.cancelledItems;
+              const finished = job.completedItems + job.failedItems + job.qaFailedItems + job.needsReviewItems + job.skippedItems + job.cancelledItems;
               const progress = job.totalItems ? Math.round((finished / job.totalItems) * 100) : 0;
               const activeItem = job.items[0];
               const executionStatus = getTranslationJobExecutionStatus({
@@ -314,7 +313,7 @@ export default async function TranslationCenterPage({
                       <p className="mt-2 inline-flex max-w-full items-center gap-1.5 rounded-md border border-violet-100 bg-violet-50 px-2 py-1 font-mono text-[11px] text-violet-700"><Bot className="size-3 shrink-0" /><span className="truncate">{job.provider} · {job.model}</span></p>
                       <p className="mt-1 text-xs text-[#98A2B3]">{dateTime.format(job.createdAt)} · {job.requestedBy?.name ?? job.requestedBy?.email ?? "管理员"}</p>
                     </Link>
-                    <TranslationJobActions jobId={job.id} status={job.status} failedItems={job.failedItems} canDelete={Boolean(productManager)} mode="menu" />
+                    <TranslationJobActions jobId={job.id} status={job.status} failedItems={job.failedItems + job.qaFailedItems + job.needsReviewItems} canDelete={Boolean(productManager)} mode="menu" />
                   </div>
                   <div className="mt-3 flex items-center gap-3">
                     <div className="admin-progress-track flex-1"><div className="admin-progress-value" style={{ width: `${progress}%` }} /></div>

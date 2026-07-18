@@ -29,6 +29,7 @@ test("processed progress excludes RUNNING but includes cancelled items", () => {
 test("only pending items can be claimed", () => {
   assert.equal(canClaimTranslationItem(TranslationJobItemStatus.PENDING), true);
   assert.equal(canClaimTranslationItem(TranslationJobItemStatus.COMPLETED), false);
+  assert.equal(canClaimTranslationItem(TranslationJobItemStatus.QA_FAILED), false);
   assert.equal(canClaimTranslationItem(TranslationJobItemStatus.FAILED), false);
 });
 
@@ -56,6 +57,8 @@ test("closed job restoration derives the correct status", () => {
   assert.equal(deriveRestoredTranslationJobStatus(counts({ failed: 2 })), TranslationJobStatus.FAILED);
   assert.equal(deriveRestoredTranslationJobStatus(counts({ completed: 1, cancelled: 1 })), TranslationJobStatus.PARTIAL_FAILED);
   assert.equal(deriveRestoredTranslationJobStatus(counts({ completed: 2 })), TranslationJobStatus.COMPLETED);
+  assert.equal(deriveRestoredTranslationJobStatus(counts({ qaPassed: 1, qaWarning: 1 })), TranslationJobStatus.COMPLETED);
+  assert.equal(deriveRestoredTranslationJobStatus(counts({ qaPassed: 1, qaFailed: 1 })), TranslationJobStatus.PARTIAL_FAILED);
 });
 
 test("one failed item does not stop a running batch with pending work", () => {

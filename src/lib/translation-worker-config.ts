@@ -42,6 +42,7 @@ export const translationProcessingSteps = [
   "GET_CONTENT",
   "BUILD_PROMPT",
   "CALL_MODEL",
+  "QUALITY_CHECK",
   "SAVE_RESULT",
   "RETRY_WAIT",
   "DONE",
@@ -56,6 +57,7 @@ export const translationProcessingStepLabels: Record<TranslationProcessingStep, 
   GET_CONTENT: "获取内容",
   BUILD_PROMPT: "生成 Prompt",
   CALL_MODEL: "调用模型",
+  QUALITY_CHECK: "质量验收",
   SAVE_RESULT: "保存结果",
   RETRY_WAIT: "等待重试",
   DONE: "处理完成",
@@ -79,8 +81,9 @@ export const translationWorkerConfig = {
   providerTimeoutMs: 90_000,
   heartbeatIntervalMs: 30_000,
   staleWorkerMs: 5 * 60_000,
-  maxRetries: 3,
-  retryDelaysMs: [10_000, 30_000, 120_000] as const,
+  maxAttempts: 3,
+  maxRetries: 2,
+  retryDelaysMs: [10_000, 30_000] as const,
 } as const;
 
 export const isTranslationProcessingStep = (value: string): value is TranslationProcessingStep =>

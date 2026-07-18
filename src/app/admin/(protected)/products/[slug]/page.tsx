@@ -26,6 +26,7 @@ import { ProductAssetUpload } from "@/components/product-asset-upload";
 import { ProductStructuredContentEditor } from "@/components/product-structured-content-editor";
 import { ProductStructuredTranslationEditor } from "@/components/product-structured-translation-editor";
 import { isDatabaseConfigured } from "@/lib/db";
+import { calculateProductLocaleCompleteness } from "@/lib/product-locale-completeness";
 import { getAdminProduct, getAdminProductCategoryOptions } from "@/lib/repositories/admin-products";
 import { contentLocales, languageMarkers, languageNames } from "@/lib/site";
 import {
@@ -141,13 +142,16 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
   const zhTranslation = product.translations.find((translation) => translation.locale === "zh");
   const publishedLocales = product.translations.filter((translation) => translation.status === "PUBLISHED").length;
   const seoReadyLocales = product.translations.filter((translation) => translation.seoTitle.trim() && translation.seoDescription.trim()).length;
+  const localeCompleteness = contentLocales.map((locale) => calculateProductLocaleCompleteness(product, locale));
+  const completeLocales = localeCompleteness.filter((item) => item.complete).length;
+  const averageLocaleCompleteness = Math.round(localeCompleteness.reduce((sum, item) => sum + item.percentage, 0) / localeCompleteness.length);
   const primaryMedia = product.media.find((item) => item.role === ProductMediaRole.PRIMARY && item.visible) ?? product.media.find((item) => item.visible);
   const structuredCount = product.features.length + product.specifications.length + product.applications.length + product.downloads.length;
 
   const completenessSections = [
     { label: "基础资料", score: product.sku && (product.categoryId || !databaseReady) ? 15 : 0, weight: 15, tab: "overview" as ProductTabId },
     { label: "产品媒体", score: product.media.some((item) => item.visible) ? 20 : 0, weight: 20, tab: "media" as ProductTabId },
-    { label: "多语言发布", score: Math.round((publishedLocales / product.translations.length) * 20), weight: 20, tab: "languages" as ProductTabId },
+    { label: "多语言完整度", score: Math.round((averageLocaleCompleteness / 100) * 20), weight: 20, tab: "languages" as ProductTabId },
     { label: "SEO 字段", score: Math.round((seoReadyLocales / product.translations.length) * 15), weight: 15, tab: "seo" as ProductTabId },
     { label: "卖点", score: product.features.length ? 10 : 0, weight: 10, tab: "content" as ProductTabId },
     { label: "规格参数", score: product.specifications.length ? 10 : 0, weight: 10, tab: "content" as ProductTabId },
@@ -157,7 +161,7 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
   const completeness = completenessSections.reduce((sum, section) => sum + section.score, 0);
   const readinessItems = [
     ["至少 1 个可见媒体", product.media.some((item) => item.visible)],
-    [`全部 ${product.translations.length} 个语言版本均已发布`, publishedLocales === product.translations.length],
+    [`全部 ${product.translations.length} 个语言版本资料完整`, completeLocales === product.translations.length],
     [`全部 ${product.translations.length} 个语言版本 SEO 完整`, seoReadyLocales === product.translations.length],
     ["已填写核心卖点", product.features.length > 0],
     ["已填写产品规格", product.specifications.length > 0],

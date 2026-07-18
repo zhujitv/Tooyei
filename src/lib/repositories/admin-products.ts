@@ -662,7 +662,7 @@ const toEditableProduct = (product: AdminEditableProductRecord): AdminEditablePr
         id,
         group: translation?.group ?? group ?? "",
         label: translation?.label ?? "",
-        value: translation?.displayValue ?? value,
+        value,
         unit: unit ?? "",
         sortOrder,
         visible,

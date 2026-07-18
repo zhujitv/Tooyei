@@ -15,6 +15,10 @@ type Progress = {
   failedItems: number;
   skippedItems: number;
   cancelledItems: number;
+  qaPassedItems: number;
+  qaWarningItems: number;
+  qaFailedItems: number;
+  needsReviewItems: number;
   pendingItems: number;
   runningItems: number;
   retryingItems: number;
@@ -50,8 +54,10 @@ export function TranslationJobRunner({
   const [progress, setProgress] = useState(initial);
   const [message, setMessage] = useState<string | null>(null);
 
-  const finished = progress.completedItems + progress.failedItems + progress.skippedItems + progress.cancelledItems;
-  const percent = progress.totalItems ? Math.round((finished / progress.totalItems) * 100) : 0;
+  const finished = progress.completedItems + progress.failedItems + progress.qaFailedItems + progress.needsReviewItems + progress.skippedItems + progress.cancelledItems;
+  const modelPercent = progress.totalItems ? Math.round((finished / progress.totalItems) * 100) : 0;
+  const qaAccepted = progress.qaPassedItems + progress.qaWarningItems;
+  const qaPercent = progress.totalItems ? Math.round((qaAccepted / progress.totalItems) * 100) : 0;
   const hasUnfinished = progress.completedItems + progress.skippedItems + progress.cancelledItems < progress.totalItems;
   const canRun = configured && hasUnfinished && resumableStatuses.has(progress.status) && !running && !stopping;
   const canStop = progress.status === "PROCESSING" || progress.status === "RETRYING" || running;
@@ -134,15 +140,15 @@ export function TranslationJobRunner({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-3 text-sm">
-            <span className="font-medium text-[#344054]">执行进度</span>
-            <span className="font-mono text-xs text-[#667085]">{finished} / {progress.totalItems} · {percent}%</span>
+            <span className="font-medium text-[#344054]">模型执行进度</span>
+            <span className="font-mono text-xs text-[#667085]">{finished} / {progress.totalItems} · {modelPercent}%</span>
           </div>
           <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#EAECF0]">
-            <div className="h-full rounded-full bg-[#25344F] transition-[width] duration-300" style={{ width: `${percent}%` }} />
+            <div className="h-full rounded-full bg-[#25344F] transition-[width] duration-300" style={{ width: `${modelPercent}%` }} />
           </div>
-          <p className="mt-2 text-xs text-[#667085]">
-            完成 {progress.completedItems} · 跳过 {progress.skippedItems} · 失败 {progress.failedItems} · 已取消 {progress.cancelledItems}
-          </p>
+          <div className="mt-3 flex items-center justify-between gap-3 text-sm"><span className="font-medium text-[#344054]">质量验收进度</span><span className="font-mono text-xs text-[#667085]">{qaAccepted} / {progress.totalItems} · {qaPercent}%</span></div>
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#EAECF0]"><div className="h-full rounded-full bg-emerald-600 transition-[width] duration-300" style={{ width: `${qaPercent}%` }} /></div>
+          <p className="mt-2 text-xs text-[#667085]">质检通过 {progress.qaPassedItems} · 有提示 {progress.qaWarningItems} · 质检失败 {progress.qaFailedItems} · 需人工审核 {progress.needsReviewItems} · 执行失败 {progress.failedItems}</p>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           {canStop ? (

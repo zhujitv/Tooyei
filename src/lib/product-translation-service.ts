@@ -11,7 +11,7 @@ import {
 import { getTranslationProviderState } from "@/lib/translation-providers/config";
 import { getTranslationProvider } from "@/lib/translation-providers/registry";
 import type { TranslationProcessingStep } from "@/lib/translation-worker-config";
-import { translationContentTypes } from "@/lib/translation-worker-config";
+import { hasTranslationContentType, translationContentTypes } from "@/lib/translation-worker-config";
 import {
   getTranslationResultQcWarnings,
   normalizeTranslationResult,
@@ -19,8 +19,17 @@ import {
   readTranslationString,
   TranslationResponseParseError,
 } from "@/lib/translation-response-parser";
+import {
+  isSpecificationValueTranslatable,
+  TRANSLATION_QA_VERSION,
+  validateProductTranslation,
+  type TranslationQaDocument,
+  type TranslationQaIssue,
+  type TranslationQaResult,
+} from "@/lib/translation/quality";
 
-export const productTranslationPromptVersion = "tooyei-product-json-v4";
+export const SOURCE_LOCALE = Locale.EN;
+export const productTranslationPromptVersion = "tooyei-product-json-v5-qa";
 
 export class TranslationBusinessError extends Error {
   readonly name = "TranslationBusinessError";
@@ -35,6 +44,25 @@ export class TranslationResponseValidationError extends Error {
 
   constructor(
     message: string,
+    readonly rawResponse: string,
+    readonly responseId: string | null,
+    readonly promptTokens: number | null,
+    readonly completionTokens: number | null,
+    readonly totalTokens: number | null,
+  ) {
+    super(message);
+  }
+}
+
+export class TranslationQualityError extends Error {
+  readonly name = "TranslationQualityError";
+  readonly errorType = "QA_VALIDATION";
+  readonly retryable = true;
+
+  constructor(
+    message: string,
+    readonly qa: TranslationQaResult,
+    readonly output: ProductTranslationOutput,
     readonly rawResponse: string,
     readonly responseId: string | null,
     readonly promptTokens: number | null,
@@ -60,8 +88,8 @@ const textItemSchema = z.object({
 const productTranslationProductSchema = z.object({
   title: z.string().trim().max(180),
   summary: z.string().trim().max(800),
-  seoTitle: z.string().trim().max(70),
-  seoDescription: z.string().trim().max(180),
+  seoTitle: z.string().trim().max(200),
+  seoDescription: z.string().trim().max(1000),
 });
 
 export const productTranslationOutputSchema = z.object({
@@ -124,12 +152,8 @@ const productTranslationJsonSchema = {
   additionalProperties: false,
 } as const;
 
-const preferredTranslation = <T extends { locale: Locale }>(rows: T[], locale: Locale) => {
-  const priorities = Array.from(new Set([locale, Locale.EN, Locale.ZH]));
-  return priorities.map((candidate) => rows.find((row) => row.locale === candidate)).find(Boolean);
-};
+const sourceTranslation = <T extends { locale: Locale }>(rows: T[]) => rows.find((row) => row.locale === SOURCE_LOCALE);
 
-const numericTokens = (value: string) => value.match(/\d+(?:[.,]\d+)?/g) ?? [];
 const equalIds = (source: Array<{ id: string }>, output: Array<{ id: string }>) => {
   const left = source.map(({ id }) => id).sort();
   const right = output.map(({ id }) => id).sort();
@@ -190,16 +214,20 @@ export type GeneratedProductTranslation = {
   rawResponse: string;
   promptVersion: string;
   warnings: string[];
+  qa: TranslationQaResult;
+  qaVersion: string;
 };
 
 export async function generateProductTranslation(
   productId: string,
   sourceLocale: Locale,
   targetLocale: Locale,
-  expected?: { provider: string; model: string; contentTypes?: readonly string[] },
-  onStep?: (step: Extract<TranslationProcessingStep, "GET_CONTENT" | "BUILD_PROMPT" | "CALL_MODEL">) => Promise<void>,
+  expected?: { provider: string; model: string; contentTypes?: readonly string[]; retryFeedback?: string[] },
+  onStep?: (step: Extract<TranslationProcessingStep, "GET_CONTENT" | "BUILD_PROMPT" | "CALL_MODEL" | "QUALITY_CHECK">) => Promise<void>,
 ): Promise<GeneratedProductTranslation> {
   if (sourceLocale === targetLocale) throw new TranslationBusinessError("源语言和目标语言不能相同。");
+  if (sourceLocale !== SOURCE_LOCALE) throw new TranslationBusinessError("产品自动翻译必须使用英文（EN）作为唯一源语言。");
+  if (targetLocale === SOURCE_LOCALE) throw new TranslationBusinessError("英文是源语言，不参与自动翻译。");
   const state = getTranslationProviderState(expected?.provider, expected?.model);
   if (!state.configured || !state.provider) throw new TranslationBusinessError(state.error || "翻译 Provider 尚未配置完整。");
 
@@ -212,78 +240,104 @@ export async function generateProductTranslation(
       slug: true,
       sku: true,
       kind: true,
-      translations: { where: { locale: { in: [sourceLocale, Locale.EN, Locale.ZH] } } },
+      translations: { where: { locale: SOURCE_LOCALE } },
       media: {
         orderBy: { sortOrder: "asc" },
-        select: { assetId: true, alt: true, caption: true, translations: { where: { locale: { in: [sourceLocale, Locale.EN, Locale.ZH] } } } },
+        select: { assetId: true, alt: true, caption: true, translations: { where: { locale: SOURCE_LOCALE } } },
       },
       features: {
         orderBy: { sortOrder: "asc" },
-        select: { id: true, translations: { where: { locale: { in: [sourceLocale, Locale.EN, Locale.ZH] } } } },
+        select: { id: true, translations: { where: { locale: SOURCE_LOCALE } } },
       },
       specifications: {
         orderBy: { sortOrder: "asc" },
-        select: { id: true, group: true, value: true, unit: true, translations: { where: { locale: { in: [sourceLocale, Locale.EN, Locale.ZH] } } } },
+        select: { id: true, group: true, value: true, unit: true, translations: { where: { locale: SOURCE_LOCALE } } },
       },
       applications: {
         orderBy: { sortOrder: "asc" },
-        select: { id: true, translations: { where: { locale: { in: [sourceLocale, Locale.EN, Locale.ZH] } } } },
+        select: { id: true, translations: { where: { locale: SOURCE_LOCALE } } },
       },
       downloads: {
         orderBy: { sortOrder: "asc" },
-        select: { id: true, kind: true, translations: { where: { locale: { in: [sourceLocale, Locale.EN, Locale.ZH] } } } },
+        select: { id: true, kind: true, translations: { where: { locale: SOURCE_LOCALE } } },
       },
     },
   });
   if (!product) throw new TranslationBusinessError("产品不存在或已被删除。");
 
-  const main = product.translations.find(({ locale }) => locale === sourceLocale);
+  const main = product.translations.find(({ locale }) => locale === SOURCE_LOCALE);
   if (!main?.title.trim() || !main.summary.trim()) {
-    throw new TranslationBusinessError(`产品 ${product.sku} 缺少完整的 ${localeNames[sourceLocale]} 源语言标题或摘要。`);
+    throw new TranslationBusinessError(`产品 ${product.sku} 缺少完整的英文源语言标题或摘要。`);
   }
 
   const requestedContentTypes = expected?.contentTypes?.length ? expected.contentTypes : translationContentTypes;
   const translatesProduct = requestedContentTypes.includes("PRODUCT");
   const translatesSeo = requestedContentTypes.includes("SEO");
-  const source = {
+  if (translatesSeo && (!main.seoTitle?.trim() || !main.seoDescription?.trim())) {
+    throw new TranslationBusinessError(`产品 ${product.sku} 缺少英文 SEO 标题或 SEO 描述，不能创建 SEO 翻译。`);
+  }
+  const specificationPolicies = new Map(product.specifications.map((item) => {
+    const translation = sourceTranslation(item.translations);
+    // The unit is a separate system-owned field and is rendered separately.
+    // Never send or persist it as part of displayValue, otherwise values such as
+    // "7 mm" become "7 mm mm" on the public product page.
+    const displayValue = translation?.displayValue?.trim() || item.value;
+    return [item.id, { displayValue, translateValue: isSpecificationValueTranslatable(displayValue, item.unit) }] as const;
+  }));
+  const source: TranslationQaDocument = {
     product: {
-      slug: product.slug,
-      sku: product.sku,
-      kind: product.kind,
       title: translatesProduct ? main.title : "",
       summary: translatesProduct ? main.summary : "",
       seoTitle: translatesSeo ? main.seoTitle ?? "" : "",
       seoDescription: translatesSeo ? main.seoDescription ?? "" : "",
     },
     media: requestedContentTypes.some((type) => type === "MEDIA_ALT" || type === "MEDIA_CAPTION") ? product.media.map((item) => {
-      const translation = preferredTranslation(item.translations, sourceLocale);
+      const translation = sourceTranslation(item.translations);
       return { id: item.assetId, alt: translation?.alt ?? item.alt ?? "", caption: translation?.caption ?? item.caption ?? "" };
     }) : [],
     features: requestedContentTypes.some((type) => type === "FEATURE" || type === "FEATURE_TITLE" || type === "FEATURE_DESCRIPTION") ? product.features.map((item) => {
-      const translation = preferredTranslation(item.translations, sourceLocale);
+      const translation = sourceTranslation(item.translations);
       return { id: item.id, title: translation?.value ?? "", description: translation?.description ?? "" };
     }) : [],
     specifications: requestedContentTypes.some((type) => type === "SPECIFICATION" || type === "SPEC_LABEL" || type === "SPEC_VALUE") ? product.specifications.map((item) => {
-      const translation = preferredTranslation(item.translations, sourceLocale);
+      const translation = sourceTranslation(item.translations);
       return {
         id: item.id,
         group: translation?.group ?? item.group ?? "",
         label: translation?.label ?? "",
-        displayValue: translation?.displayValue ?? [item.value, item.unit].filter(Boolean).join(" "),
+        displayValue: specificationPolicies.get(item.id)?.displayValue ?? item.value,
       };
     }) : [],
     applications: requestedContentTypes.some((type) => type === "APPLICATION" || type === "APPLICATION_TITLE" || type === "APPLICATION_DESCRIPTION") ? product.applications.map((item) => {
-      const translation = preferredTranslation(item.translations, sourceLocale);
+      const translation = sourceTranslation(item.translations);
       return { id: item.id, title: translation?.title ?? "", description: translation?.description ?? "", imageAlt: translation?.imageAlt ?? "" };
     }) : [],
     downloads: requestedContentTypes.some((type) => type === "DOWNLOAD" || type === "DOWNLOAD_TITLE") ? product.downloads.map((item) => {
-      const translation = preferredTranslation(item.translations, sourceLocale);
-      return { id: item.id, kind: item.kind, title: translation?.title ?? "", description: translation?.description ?? "" };
+      const translation = sourceTranslation(item.translations);
+      return { id: item.id, title: translation?.title ?? "", description: translation?.description ?? "" };
     }) : [],
   };
 
+  const requiredSourceFields: Array<[boolean, string, string]> = [
+    ...source.media.map((item) => [hasTranslationContentType(requestedContentTypes, "MEDIA_ALT"), `媒体 ${item.id} ALT`, item.alt] as [boolean, string, string]),
+    ...source.features.map((item) => [hasTranslationContentType(requestedContentTypes, "FEATURE_TITLE"), `卖点 ${item.id} 标题`, item.title] as [boolean, string, string]),
+    ...source.specifications.map((item) => [hasTranslationContentType(requestedContentTypes, "SPEC_LABEL"), `参数 ${item.id} 名称`, item.label] as [boolean, string, string]),
+    ...source.applications.map((item) => [hasTranslationContentType(requestedContentTypes, "APPLICATION_TITLE"), `应用 ${item.id} 标题`, item.title] as [boolean, string, string]),
+    ...source.downloads.map((item) => [hasTranslationContentType(requestedContentTypes, "DOWNLOAD_TITLE"), `下载资料 ${item.id} 标题`, item.title] as [boolean, string, string]),
+  ];
+  const missingSource = requiredSourceFields.find(([enabled, , value]) => enabled && !value.trim());
+  if (missingSource) throw new TranslationBusinessError(`产品 ${product.sku} 的英文源字段“${missingSource[1]}”为空，已阻止翻译。`);
+
+  const providerSource: TranslationQaDocument = {
+    ...source,
+    specifications: source.specifications.map((item) => ({
+      ...item,
+      displayValue: specificationPolicies.get(item.id)?.translateValue ? item.displayValue : "",
+    })),
+  };
+
   await onStep?.("BUILD_PROMPT");
-  const sourceJson = JSON.stringify(source);
+  const sourceJson = JSON.stringify(providerSource);
   const inputHash = createHash("sha256")
     .update(`${state.provider}:${state.model}:${sourceLocale}:${targetLocale}:${sourceJson}`)
     .digest("hex");
@@ -293,12 +347,15 @@ export async function generateProductTranslation(
     "Preserve the brand TOOYEI, SKU, model identifiers, technical meanings, all numbers, dimensions, standards, percentages, units, URLs, and item IDs exactly.",
     "Do not invent certifications, performance claims, warranties, applications, materials, or technical facts that are absent from the source.",
     "Translate every supplied visitor-facing field. Empty source fields must remain empty. Return every array item exactly once with the same id.",
-    "Write a concise SEO title no longer than 70 characters and an accurate SEO description no longer than 180 characters in the target language.",
+    "Write a concise SEO title no longer than 70 characters and a complete, natural SEO description within the target language limit.",
     "For Arabic, use natural Modern Standard Arabic. For Chinese, use Simplified Chinese. For Japanese, use natural Japanese industry terminology.",
     "Return one valid JSON object only. Do not return Markdown, explanations, headings, comments, or ```json fences.",
     "Return the translated title, summary, seoTitle, and seoDescription inside the product object. Keep media, features, specifications, applications, and downloads as root arrays.",
     "Do not rename or omit fields. Every schema field must be present and every field value defined as a string must be a JSON string.",
     `Requested translation types: ${requestedContentTypes.join(", ")}.`,
+    expected?.retryFeedback?.length
+      ? `The previous output failed validation for these reasons: ${expected.retryFeedback.join("; ")}. Regenerate the translation and correct only these issues.`
+      : "",
     buildBuildingMaterialsGlossaryPrompt(sourceJson, targetLocale),
   ].filter(Boolean).join(" ");
   await onStep?.("CALL_MODEL");
@@ -311,6 +368,7 @@ export async function generateProductTranslation(
     sourceLanguage: sourceLocale.toLowerCase(),
     targetLanguage: targetLocale.toLowerCase(),
     glossaryTerms: getBuildingMaterialsGlossaryTerms(sourceJson, targetLocale),
+    retryFeedback: expected?.retryFeedback,
   });
   let parsed: Record<string, unknown>;
   try {
@@ -347,7 +405,12 @@ export async function generateProductTranslation(
     }, "卖点", warnings),
     specifications: normalizeStructuredItems(normalizedResult.specifications, source.specifications, {
       group: ["group"], label: ["label", "name", "title"], displayValue: ["displayValue", "display_value", "value"],
-    }, "参数", warnings),
+    }, "参数", warnings).map((item) => ({
+      ...item,
+      displayValue: specificationPolicies.get(item.id)?.translateValue
+        ? item.displayValue
+        : specificationPolicies.get(item.id)?.displayValue ?? item.displayValue,
+    })),
     applications: normalizeStructuredItems(normalizedResult.applications, source.applications, {
       title: ["title", "name"], description: ["description", "summary"], imageAlt: ["imageAlt", "image_alt", "alt"],
     }, "应用场景", warnings),
@@ -387,11 +450,37 @@ export async function generateProductTranslation(
     if (!equalIds(inputItems, outputItems)) throw new TranslationBusinessError(`${label}的项目 ID 与源内容不一致，已阻止写入。`);
   }
 
-  for (const sourceItem of source.specifications) {
-    const translated = output.specifications.find(({ id }) => id === sourceItem.id);
-    if (translated && numericTokens(sourceItem.displayValue).join("|") !== numericTokens(translated.displayValue).join("|")) {
-      warnings.push(`参数“${sourceItem.label || sourceItem.id}”中的数字可能发生变化，请人工核对。`);
-    }
+  await onStep?.("QUALITY_CHECK");
+  const baseQa = validateProductTranslation({ source, target: output, targetLocale, contentTypes: requestedContentTypes });
+  const providerWarningIssues: TranslationQaIssue[] = warnings.map((warning) => ({
+    code: "MODEL_WARNING",
+    severity: "WARNING",
+    field: "model",
+    message: warning,
+  }));
+  const qaIssues = [...baseQa.issues, ...providerWarningIssues];
+  const qaErrors = qaIssues.filter((entry) => entry.severity === "ERROR");
+  const qaWarnings = qaIssues.filter((entry) => entry.severity === "WARNING");
+  const qa: TranslationQaResult = {
+    status: qaErrors.length ? "QA_FAILED" : qaWarnings.length ? "QA_WARNING" : "QA_PASSED",
+    passed: qaErrors.length === 0,
+    retryable: qaErrors.length > 0,
+    issues: qaIssues,
+    errors: qaErrors,
+    warnings: qaWarnings,
+    retryInstructions: qaErrors.map((entry) => `${entry.field}: ${entry.message}`),
+  };
+  if (!qa.passed) {
+    throw new TranslationQualityError(
+      `翻译质量校验失败：${qa.retryInstructions.join(" ")}`,
+      qa,
+      output,
+      generated.outputText,
+      generated.responseId,
+      generated.promptTokens,
+      generated.completionTokens,
+      generated.totalTokens,
+    );
   }
 
   return {
@@ -404,5 +493,7 @@ export async function generateProductTranslation(
     rawResponse: generated.outputText,
     promptVersion: productTranslationPromptVersion,
     warnings,
+    qa,
+    qaVersion: TRANSLATION_QA_VERSION,
   };
 }

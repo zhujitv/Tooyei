@@ -13,6 +13,7 @@ import {
   Pause,
   Play,
   RotateCcw,
+  ShieldCheck,
   Trash2,
 } from "lucide-react";
 
@@ -20,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { fetchWithRetry } from "@/lib/fetch-with-retry";
 
 type ConfirmAction = "STOP" | "CLOSE" | "DELETE";
-type MutationAction = ConfirmAction | "REQUEUE_FAILED" | "RESTORE";
+type MutationAction = ConfirmAction | "REQUEUE_FAILED" | "REVALIDATE_ALL" | "RESTORE";
 
 const runnableStatuses = new Set(["PENDING", "PAUSED", "CANCELLED", "FAILED", "PARTIAL_FAILED"]);
 
@@ -73,18 +74,20 @@ export function TranslationJobActions({
     run: runnableStatuses.has(status),
     stop: mode === "menu" && status === "RUNNING",
     requeue: failedItems > 0 && status !== "RUNNING" && status !== "CLOSED",
+    revalidate: status !== "RUNNING" && status !== "PENDING",
     close: status !== "RUNNING" && status !== "CLOSED",
     restore: status === "CLOSED",
     delete: canDelete && status !== "RUNNING",
   };
-  const showToolbar = available.requeue || available.close || available.restore || available.delete;
+  const showToolbar = available.requeue || available.revalidate || available.close || available.restore || available.delete;
 
   const actionButtons = (
     <>
       {mode === "menu" ? <DropdownMenu.Item asChild><Link href={`/admin/translations/${jobId}`} className="flex cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm outline-none hover:bg-[#F2F4F7]"><Eye className="size-4" />查看</Link></DropdownMenu.Item> : null}
       {mode === "menu" && available.run ? <DropdownMenu.Item asChild><Link href={`/admin/translations/${jobId}?run=1`} className="flex cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm outline-none hover:bg-[#F2F4F7]"><Play className="size-4" />继续执行未完成任务</Link></DropdownMenu.Item> : null}
       {available.stop ? <button type="button" onClick={() => setConfirmAction("STOP")} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-[#344054] hover:bg-[#F2F4F7]"><Pause className="size-4" />停止</button> : null}
-      {available.requeue ? <button type="button" onClick={() => void mutate("REQUEUE_FAILED")} disabled={Boolean(pending)} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-[#344054] hover:bg-[#F2F4F7] disabled:opacity-50"><RotateCcw className="size-4" />重新排队失败项</button> : null}
+      {available.revalidate ? <button type="button" onClick={() => void mutate("REVALIDATE_ALL")} disabled={Boolean(pending)} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-[#344054] hover:bg-[#F2F4F7] disabled:opacity-50"><ShieldCheck className="size-4" />重新质检</button> : null}
+      {available.requeue ? <button type="button" onClick={() => void mutate("REQUEUE_FAILED")} disabled={Boolean(pending)} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-[#344054] hover:bg-[#F2F4F7] disabled:opacity-50"><RotateCcw className="size-4" />重新翻译失败项</button> : null}
       {available.close ? <button type="button" onClick={() => setConfirmAction("CLOSE")} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-[#344054] hover:bg-[#F2F4F7]"><Archive className="size-4" />关闭任务</button> : null}
       {available.restore ? <button type="button" onClick={() => void mutate("RESTORE")} disabled={Boolean(pending)} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-[#344054] hover:bg-[#F2F4F7] disabled:opacity-50"><ArchiveRestore className="size-4" />恢复任务</button> : null}
       {available.delete ? <button type="button" onClick={() => setConfirmAction("DELETE")} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-[#B42318] hover:bg-[#FEF3F2]"><Trash2 className="size-4" />删除任务</button> : null}

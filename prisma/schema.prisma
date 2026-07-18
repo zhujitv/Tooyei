@@ -52,6 +52,11 @@ enum TranslationJobStatus {
 enum TranslationJobItemStatus {
   PENDING
   RUNNING
+  TRANSLATED
+  QA_PASSED
+  QA_WARNING
+  QA_FAILED
+  NEEDS_REVIEW
   COMPLETED
   FAILED
   SKIPPED
@@ -261,6 +266,10 @@ model ProductTranslationJob {
   failedItems    Int                      @default(0)
   skippedItems   Int                      @default(0)
   cancelledItems Int                     @default(0)
+  qaPassedItems  Int                      @default(0)
+  qaWarningItems Int                      @default(0)
+  qaFailedItems  Int                      @default(0)
+  needsReviewItems Int                    @default(0)
   promptTokens   Int?
   completionTokens Int?
   totalTokens    Int?
@@ -294,6 +303,7 @@ model ProductTranslationJobItem {
   product      Product                  @relation(fields: [productId], references: [id], onDelete: Restrict)
   productSlug  String
   productSku   String
+  sourceLocale Locale
   targetLocale Locale
   status       TranslationJobItemStatus @default(PENDING)
   inputHash    String?
@@ -309,6 +319,14 @@ model ProductTranslationJobItem {
   attemptCount Int                      @default(0)
   retryCount   Int                      @default(0)
   currentRunAttemptCount Int            @default(0)
+  qaStatus     String?
+  qaIssues     Json?
+  qaErrorCount Int                      @default(0)
+  qaWarningCount Int                    @default(0)
+  qaAttemptCount Int                    @default(0)
+  qaVersion    String?
+  lastQaAt     DateTime?
+  savedAt      DateTime?
   durationMs   Int?
   contentTypes String[]                 @default(["PRODUCT", "MEDIA_ALT", "MEDIA_CAPTION", "FEATURE_TITLE", "FEATURE_DESCRIPTION", "SPEC_LABEL", "SPEC_VALUE", "APPLICATION_TITLE", "APPLICATION_DESCRIPTION", "DOWNLOAD_TITLE", "SEO"])
   processingStep String                 @default("QUEUED")
@@ -347,6 +365,8 @@ model ProductTranslationLog {
   promptTokens      Int?
   completionTokens  Int?
   totalTokens       Int?
+  qaCodes           String[]                  @default([])
+  qaStatus          String?
   createdAt         DateTime                  @default(now())
 
   @@index([jobId, createdAt])
