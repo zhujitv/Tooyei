@@ -7,7 +7,9 @@ import {
 
 export type ProductPublicVisibilityReason =
   | "PRODUCT_NOT_PUBLISHED"
-  | "ZH_TRANSLATION_NOT_PUBLISHED"
+  | "ENGLISH_SOURCE_MISSING"
+  | "ENGLISH_SOURCE_INCOMPLETE"
+  | "ENGLISH_SOURCE_NOT_PUBLISHED"
   | "CATEGORY_NOT_PUBLIC";
 
 export const publicCategoryWhere = {
@@ -29,7 +31,15 @@ export const visibleProductCategoryWhere = {
 export const publicProductListWhere = {
   status: ContentStatus.PUBLISHED,
   translations: {
-    some: { locale: DatabaseLocale.ZH, status: TranslationStatus.PUBLISHED },
+    some: {
+      locale: DatabaseLocale.EN,
+      status: TranslationStatus.PUBLISHED,
+      title: { not: "" },
+      summary: { not: "" },
+      seoTitle: { not: null },
+      seoDescription: { not: null },
+      NOT: [{ seoTitle: "" }, { seoDescription: "" }],
+    },
   },
   AND: [visibleProductCategoryWhere],
 } satisfies Prisma.ProductWhereInput;
@@ -48,16 +58,23 @@ export const isPublicCategoryRecord = (category: {
 
 export const getProductPublicVisibility = ({
   productStatus,
-  zhTranslationStatus,
+  englishTranslationStatus,
+  englishContentStatus,
   hasPublicCategory,
 }: {
   productStatus: ContentStatus;
-  zhTranslationStatus: TranslationStatus;
+  englishTranslationStatus: TranslationStatus;
+  englishContentStatus: "READY" | "MISSING" | "INCOMPLETE";
   hasPublicCategory: boolean;
 }) => {
   const reasons: ProductPublicVisibilityReason[] = [];
   if (productStatus !== ContentStatus.PUBLISHED) reasons.push("PRODUCT_NOT_PUBLISHED");
-  if (zhTranslationStatus !== TranslationStatus.PUBLISHED) reasons.push("ZH_TRANSLATION_NOT_PUBLISHED");
+  if (englishContentStatus === "MISSING") reasons.push("ENGLISH_SOURCE_MISSING");
+  if (englishContentStatus === "INCOMPLETE") reasons.push("ENGLISH_SOURCE_INCOMPLETE");
+  if (
+    englishContentStatus === "READY" &&
+    englishTranslationStatus !== TranslationStatus.PUBLISHED
+  ) reasons.push("ENGLISH_SOURCE_NOT_PUBLISHED");
   if (!hasPublicCategory) reasons.push("CATEGORY_NOT_PUBLIC");
   return { publicVisible: reasons.length === 0, publicVisibilityReasons: reasons };
 };

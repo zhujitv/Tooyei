@@ -15,6 +15,7 @@ import {
   createProduct,
   fillMissingProductSeo,
   ProductBatchOperationError,
+  ProductPublicationError,
   updateProductListSettings,
 } from "@/lib/repositories/admin-products";
 import { contentLocales, localizedPath } from "@/lib/site";
@@ -129,6 +130,14 @@ export async function createProductAction(formData: FormData) {
 
     revalidateProductAdminPaths(product.slug);
   } catch (error) {
+    if (error instanceof ProductPublicationError) {
+      logWarn("Product publication rejected", {
+        operation: "admin-product.create.publication-validation",
+        productSlug: error.productSlug,
+        missingFields: error.missingFields,
+      }, error);
+      redirect("/admin/products?error=publish-blocked");
+    }
     logError("Create product failed", { operation: "admin-product.create" }, error);
     redirect("/admin/products?error=create");
   }
@@ -166,6 +175,14 @@ export async function updateProductListSettingsAction(formData: FormData) {
 
     revalidateProductAdminPaths(product.slug);
   } catch (error) {
+    if (error instanceof ProductPublicationError) {
+      logWarn("Product publication rejected", {
+        operation: "admin-product.quick-update.publication-validation",
+        productSlug: error.productSlug,
+        missingFields: error.missingFields,
+      }, error);
+      redirect(feedbackPath(formData, "error", "publish-blocked"));
+    }
     logError("Update product quick settings failed", { operation: "admin-product.quick-update" }, error);
     redirect(feedbackPath(formData, "error", "quick"));
   }
@@ -265,7 +282,9 @@ export async function batchUpdateProductsAction(formData: FormData) {
         ? "batch-delete-blocked"
         : error.code === "NOTHING_TO_REVIEW"
           ? "batch-review-empty"
-          : "batch-stale";
+          : error.code === "PUBLICATION_BLOCKED"
+            ? "publish-blocked"
+            : "batch-stale";
       redirect(feedbackPath(formData, "error", feedback));
     }
     logError("Batch update products failed", { operation: "admin-product.batch-update" }, error);

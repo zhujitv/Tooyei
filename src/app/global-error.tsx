@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { createErrorId } from "@/lib/error-id";
 
 export default function GlobalError({
   error,
@@ -9,9 +10,10 @@ export default function GlobalError({
   error: Error & { digest?: string };
   unstable_retry: () => void;
 }) {
+  const [errorId] = useState(() => error.digest?.trim() || createErrorId());
   useEffect(() => {
-    console.error(JSON.stringify({ level: "error", operation: "client.global-boundary", message: error.message, digest: error.digest }));
-  }, [error]);
+    console.error(JSON.stringify({ level: "error", operation: "client.global-boundary", errorId, message: error.message, digest: error.digest }));
+  }, [error, errorId]);
 
   return (
     <html lang="zh-CN">
@@ -19,7 +21,7 @@ export default function GlobalError({
         <main style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 24, textAlign: "center" }}>
           <div>
             <h1>系统暂时无法加载</h1>
-            <p style={{ color: "#475569", lineHeight: 1.7 }}>错误已记录，请重新加载。编号：{error.digest || "未生成"}</p>
+            <p style={{ color: "#475569", lineHeight: 1.7 }}>错误已记录，请重新加载。编号：{errorId}</p>
             <button type="button" onClick={() => unstable_retry()} style={{ marginTop: 16, minHeight: 40, padding: "0 20px", border: 0, borderRadius: 8, background: "#2563EB", color: "white", cursor: "pointer" }}>重新加载</button>
           </div>
         </main>

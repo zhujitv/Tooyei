@@ -81,9 +81,21 @@ export async function listMediaAssets(input: { q?: string; type?: AssetType; kin
 export async function listMediaAssetProductOptions() {
   if (!isDatabaseConfigured()) return [];
   return withDataFallback("media-assets.product-options", () => getPrisma().product.findMany({
-    select: { id: true, slug: true, sku: true, translations: { where: { locale: Locale.ZH }, select: { title: true }, take: 1 } },
+    select: {
+      id: true,
+      slug: true,
+      sku: true,
+      translations: {
+        where: { locale: { in: [Locale.EN, Locale.ZH] } },
+        select: { locale: true, title: true },
+      },
+    },
     orderBy: { updatedAt: "desc" },
-  }), []).then((products) => products.map((product) => ({ id: product.id, label: `${product.sku} · ${product.translations[0]?.title || product.slug}` })));
+  }), []).then((products) => products.map((product) => {
+    const english = product.translations.find(({ locale }) => locale === Locale.EN);
+    const chinese = product.translations.find(({ locale }) => locale === Locale.ZH);
+    return { id: product.id, label: `${product.sku} · ${english?.title?.trim() || chinese?.title?.trim() || product.slug}` };
+  }));
 }
 
 export async function deleteUnusedMediaAsset(assetId: string, deleteBlob: boolean) {

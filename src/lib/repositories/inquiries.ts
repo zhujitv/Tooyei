@@ -17,8 +17,8 @@ const inquiryProductInclude = {
   product: {
     include: {
       translations: {
-        where: { locale: DatabaseLocale.ZH },
-        select: { title: true },
+        where: { locale: { in: [DatabaseLocale.EN, DatabaseLocale.ZH] } },
+        select: { locale: true, title: true },
       },
     },
   },
@@ -110,8 +110,11 @@ const localeMap: Record<Locale, DatabaseLocale> = {
   zh: DatabaseLocale.ZH,
 };
 
-const productLabel = ({ product }: InquiryWithProducts["products"][number]) =>
-  product.translations[0]?.title ?? product.sku;
+const productLabel = ({ product }: InquiryWithProducts["products"][number]) => {
+  const english = product.translations.find(({ locale }) => locale === DatabaseLocale.EN);
+  const chinese = product.translations.find(({ locale }) => locale === DatabaseLocale.ZH);
+  return english?.title?.trim() || chinese?.title?.trim() || product.sku;
+};
 
 const toSummary = (inquiry: InquiryWithProducts): AdminInquirySummary => ({
   id: inquiry.id,

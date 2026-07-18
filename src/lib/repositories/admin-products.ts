@@ -18,10 +18,16 @@ import {
   publicProductListWhere,
   type ProductPublicVisibilityReason,
 } from "@/lib/product-publication";
+import { parseAdminProductVisibility, type AdminProductVisibility } from "@/lib/admin-product-filters";
+import { createErrorId, withGeneratedErrorId } from "@/lib/error-id";
+import { getEnglishSourceContent, validateProductForPublication } from "@/lib/product-english-source";
+import { logError } from "@/lib/observability";
+import { mapWithRecordIsolation } from "@/lib/record-isolation";
 import { contentLocales, type ContentLocale } from "@/lib/site";
 import { withDataFallback } from "@/lib/server-data";
 
 export type AdminProductSummary = {
+  id: string;
   slug: string;
   sku: string;
   category: string;
@@ -36,6 +42,16 @@ export type AdminProductSummary = {
   title: string;
   thumbnailUrl: string;
   thumbnailAlt: string;
+  mediaStatus: "READY" | "MISSING" | "BROKEN";
+  hasEnglishContent: boolean;
+  englishContentStatus: "READY" | "MISSING" | "INCOMPLETE";
+  englishMissingFields: string[];
+  publicationReady: boolean;
+  publicationMissingFields: string[];
+  hasError: boolean;
+  errorCode: string | null;
+  errorMessage: string | null;
+  errorId: string | null;
   updatedAt: Date | null;
   translationStates: Record<ContentLocale, TranslationStatus>;
   seoStates: Record<ContentLocale, boolean>;
@@ -138,6 +154,11 @@ export type AdminEditableProduct = {
   featured: boolean;
   sortOrder: number;
   updatedAt: Date | null;
+  hasEnglishContent: boolean;
+  englishContentStatus: "READY" | "MISSING" | "INCOMPLETE";
+  englishMissingFields: string[];
+  publicationReady: boolean;
+  publicationMissingFields: string[];
   translations: AdminProductTranslation[];
   media: AdminProductMediaItem[];
   features: AdminProductFeatureItem[];
@@ -164,7 +185,7 @@ export type AdminProductFilters = {
   locale?: ContentLocale;
   translationState?: "MISSING" | "NOT_PUBLISHED" | "NEEDS_REVIEW";
   seoState?: "READY" | "MISSING";
-  visibility?: "VISIBLE" | "HIDDEN";
+  visibility?: AdminProductVisibility;
   page?: number;
   pageSize?: number;
 };
@@ -176,6 +197,15 @@ export type AdminProductPage = {
   pageSize: number;
   totalPages: number;
 };
+
+export type AdminProductsLoadResult =
+  | { ok: true; data: AdminProductPage }
+  | {
+      ok: false;
+      code: "ADMIN_PRODUCTS_LOAD_FAILED";
+      message: "产品列表加载失败";
+      errorId: string;
+    };
 
 export type AdminProductStats = {
   total: number;
@@ -226,15 +256,30 @@ export type BatchProductOperation =
 export type ProductBatchOperationErrorCode =
   | "STALE_SELECTION"
   | "NOTHING_TO_REVIEW"
-  | "DELETE_BLOCKED";
+  | "DELETE_BLOCKED"
+  | "PUBLICATION_BLOCKED";
 
 export class ProductBatchOperationError extends Error {
   constructor(
     public readonly code: ProductBatchOperationErrorCode,
     message: string,
+    public readonly details?: Array<{ slug: string; missingFields: string[] }>,
   ) {
     super(message);
     this.name = "ProductBatchOperationError";
+  }
+}
+
+export class ProductPublicationError extends Error {
+  readonly code = "PRODUCT_PUBLICATION_BLOCKED" as const;
+
+  constructor(
+    message: string,
+    public readonly missingFields: string[],
+    public readonly productSlug: string,
+  ) {
+    super(message);
+    this.name = "ProductPublicationError";
   }
 }
 
@@ -348,6 +393,11 @@ const sampleEditableProduct = (slug: string): AdminEditableProduct | undefined =
     featured: true,
     sortOrder: 0,
     updatedAt: sampleDate,
+    hasEnglishContent: Boolean(product.title.en),
+    englishContentStatus: product.title.en ? "READY" : "MISSING",
+    englishMissingFields: [],
+    publicationReady: true,
+    publicationMissingFields: [],
     translations: contentLocales.map((locale) => ({
       locale,
       title: readLocalizedText(product.title, locale),
@@ -408,6 +458,7 @@ const sampleEditableProduct = (slug: string): AdminEditableProduct | undefined =
 
 const sampleSummaries = (): AdminProductSummary[] =>
   sampleProducts.map((product, index) => ({
+    id: `sample:${product.slug}`,
     slug: product.slug,
     sku: product.sku,
     category: product.category,
@@ -420,9 +471,19 @@ const sampleSummaries = (): AdminProductSummary[] =>
     featured: true,
     sortOrder: index,
     updatedAt: sampleDate,
-    title: product.title.zh,
+    title: product.title.en || product.sku,
     thumbnailUrl: product.image,
-    thumbnailAlt: product.title.zh,
+    thumbnailAlt: product.title.en || product.sku,
+    mediaStatus: "READY",
+    hasEnglishContent: Boolean(product.title.en),
+    englishContentStatus: product.title.en ? "READY" : "MISSING",
+    englishMissingFields: [],
+    publicationReady: true,
+    publicationMissingFields: [],
+    hasError: false,
+    errorCode: null,
+    errorMessage: null,
+    errorId: null,
     translationStates: Object.fromEntries(
       contentLocales.map((locale) => [locale, product.title[locale] ? TranslationStatus.PUBLISHED : TranslationStatus.MISSING]),
     ) as Record<ContentLocale, TranslationStatus>,
@@ -451,6 +512,7 @@ const categoryLabel = (category?: {
   "—";
 
 const listProductSelect = {
+  id: true,
   slug: true,
   sku: true,
   kind: true,
@@ -477,12 +539,23 @@ const listProductSelect = {
       locale: true,
       status: true,
       title: true,
+      summary: true,
       seoTitle: true,
       seoDescription: true,
     },
   },
   primaryImage: {
-    select: { url: true, alt: true },
+    select: { url: true, alt: true, deletedAt: true, blobDeletedAt: true },
+  },
+  media: {
+    where: { visible: true },
+    orderBy: [{ role: "asc" as const }, { sortOrder: "asc" as const }],
+    take: 1,
+    select: {
+      asset: {
+        select: { url: true, alt: true, deletedAt: true, blobDeletedAt: true },
+      },
+    },
   },
   categoryAssignments: {
     where: { category: { is: publicCategoryWhere } },
@@ -552,12 +625,22 @@ type AdminProductRecord = Prisma.ProductGetPayload<{ select: typeof listProductS
 type AdminEditableProductRecord = Prisma.ProductGetPayload<{ include: typeof editProductInclude }>;
 
 const translationFor = (product: AdminProductRecord, locale: ContentLocale) =>
-  product.translations.find((translation) => translation.locale === localeMap[locale]);
+  (Array.isArray(product.translations) ? product.translations : [])
+    .find((translation) => translation?.locale === localeMap[locale]);
 
 const zhTranslation = <T extends { locale: DatabaseLocale }>(translations: T[]) =>
   translations.find((translation) => translation.locale === DatabaseLocale.ZH);
 
-const toSummary = (product: AdminProductRecord): AdminProductSummary => {
+const usableListAsset = (asset: AdminProductRecord["primaryImage"]) =>
+  Boolean(asset?.url?.trim() && !asset.deletedAt && !asset.blobDeletedAt);
+
+export const normalizeProductForAdmin = (product: AdminProductRecord): AdminProductSummary => {
+  const englishSource = getEnglishSourceContent(product);
+  const englishContentStatus = englishSource.code === "ENGLISH_SOURCE_MISSING"
+    ? "MISSING" as const
+    : englishSource.code === "ENGLISH_SOURCE_INCOMPLETE"
+      ? "INCOMPLETE" as const
+      : "READY" as const;
   const states = Object.fromEntries(
     contentLocales.map((locale) => [locale, translationFor(product, locale)?.status ?? TranslationStatus.MISSING]),
   ) as Record<ContentLocale, TranslationStatus>;
@@ -572,18 +655,33 @@ const toSummary = (product: AdminProductRecord): AdminProductSummary => {
     }),
   ) as Record<ContentLocale, boolean>;
   const contentCounts = {
-    media: product._count.media,
-    features: product._count.features,
-    specifications: product._count.specifications,
-    applications: product._count.applications,
-    downloads: product._count.downloads,
+    media: Number(product._count?.media ?? 0),
+    features: Number(product._count?.features ?? 0),
+    specifications: Number(product._count?.specifications ?? 0),
+    applications: Number(product._count?.applications ?? 0),
+    downloads: Number(product._count?.downloads ?? 0),
   };
   const publishedTranslations = contentLocales.filter((locale) => states[locale] === TranslationStatus.PUBLISHED).length;
   const visibility = getProductPublicVisibility({
     productStatus: product.status,
-    zhTranslationStatus: states.zh,
-    hasPublicCategory: isPublicCategoryRecord(product.category) || product.categoryAssignments.length > 0,
+    englishTranslationStatus: states.en,
+    englishContentStatus,
+    hasPublicCategory: Boolean(
+      product.category && isPublicCategoryRecord(product.category),
+    ) || (Array.isArray(product.categoryAssignments) && product.categoryAssignments.length > 0),
   });
+  const firstMedia = Array.isArray(product.media) ? product.media[0]?.asset ?? null : null;
+  const coverImage = usableListAsset(product.primaryImage)
+    ? product.primaryImage
+    : usableListAsset(firstMedia)
+      ? firstMedia
+      : null;
+  const mediaStatus = coverImage
+    ? "READY" as const
+    : product.primaryImage || contentCounts.media > 0
+      ? "BROKEN" as const
+      : "MISSING" as const;
+  const publicationValidation = validateProductForPublication(product);
   const completion = Math.min(
     100,
     15 +
@@ -597,20 +695,31 @@ const toSummary = (product: AdminProductRecord): AdminProductSummary => {
   );
 
   return {
+    id: product.id,
     slug: product.slug,
     sku: product.sku,
     category: categoryLabel(product.category),
     categoryId: product.categoryId,
-    isClassified: product._count.categoryAssignments > 0,
+    isClassified: Number(product._count?.categoryAssignments ?? 0) > 0,
     ...visibility,
     kind: product.kind,
     status: product.status,
     featured: product.featured,
     sortOrder: product.sortOrder,
     updatedAt: product.updatedAt,
-    title: translationFor(product, "zh")?.title ?? translationFor(product, "en")?.title ?? product.sku,
-    thumbnailUrl: product.primaryImage?.url ?? "",
-    thumbnailAlt: product.primaryImage?.alt ?? translationFor(product, "zh")?.title ?? product.sku,
+    title: englishSource.content?.title || product.sku?.trim() || product.slug?.trim() || "未命名产品",
+    thumbnailUrl: coverImage?.url?.trim() || "/media/placeholder.svg",
+    thumbnailAlt: coverImage?.alt?.trim() || englishSource.content?.title || product.sku?.trim() || "产品图片占位图",
+    mediaStatus,
+    hasEnglishContent: englishSource.code !== "ENGLISH_SOURCE_MISSING",
+    englishContentStatus,
+    englishMissingFields: [...englishSource.missingFields],
+    publicationReady: publicationValidation.ok,
+    publicationMissingFields: [...publicationValidation.missingFields],
+    hasError: false,
+    errorCode: null,
+    errorMessage: null,
+    errorId: null,
     translationStates: states,
     seoStates,
     publishedTranslations,
@@ -621,7 +730,64 @@ const toSummary = (product: AdminProductRecord): AdminProductSummary => {
   };
 };
 
+const failedProductSummary = (product: AdminProductRecord, errorId: string): AdminProductSummary => ({
+  id: product.id || `invalid:${errorId}`,
+  slug: product.slug || `invalid-${errorId}`,
+  sku: product.sku || "—",
+  category: "—",
+  categoryId: product.categoryId ?? null,
+  isClassified: false,
+  publicVisible: false,
+  publicVisibilityReasons: ["ENGLISH_SOURCE_MISSING"],
+  kind: product.kind ?? ProductKind.SPC,
+  status: product.status ?? ContentStatus.DRAFT,
+  featured: Boolean(product.featured),
+  sortOrder: Number(product.sortOrder ?? 0),
+  title: "产品数据异常",
+  thumbnailUrl: "/media/placeholder.svg",
+  thumbnailAlt: "产品数据异常",
+  mediaStatus: "BROKEN",
+  hasEnglishContent: false,
+  englishContentStatus: "MISSING",
+  englishMissingFields: [],
+  publicationReady: false,
+  publicationMissingFields: ["englishSource", "category", "media", "features", "specifications"],
+  hasError: true,
+  errorCode: "PRODUCT_NORMALIZE_FAILED",
+  errorMessage: "该产品数据异常，请进入详情页检查。",
+  errorId,
+  updatedAt: product.updatedAt ?? null,
+  translationStates: Object.fromEntries(contentLocales.map((locale) => [locale, TranslationStatus.MISSING])) as Record<ContentLocale, TranslationStatus>,
+  seoStates: Object.fromEntries(contentLocales.map((locale) => [locale, false])) as Record<ContentLocale, boolean>,
+  publishedTranslations: 0,
+  missingTranslations: contentLocales.length,
+  seoReadyTranslations: 0,
+  contentCounts: { media: 0, features: 0, specifications: 0, applications: 0, downloads: 0 },
+  completion: 0,
+});
+
+export const normalizeAdminProductRows = (records: AdminProductRecord[]) =>
+  mapWithRecordIsolation(records, normalizeProductForAdmin, (product, error) => {
+      const errorId = createErrorId();
+      logError("Admin product normalization failed", {
+        operation: "admin-products.normalize",
+        route: "/admin/products",
+        errorId,
+        productId: product.id,
+        productSlug: product.slug,
+        code: "PRODUCT_NORMALIZE_FAILED",
+      }, error);
+      return failedProductSummary(product, errorId);
+  });
+
 const toEditableProduct = (product: AdminEditableProductRecord): AdminEditableProduct => {
+  const productTranslations = Array.isArray(product.translations) ? product.translations : [];
+  const productMedia = Array.isArray(product.media) ? product.media : [];
+  const productFeatures = Array.isArray(product.features) ? product.features : [];
+  const productSpecifications = Array.isArray(product.specifications) ? product.specifications : [];
+  const productApplications = Array.isArray(product.applications) ? product.applications : [];
+  const productDownloads = Array.isArray(product.downloads) ? product.downloads : [];
+  const categoryAssignments = Array.isArray(product.categoryAssignments) ? product.categoryAssignments : [];
   const assetOption = (asset: AdminEditableProductRecord["media"][number]["asset"]): MediaAssetOption => ({
     id: asset.id,
     url: asset.url,
@@ -639,20 +805,22 @@ const toEditableProduct = (product: AdminEditableProductRecord): AdminEditablePr
     referenceCount: 1,
     references: [],
   });
-  const media = product.media.map(({ asset, role, alt, caption, sortOrder, translations, visible }) => {
-    const translation = zhTranslation(translations);
+  const media = productMedia.map(({ asset, role, alt, caption, sortOrder, translations, visible }) => {
+    const safeTranslations = Array.isArray(translations) ? translations : [];
+    const translation = zhTranslation(safeTranslations);
+    const assetUrl = asset.deletedAt || asset.blobDeletedAt ? "" : asset.url;
     return {
       id: asset.id,
       role,
       kind: asset.kind,
-      url: asset.url,
+      url: assetUrl,
       alt: translation?.alt ?? alt ?? asset.alt ?? "",
       caption: translation?.caption ?? caption ?? "",
       sortOrder,
       visible,
       asset: assetOption(asset),
       translations: structuredTranslationMap(
-        translations,
+        safeTranslations,
         (item) => ({ alt: item.alt, caption: item.caption ?? "" }),
         () => ({ alt: "", caption: "" }),
       ),
@@ -660,7 +828,7 @@ const toEditableProduct = (product: AdminEditableProductRecord): AdminEditablePr
   });
   const hasPrimary = product.primaryImage && media.some((item) => item.url === product.primaryImage?.url);
 
-  if (product.primaryImage && !hasPrimary) {
+  if (product.primaryImage && !product.primaryImage.deletedAt && !product.primaryImage.blobDeletedAt && !hasPrimary) {
     media.unshift({
       id: product.primaryImage.id,
       role: ProductMediaRole.PRIMARY,
@@ -675,14 +843,21 @@ const toEditableProduct = (product: AdminEditableProductRecord): AdminEditablePr
     });
   }
 
+  const editableEnglishSource = getEnglishSourceContent(product);
   const visibility = getProductPublicVisibility({
     productStatus: product.status,
-    zhTranslationStatus:
-      product.translations.find(({ locale }) => locale === DatabaseLocale.ZH)?.status ?? TranslationStatus.MISSING,
+    englishTranslationStatus:
+      productTranslations.find(({ locale }) => locale === DatabaseLocale.EN)?.status ?? TranslationStatus.MISSING,
+    englishContentStatus: editableEnglishSource.code === "ENGLISH_SOURCE_MISSING"
+      ? "MISSING"
+      : editableEnglishSource.code === "ENGLISH_SOURCE_INCOMPLETE"
+        ? "INCOMPLETE"
+        : "READY",
     hasPublicCategory:
       isPublicCategoryRecord(product.category) ||
-      product.categoryAssignments.some(({ category }) => isPublicCategoryRecord(category)),
+      categoryAssignments.some(({ category }) => isPublicCategoryRecord(category)),
   });
+  const publicationValidation = validateProductForPublication(product);
 
   return {
     id: product.id,
@@ -690,15 +865,24 @@ const toEditableProduct = (product: AdminEditableProductRecord): AdminEditablePr
     sku: product.sku,
     category: categoryLabel(product.category),
     categoryId: product.categoryId,
-    categoryIds: product.categoryAssignments.map(({ categoryId }) => categoryId),
+    categoryIds: categoryAssignments.map(({ categoryId }) => categoryId),
     ...visibility,
     kind: product.kind,
     status: product.status,
     featured: product.featured,
     sortOrder: product.sortOrder,
     updatedAt: product.updatedAt,
+    hasEnglishContent: editableEnglishSource.code !== "ENGLISH_SOURCE_MISSING",
+    englishContentStatus: editableEnglishSource.code === "ENGLISH_SOURCE_MISSING"
+      ? "MISSING"
+      : editableEnglishSource.code === "ENGLISH_SOURCE_INCOMPLETE"
+        ? "INCOMPLETE"
+        : "READY",
+    englishMissingFields: [...editableEnglishSource.missingFields],
+    publicationReady: publicationValidation.ok,
+    publicationMissingFields: [...publicationValidation.missingFields],
     translations: contentLocales.map((locale) => {
-      const translation = product.translations.find(({ locale: value }) => value === localeMap[locale]);
+      const translation = productTranslations.find(({ locale: value }) => value === localeMap[locale]);
       return {
         locale,
         title: translation?.title ?? "",
@@ -709,8 +893,9 @@ const toEditableProduct = (product: AdminEditableProductRecord): AdminEditablePr
       };
     }),
     media,
-    features: product.features.map(({ id, icon, sortOrder, translations, visible }) => {
-      const translation = zhTranslation(translations);
+    features: productFeatures.map(({ id, icon, sortOrder, translations, visible }) => {
+      const safeTranslations = Array.isArray(translations) ? translations : [];
+      const translation = zhTranslation(safeTranslations);
       return {
         id,
         title: translation?.value ?? "",
@@ -719,14 +904,15 @@ const toEditableProduct = (product: AdminEditableProductRecord): AdminEditablePr
         sortOrder,
         visible,
         translations: structuredTranslationMap(
-          translations,
+          safeTranslations,
           (item) => ({ title: item.value, description: item.description ?? "" }),
           () => ({ title: "", description: "" }),
         ),
       };
     }),
-    specifications: product.specifications.map(({ id, group, sortOrder, translations, unit, value, visible }) => {
-      const translation = zhTranslation(translations);
+    specifications: productSpecifications.map(({ id, group, sortOrder, translations, unit, value, visible }) => {
+      const safeTranslations = Array.isArray(translations) ? translations : [];
+      const translation = zhTranslation(safeTranslations);
       return {
         id,
         group: translation?.group ?? group ?? "",
@@ -736,43 +922,45 @@ const toEditableProduct = (product: AdminEditableProductRecord): AdminEditablePr
         sortOrder,
         visible,
         translations: structuredTranslationMap(
-          translations,
+          safeTranslations,
           (item) => ({ group: item.group ?? "", label: item.label, displayValue: item.displayValue ?? "" }),
           () => ({ group: "", label: "", displayValue: "" }),
         ),
       };
     }),
-    applications: product.applications.map(({ id, imageAsset, sortOrder, translations, visible }) => {
-      const translation = zhTranslation(translations);
+    applications: productApplications.map(({ id, imageAsset, sortOrder, translations, visible }) => {
+      const safeTranslations = Array.isArray(translations) ? translations : [];
+      const translation = zhTranslation(safeTranslations);
       return {
         id,
         title: translation?.title ?? "",
         description: translation?.description ?? "",
-        imageUrl: imageAsset?.url ?? "",
+        imageUrl: imageAsset && !imageAsset.deletedAt && !imageAsset.blobDeletedAt ? imageAsset.url : "",
         imageAlt: translation?.imageAlt ?? imageAsset?.alt ?? "",
         sortOrder,
         visible,
         asset: imageAsset ? assetOption(imageAsset) : null,
         translations: structuredTranslationMap(
-          translations,
+          safeTranslations,
           (item) => ({ title: item.title, description: item.description ?? "", imageAlt: item.imageAlt ?? "" }),
           () => ({ title: "", description: "", imageAlt: "" }),
         ),
       };
     }),
-    downloads: product.downloads.map(({ id, asset, kind, sortOrder, translations, visible }) => {
-      const translation = zhTranslation(translations);
+    downloads: productDownloads.map(({ id, asset, kind, sortOrder, translations, visible }) => {
+      const safeTranslations = Array.isArray(translations) ? translations : [];
+      const translation = zhTranslation(safeTranslations);
       return {
         id,
         kind,
         title: translation?.title ?? "",
         description: translation?.description ?? "",
-        url: asset.url,
+        url: asset.deletedAt || asset.blobDeletedAt ? "" : asset.url,
         sortOrder,
         visible,
         asset: assetOption(asset),
         translations: structuredTranslationMap(
-          translations,
+          safeTranslations,
           (item) => ({ title: item.title, description: item.description ?? "" }),
           () => ({ title: "", description: "" }),
         ),
@@ -830,9 +1018,10 @@ const missingSeoWhere = (locale?: ContentLocale): Prisma.ProductWhereInput => ({
   OR: translationLocalesFor(locale).map((item) => ({ NOT: hasSeoTranslation(item) })),
 });
 
-const buildWhere = (filters: AdminProductFilters = {}): Prisma.ProductWhereInput => {
+export const buildAdminProductWhere = (filters: AdminProductFilters = {}): Prisma.ProductWhereInput => {
   const clauses: Prisma.ProductWhereInput[] = [];
   const query = filters.q?.trim();
+  const visibility = parseAdminProductVisibility(filters.visibility);
 
   if (filters.status) clauses.push({ status: filters.status });
   if (filters.kind) clauses.push({ kind: filters.kind });
@@ -847,8 +1036,10 @@ const buildWhere = (filters: AdminProductFilters = {}): Prisma.ProductWhereInput
   if (filters.seoState === "READY") {
     clauses.push({ AND: translationLocalesFor(filters.locale).map((locale) => hasSeoTranslation(locale)) });
   }
-  if (filters.visibility === "VISIBLE") clauses.push(publicProductListWhere);
-  if (filters.visibility === "HIDDEN") clauses.push({ NOT: publicProductListWhere });
+  if (visibility === "VISIBLE") clauses.push(publicProductListWhere);
+  if (visibility === "HIDDEN") clauses.push({ NOT: publicProductListWhere });
+  if (visibility === "DRAFT") clauses.push({ status: ContentStatus.DRAFT });
+  if (visibility === "ARCHIVED") clauses.push({ status: ContentStatus.ARCHIVED });
   if (query) clauses.push(searchCondition(query));
 
   return clauses.length ? { AND: clauses } : {};
@@ -876,8 +1067,11 @@ const applySampleFilters = (products: AdminProductSummary[], filters: AdminProdu
     ) return false;
     if (filters.seoState === "MISSING" && product.seoReadyTranslations === contentLocales.length) return false;
     if (filters.seoState === "READY" && product.seoReadyTranslations !== contentLocales.length) return false;
-    if (filters.visibility === "VISIBLE" && !product.publicVisible) return false;
-    if (filters.visibility === "HIDDEN" && product.publicVisible) return false;
+    const visibility = parseAdminProductVisibility(filters.visibility);
+    if (visibility === "VISIBLE" && !product.publicVisible) return false;
+    if (visibility === "HIDDEN" && product.publicVisible) return false;
+    if (visibility === "DRAFT" && product.status !== ContentStatus.DRAFT) return false;
+    if (visibility === "ARCHIVED" && product.status !== ContentStatus.ARCHIVED) return false;
     if (!query) return true;
     return [product.title, product.sku, product.slug, product.category]
       .filter(Boolean)
@@ -944,8 +1138,8 @@ export async function getAdminProducts(filters: AdminProductFilters = {}): Promi
   }
 
   const prisma = getPrisma();
-  const where = buildWhere(filters);
-  const result = await withDataFallback("admin-products.list", () => Promise.all([
+  const where = buildAdminProductWhere(filters);
+  const [records, total] = await Promise.all([
     prisma.product.findMany({
       where,
       select: listProductSelect,
@@ -954,24 +1148,39 @@ export async function getAdminProducts(filters: AdminProductFilters = {}): Promi
       take: pageSize,
     }),
     prisma.product.count({ where }),
-  ]), null, { filters, requestedPage, pageSize });
-  if (!result) {
-    const filtered = applySampleFilters(sampleSummaries(), filters);
-    const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-    const page = Math.min(requestedPage, totalPages);
-    return { items: filtered.slice((page - 1) * pageSize, page * pageSize), total: filtered.length, page, pageSize, totalPages };
-  }
-  const [records, total] = result;
+  ]);
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   if (requestedPage > totalPages) return getAdminProducts({ ...filters, page: totalPages, pageSize });
 
   return {
-    items: records.map(toSummary),
+    items: normalizeAdminProductRows(records),
     total,
     page: requestedPage,
     pageSize,
     totalPages,
   };
+}
+
+export async function getAdminProductsResult(filters: AdminProductFilters = {}): Promise<AdminProductsLoadResult> {
+  return withGeneratedErrorId(
+    async () => ({ ok: true, data: await getAdminProducts(filters) }) as const,
+    (errorId, error) => {
+      logError("Admin products load failed", {
+        operation: "admin-products.list",
+        route: "/admin/products",
+        errorId,
+        visibility: parseAdminProductVisibility(filters.visibility),
+        filters,
+        code: "ADMIN_PRODUCTS_LOAD_FAILED",
+      }, error);
+      return {
+        ok: false,
+        code: "ADMIN_PRODUCTS_LOAD_FAILED",
+        message: "产品列表加载失败",
+        errorId,
+      } as const;
+    },
+  );
 }
 
 export async function getAdminProduct(slug: string): Promise<AdminEditableProduct | undefined> {
@@ -1105,6 +1314,50 @@ export async function getAdminProductCategoryOptions(): Promise<AdminProductCate
   }));
 }
 
+const publicationProductSelect = {
+  slug: true,
+  status: true,
+  categoryId: true,
+  translations: {
+    select: {
+      locale: true,
+      status: true,
+      title: true,
+      summary: true,
+      seoTitle: true,
+      seoDescription: true,
+    },
+  },
+  primaryImage: {
+    select: { url: true, deletedAt: true, blobDeletedAt: true },
+  },
+  media: {
+    where: { visible: true },
+    take: 1,
+    select: {
+      visible: true,
+      asset: { select: { url: true, deletedAt: true, blobDeletedAt: true } },
+    },
+  },
+  _count: {
+    select: { media: true, features: true, specifications: true },
+  },
+} satisfies Prisma.ProductSelect;
+
+type PublicationProductRecord = Prisma.ProductGetPayload<{ select: typeof publicationProductSelect }>;
+
+const assertProductCanBePublished = (product: PublicationProductRecord) => {
+  const validation = validateProductForPublication(product);
+  if (!validation.ok) {
+    throw new ProductPublicationError(validation.message, validation.missingFields, product.slug);
+  }
+};
+
+const findPublicationProduct = (slug: string) => getPrisma().product.findUnique({
+  where: { slug },
+  select: publicationProductSelect,
+});
+
 export async function createProduct(input: CreateProductInput) {
   if (!isDatabaseConfigured()) {
     throw new Error("DATABASE_URL is required before products can be created.");
@@ -1118,6 +1371,26 @@ export async function createProduct(input: CreateProductInput) {
   const category = categories.find(({ id }) => id === input.categoryId);
   if (!category) throw new Error("Product category does not exist.");
   if (categories.length !== categoryIds.length) throw new Error("One or more product categories do not exist.");
+  if (input.status === ContentStatus.PUBLISHED) {
+    const validation = validateProductForPublication({
+      slug: input.slug,
+      categoryId: input.categoryId,
+      translations: [{
+        locale: DatabaseLocale.EN,
+        status: TranslationStatus.PUBLISHED,
+        title: input.title,
+        summary: input.summary,
+        seoTitle: seoTitleFor(input.seoTitle, input.title),
+        seoDescription: seoDescriptionFor(input.seoDescription, input.summary),
+      }],
+      media: [],
+      features: [],
+      specifications: [],
+    });
+    if (!validation.ok) {
+      throw new ProductPublicationError(validation.message, validation.missingFields, input.slug);
+    }
+  }
 
   return prisma.product.create({
     data: {
@@ -1133,7 +1406,7 @@ export async function createProduct(input: CreateProductInput) {
       sortOrder: input.sortOrder,
       translations: {
         create: {
-          locale: DatabaseLocale.ZH,
+          locale: DatabaseLocale.EN,
           title: input.title,
           summary: input.summary,
           seoTitle: seoTitleFor(input.seoTitle, input.title),
@@ -1160,7 +1433,14 @@ export async function updateProductListSettings(input: UpdateProductListSettings
     throw new Error("DATABASE_URL is required before products can be updated.");
   }
 
-  return getPrisma().product.update({
+  const prisma = getPrisma();
+  if (input.status === ContentStatus.PUBLISHED) {
+    const current = await findPublicationProduct(input.slug);
+    if (!current) throw new Error("Product does not exist.");
+    if (current.status !== ContentStatus.PUBLISHED) assertProductCanBePublished(current);
+  }
+
+  return prisma.product.update({
     where: { slug: input.slug },
     data: {
       status: input.status,
@@ -1187,6 +1467,29 @@ export async function batchUpdateProducts(slugs: string[], operation: BatchProdu
     throw new Error("This batch operation requires its dedicated handler.");
   }
 
+  const prisma = getPrisma();
+  const uniqueSlugs = Array.from(new Set(slugs));
+  if (operation === "PUBLISH") {
+    const products = await prisma.product.findMany({
+      where: { slug: { in: uniqueSlugs } },
+      select: publicationProductSelect,
+    });
+    if (products.length !== uniqueSlugs.length) {
+      throw new ProductBatchOperationError("STALE_SELECTION", "One or more selected products no longer exist.");
+    }
+    const blocked = products.flatMap((product) => {
+      const validation = validateProductForPublication(product);
+      return validation.ok ? [] : [{ slug: product.slug, missingFields: validation.missingFields }];
+    });
+    if (blocked.length) {
+      throw new ProductBatchOperationError(
+        "PUBLICATION_BLOCKED",
+        `${blocked.length} product(s) do not meet the English-source publication requirements.`,
+        blocked,
+      );
+    }
+  }
+
   const data: Prisma.ProductUpdateManyMutationInput =
     operation === "PUBLISH"
       ? { status: ContentStatus.PUBLISHED }
@@ -1198,8 +1501,8 @@ export async function batchUpdateProducts(slugs: string[], operation: BatchProdu
             ? { featured: true }
             : { featured: false };
 
-  return getPrisma().product.updateMany({
-    where: { slug: { in: slugs } },
+  return prisma.product.updateMany({
+    where: { slug: { in: uniqueSlugs } },
     data,
   });
 }
@@ -1423,6 +1726,11 @@ export async function updateProductCore(input: UpdateProductCoreInput) {
   }
 
   const prisma = getPrisma();
+  if (input.status === ContentStatus.PUBLISHED) {
+    const current = await findPublicationProduct(input.slug);
+    if (!current) throw new Error("Product does not exist.");
+    if (current.status !== ContentStatus.PUBLISHED) assertProductCanBePublished(current);
+  }
   const categoryIds = Array.from(new Set([input.categoryId, ...input.categoryIds]));
   const categories = await prisma.category.findMany({ where: { id: { in: categoryIds } }, select: { id: true, kind: true } });
   const category = categories.find(({ id }) => id === input.categoryId);

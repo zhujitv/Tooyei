@@ -29,9 +29,10 @@ import { getProductManagerSession } from "@/lib/admin-auth";
 import { isDatabaseConfigured } from "@/lib/db";
 import {
   getAdminProductCategoryOptions,
-  getAdminProducts,
+  getAdminProductsResult,
   getAdminProductStats,
 } from "@/lib/repositories/admin-products";
+import { parseAdminProductVisibility } from "@/lib/admin-product-filters";
 import {
   assignProductCategoryAction,
   batchUpdateProductsAction,
@@ -78,7 +79,7 @@ const feedbackCopy = {
   },
   error: {
     database: ["数据库未连接", "产品新增和保存需要 PostgreSQL 数据库。"],
-    create: ["新建失败", "请检查 slug、SKU、分类、中文标题和摘要；slug/SKU 不能重复。"],
+    create: ["新建失败", "请检查 slug、SKU、分类、英文标题和摘要；slug/SKU 不能重复。"],
     quick: ["保存失败", "请检查产品是否存在、状态和排序值是否有效。"],
     category: ["归类失败", "请选择有效栏目，并确认产品仍然存在。"],
     batch: ["批量操作失败", "请至少选择一个产品，并检查操作类型是否有效。"],
@@ -86,6 +87,7 @@ const feedbackCopy = {
     "batch-delete-permission": ["没有永久删除权限", "永久删除仅限站点所有者操作；编辑人员仍可审核、发布或归档产品。"],
     "batch-review-empty": ["没有可审核的语言版本", "所选产品中没有状态为“待审核”且标题、摘要与 SEO 信息完整的语言内容。"],
     "batch-stale": ["产品列表已发生变化", "部分所选产品已不存在，请刷新列表后重新选择。"],
+    "publish-blocked": ["发布被阻止", "请先补齐并发布英文源内容、主图、卖点、规格和产品栏目，再执行发布。"],
   },
 } as const;
 
@@ -120,16 +122,17 @@ export default async function AdminProductsPage({
   const seoState = ["READY", "MISSING"].includes(filters.seoState ?? "")
     ? (filters.seoState as "READY" | "MISSING")
     : undefined;
-  const visibility = ["VISIBLE", "HIDDEN"].includes(filters.visibility ?? "")
-    ? (filters.visibility as "VISIBLE" | "HIDDEN")
-    : undefined;
+  const visibility = parseAdminProductVisibility(filters.visibility);
   const page = Math.max(1, Number.parseInt(filters.page ?? "1", 10) || 1);
-  const [productPage, stats, categories, managerSession] = await Promise.all([
-    getAdminProducts({ q: filters.q, status, kind, classification, locale, translationState, seoState, visibility, page }),
+  const [productResult, stats, categories, managerSession] = await Promise.all([
+    getAdminProductsResult({ q: filters.q, status, kind, classification, locale, translationState, seoState, visibility, page }),
     getAdminProductStats(),
     getAdminProductCategoryOptions(),
     databaseReady ? getProductManagerSession() : Promise.resolve(null),
   ]);
+  const productPage = productResult.ok
+    ? productResult.data
+    : { items: [], total: 0, page: 1, pageSize: 24, totalPages: 1 };
   const products = productPage.items;
   const defaultCategoryId = categories[0]?.id ?? "";
   const successFeedback = filters.saved ? feedbackCopy.saved[filters.saved as keyof typeof feedbackCopy.saved] : undefined;
@@ -214,6 +217,16 @@ export default async function AdminProductsPage({
         </Alert>
       ) : null}
 
+      {!productResult.ok ? (
+        <Alert className="mt-5 border-red-200 bg-red-50 text-red-900">
+          <TriangleAlert className="size-4" />
+          <AlertTitle>产品列表加载失败</AlertTitle>
+          <AlertDescription className="text-red-700">
+            系统已记录详细错误，其他后台模块仍可继续使用。错误编号：<span className="font-mono">{productResult.errorId}</span>
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
       <section className="mt-5 grid gap-px overflow-hidden rounded-xl border border-white/[0.07] bg-white/[0.07] sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
         {metrics.map(({ label, value, detail, icon: Icon, tone }) => (
           <div key={label} className="bg-[#111113] p-4">
@@ -262,7 +275,7 @@ export default async function AdminProductsPage({
           </span>
           <div>
             <p className="text-sm font-medium text-zinc-200">创建新产品</p>
-            <p className="mt-0.5 text-[11px] text-zinc-600">先建立中文基础资料，创建后进入详情页继续完善。</p>
+            <p className="mt-0.5 text-[11px] text-zinc-600">先建立英文源资料，其他语言从英文翻译生成。</p>
           </div>
           <ChevronDown className="ml-auto size-4 text-zinc-600 transition-transform group-open:rotate-180" />
         </summary>
@@ -292,12 +305,12 @@ export default async function AdminProductsPage({
             <Input id="new-sort" name="sortOrder" type="number" min={0} defaultValue={stats.total + 1} disabled={!databaseReady} className="admin-field" />
           </div>
           <div className="space-y-1.5 lg:col-span-5">
-            <Label htmlFor="new-title" className="admin-label">中文标题</Label>
-            <Input id="new-title" name="title" required minLength={3} maxLength={180} placeholder="例如：同步对花 SPC 锁扣地板" disabled={!databaseReady} className="admin-field" />
+            <Label htmlFor="new-title" className="admin-label">英文标题</Label>
+            <Input id="new-title" name="title" required minLength={3} maxLength={180} placeholder="e.g. Registered Embossed SPC Flooring" disabled={!databaseReady} className="admin-field" />
           </div>
           <div className="space-y-1.5 lg:col-span-7">
-            <Label htmlFor="new-summary" className="admin-label">中文摘要</Label>
-            <Textarea id="new-summary" name="summary" required minLength={20} maxLength={800} placeholder="用于产品列表、详情页和 SEO 描述的基础摘要，至少 20 个字符。" disabled={!databaseReady} className="admin-field min-h-16" />
+            <Label htmlFor="new-summary" className="admin-label">英文摘要</Label>
+            <Textarea id="new-summary" name="summary" required minLength={20} maxLength={800} placeholder="English source summary for product pages and downstream translations." disabled={!databaseReady} className="admin-field min-h-16" />
           </div>
           <div className="flex items-center justify-between gap-4 border-t border-white/[0.06] pt-4 lg:col-span-12">
             <label className="flex items-center gap-2 text-xs text-zinc-500">
@@ -350,6 +363,8 @@ export default async function AdminProductsPage({
             <option value="">全部产品中心状态</option>
             <option value="VISIBLE">产品中心可见</option>
             <option value="HIDDEN">产品中心不可见</option>
+            <option value="DRAFT">草稿产品</option>
+            <option value="ARCHIVED">已归档产品</option>
           </select>
           <div className="flex items-center gap-2 md:col-span-2 xl:col-span-3">
             <Button type="submit" size="sm" variant="outline" className="flex-1 border-white/[0.1] bg-white/[0.04] text-zinc-300 hover:bg-white/[0.08] hover:text-white">

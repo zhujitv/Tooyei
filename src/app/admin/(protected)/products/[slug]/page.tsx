@@ -13,6 +13,7 @@ import {
   ExternalLink,
   FileStack,
   ImageIcon,
+  Languages,
   Save,
   SearchCheck,
 } from "lucide-react";
@@ -60,7 +61,9 @@ const productStatusLabel: Record<ContentStatus, string> = {
 
 const publicVisibilityReasonLabel = {
   PRODUCT_NOT_PUBLISHED: "产品状态尚未发布",
-  ZH_TRANSLATION_NOT_PUBLISHED: "中文内容尚未审核发布",
+  ENGLISH_SOURCE_MISSING: "英文内容未创建",
+  ENGLISH_SOURCE_INCOMPLETE: "英文源内容不完整",
+  ENGLISH_SOURCE_NOT_PUBLISHED: "英文源内容尚未审核发布",
   CATEGORY_NOT_PUBLIC: "未关联已启用且公开的产品栏目",
 } as const;
 
@@ -149,6 +152,7 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
   const mediaRoleOptions = Object.values(ProductMediaRole).map((role) => ({ value: role, label: mediaRoleLabel[role] }));
   const downloadKindOptions = Object.values(ProductDownloadKind).map((kind) => ({ value: kind, label: downloadKindLabel[kind] }));
   const zhTranslation = product.translations.find((translation) => translation.locale === "zh");
+  const enTranslation = product.translations.find((translation) => translation.locale === "en");
   const publishedLocales = product.translations.filter((translation) => translation.status === "PUBLISHED").length;
   const seoReadyLocales = product.translations.filter((translation) => translation.seoTitle.trim() && translation.seoDescription.trim()).length;
   const localeCompleteness = contentLocales.map((locale) => calculateProductLocaleCompleteness(product, locale));
@@ -170,7 +174,7 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
   const completeness = completenessSections.reduce((sum, section) => sum + section.score, 0);
   const readinessItems = [
     ["产品状态已发布", !product.publicVisibilityReasons.includes("PRODUCT_NOT_PUBLISHED")],
-    ["中文内容已审核发布", !product.publicVisibilityReasons.includes("ZH_TRANSLATION_NOT_PUBLISHED")],
+    ["英文源内容完整并已审核发布", !product.publicVisibilityReasons.some((reason) => reason.startsWith("ENGLISH_SOURCE_"))],
     ["已关联公开栏目", !product.publicVisibilityReasons.includes("CATEGORY_NOT_PUBLIC")],
     ["至少 1 个可见媒体", product.media.some((item) => item.visible)],
     [`全部 ${product.translations.length} 个语言版本资料完整`, completeLocales === product.translations.length],
@@ -445,7 +449,7 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
               <span className="text-[10px] text-slate-400">{kindLabel[product.kind]}</span>
               {product.featured ? <Badge className="admin-badge-ai">AI 精选</Badge> : null}
             </div>
-            <h1 className="mt-2 truncate text-2xl font-semibold tracking-[-0.035em] text-[#111827]">{zhTranslation?.title || "产品编辑器"}</h1>
+            <h1 className="mt-2 truncate text-2xl font-semibold tracking-[-0.035em] text-[#111827]">{enTranslation?.title || product.sku || "产品编辑器"}</h1>
             <p className="mt-1.5 font-mono text-[10px] text-[#94A3B8]">{product.sku} · {product.slug}</p>
           </div>
         </div>
@@ -477,11 +481,23 @@ export default async function AdminProductEditPage({ params, searchParams }: Pag
         </Alert>
       ) : null}
 
+      {product.englishContentStatus !== "READY" ? (
+        <Alert className="mt-5 border-rose-200 bg-rose-50 text-rose-900">
+          <Languages className="size-4" />
+          <AlertTitle>{product.englishContentStatus === "MISSING" ? "英文内容未创建" : "英文源内容不完整"}</AlertTitle>
+          <AlertDescription className="text-rose-700">
+            {product.englishContentStatus === "MISSING"
+              ? "产品仍可查看和编辑，但其他语言必须等英文源内容建立后再生成。"
+              : `产品仍可编辑；发布前请补齐：${product.englishMissingFields.join("、")}。`}
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
       {feedback.saved ? (
         <Alert className="mt-5 border-emerald-200 bg-emerald-50 text-emerald-800"><Save className="size-4" /><AlertTitle>{feedback.saved === "core" ? "产品基础信息已保存" : feedback.saved === "created" ? "新产品已创建" : feedback.saved === "upload" ? "文件已上传并关联" : feedback.saved === "structured" ? "产品结构化内容已保存" : "翻译已保存"}</AlertTitle><AlertDescription>{feedback.saved === "core" ? product.publicVisible ? "产品列表、公开页面和缓存已刷新。" : "基础信息已更新，但产品仍未满足产品中心公开条件。" : feedback.saved === "created" ? "可以继续完善图片、规格、卖点、应用场景、下载资料和多语言 SEO。" : feedback.saved === "upload" ? "对象存储和产品媒体关系已更新。" : feedback.saved === "structured" ? "图库、规格、卖点、应用场景和下载资料已同步到公开产品页。" : `${savedLocale} 版本、SEO 字段和公开页面缓存已更新。`}</AlertDescription></Alert>
       ) : null}
       {feedback.error ? (
-        <Alert className="mt-5 border-amber-200 bg-amber-50 text-amber-900"><Database className="size-4" /><AlertTitle>修改未保存</AlertTitle><AlertDescription>{feedback.error === "database" ? "请先连接 PostgreSQL 并初始化产品目录。" : feedback.error === "core" ? "请检查 SKU、分类、状态和排序。" : feedback.error === "structured" ? "请检查结构化内容字段。" : feedback.error === "upload" ? "请检查文件类型、大小、媒体服务和数据库连接。" : "请检查标题、摘要、SEO 字段和发布状态。"}</AlertDescription></Alert>
+        <Alert className="mt-5 border-amber-200 bg-amber-50 text-amber-900"><Database className="size-4" /><AlertTitle>修改未保存</AlertTitle><AlertDescription>{feedback.error === "database" ? "请先连接 PostgreSQL 并初始化产品目录。" : feedback.error === "core" ? "请检查 SKU、分类、状态和排序。" : feedback.error === "publish-blocked" ? "发布被阻止：请先补齐英文源内容、主图、卖点、规格和产品栏目。" : feedback.error === "structured" ? "请检查结构化内容字段。" : feedback.error === "upload" ? "请检查文件类型、大小、媒体服务和数据库连接。" : "请检查标题、摘要、SEO 字段和发布状态。"}</AlertDescription></Alert>
       ) : null}
 
       <AdminProductTabs

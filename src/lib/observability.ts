@@ -1,10 +1,12 @@
 import "server-only";
+import { createErrorId } from "@/lib/error-id";
 
 type LogLevel = "info" | "warn" | "error";
 
 type LogContext = Record<string, unknown> & {
   operation: string;
   requestId?: string;
+  errorId?: string;
   route?: string;
 };
 
@@ -30,12 +32,25 @@ const write = (level: LogLevel, message: string, context: LogContext, error?: un
     ...context,
     ...(error === undefined ? {} : errorDetails(error)),
   };
-  console[level](JSON.stringify(payload));
+  const seen = new WeakSet<object>();
+  const serialized = JSON.stringify(payload, (_key, value: unknown) => {
+    if (typeof value === "bigint") return value.toString();
+    if (value && typeof value === "object") {
+      if (seen.has(value)) return "[Circular]";
+      seen.add(value);
+    }
+    return value;
+  });
+  console[level](serialized);
 };
 
 export const logInfo = (message: string, context: LogContext) => write("info", message, context);
 export const logWarn = (message: string, context: LogContext, error?: unknown) => write("warn", message, context, error);
-export const logError = (message: string, context: LogContext, error: unknown) => write("error", message, context, error);
+export const logError = (message: string, context: LogContext, error: unknown) => {
+  const errorId = context.errorId?.trim() || createErrorId();
+  write("error", message, { ...context, errorId }, error);
+  return errorId;
+};
 
 export const requestIdFrom = (request?: Request) =>
   request?.headers.get("x-vercel-id")?.trim() ||

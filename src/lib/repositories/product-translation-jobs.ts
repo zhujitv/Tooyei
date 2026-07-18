@@ -259,12 +259,14 @@ export async function createProductTranslationJob(input: CreateTranslationJobInp
   const missingEnglishSource = products.flatMap((product) => {
     const missing: string[] = [];
     const main = product.translations.find(({ locale }) => locale === SOURCE_LOCALE);
+    const sourceTranslation = <T extends { locale: Locale }>(translations: T[]) =>
+      translations.find(({ locale }) => locale === SOURCE_LOCALE);
     if (hasTranslationContentType(contentTypes, "SEO") && (!main?.seoTitle?.trim() || !main.seoDescription?.trim())) missing.push("SEO");
-    if (hasTranslationContentType(contentTypes, "MEDIA_ALT") && product.media.some((row) => !(row.translations[0]?.alt ?? row.alt ?? "").trim())) missing.push("媒体 ALT");
-    if (hasTranslationContentType(contentTypes, "FEATURE_TITLE") && product.features.some((row) => !row.translations[0]?.value.trim())) missing.push("卖点标题");
-    if (hasTranslationContentType(contentTypes, "SPEC_LABEL") && product.specifications.some((row) => !row.translations[0]?.label.trim())) missing.push("参数名称");
-    if (hasTranslationContentType(contentTypes, "APPLICATION_TITLE") && product.applications.some((row) => !row.translations[0]?.title.trim())) missing.push("应用场景标题");
-    if (hasTranslationContentType(contentTypes, "DOWNLOAD_TITLE") && product.downloads.some((row) => !row.translations[0]?.title.trim())) missing.push("下载资料标题");
+    if (hasTranslationContentType(contentTypes, "MEDIA_ALT") && product.media.some((row) => !(sourceTranslation(row.translations)?.alt ?? row.alt ?? "").trim())) missing.push("媒体 ALT");
+    if (hasTranslationContentType(contentTypes, "FEATURE_TITLE") && product.features.some((row) => !sourceTranslation(row.translations)?.value.trim())) missing.push("卖点标题");
+    if (hasTranslationContentType(contentTypes, "SPEC_LABEL") && product.specifications.some((row) => !sourceTranslation(row.translations)?.label.trim())) missing.push("参数名称");
+    if (hasTranslationContentType(contentTypes, "APPLICATION_TITLE") && product.applications.some((row) => !sourceTranslation(row.translations)?.title.trim())) missing.push("应用场景标题");
+    if (hasTranslationContentType(contentTypes, "DOWNLOAD_TITLE") && product.downloads.some((row) => !sourceTranslation(row.translations)?.title.trim())) missing.push("下载资料标题");
     return missing.length ? [`${product.sku}：${Array.from(new Set(missing)).join("、")}`] : [];
   });
   if (missingEnglishSource.length) {

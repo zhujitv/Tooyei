@@ -13,6 +13,7 @@ import {
   updateProductStructuredTranslations,
   updateProductCore,
   updateProductTranslation,
+  ProductPublicationError,
   type AdminProductApplicationItem,
   type AdminProductDownloadItem,
   type AdminProductFeatureItem,
@@ -20,6 +21,7 @@ import {
   type AdminProductSpecificationItem,
   type UpdateProductStructuredTranslationsInput,
 } from "@/lib/repositories/admin-products";
+import { logWarn } from "@/lib/observability";
 import { createProductTranslationJob, type TranslationLocale } from "@/lib/repositories/product-translation-jobs";
 import { contentLocales, localizedPath } from "@/lib/site";
 import { productTranslationProviderId } from "@/lib/translation-providers/types";
@@ -191,15 +193,28 @@ export async function updateProductCoreAction(slug: string, formData: FormData) 
   });
   if (!parsed.success) redirect(`/admin/products/${slug}?error=core`);
 
-  const product = await updateProductCore({
-    slug,
-    sku: parsed.data.sku,
-    categoryId: parsed.data.categoryId,
-    categoryIds: parsed.data.categoryIds,
-    status: ContentStatus[parsed.data.status],
-    featured: parsed.data.featured,
-    sortOrder: parsed.data.sortOrder,
-  });
+  let product;
+  try {
+    product = await updateProductCore({
+      slug,
+      sku: parsed.data.sku,
+      categoryId: parsed.data.categoryId,
+      categoryIds: parsed.data.categoryIds,
+      status: ContentStatus[parsed.data.status],
+      featured: parsed.data.featured,
+      sortOrder: parsed.data.sortOrder,
+    });
+  } catch (error) {
+    if (error instanceof ProductPublicationError) {
+      logWarn("Product publication rejected", {
+        operation: "admin-product.core.publication-validation",
+        productSlug: error.productSlug,
+        missingFields: error.missingFields,
+      }, error);
+      redirect(`/admin/products/${slug}?error=publish-blocked`);
+    }
+    throw error;
+  }
 
   await safeWriteAuditLog({
     actorEmail: session.email,

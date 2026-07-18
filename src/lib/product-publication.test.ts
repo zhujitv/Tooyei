@@ -3,10 +3,11 @@ import test from "node:test";
 import { ContentStatus, TranslationStatus } from "@/generated/prisma/client";
 import { getProductPublicVisibility } from "@/lib/product-publication";
 
-test("a published product with published Chinese content and a public category is visible", () => {
+test("a published product with complete published English content and a public category is visible", () => {
   const result = getProductPublicVisibility({
     productStatus: ContentStatus.PUBLISHED,
-    zhTranslationStatus: TranslationStatus.PUBLISHED,
+    englishTranslationStatus: TranslationStatus.PUBLISHED,
+    englishContentStatus: "READY",
     hasPublicCategory: true,
   });
   assert.equal(result.publicVisible, true);
@@ -16,23 +17,36 @@ test("a published product with published Chinese content and a public category i
 test("publication status alone does not make a product publicly visible", () => {
   const result = getProductPublicVisibility({
     productStatus: ContentStatus.PUBLISHED,
-    zhTranslationStatus: TranslationStatus.NEEDS_REVIEW,
+    englishTranslationStatus: TranslationStatus.NEEDS_REVIEW,
+    englishContentStatus: "READY",
     hasPublicCategory: true,
   });
   assert.equal(result.publicVisible, false);
-  assert.deepEqual(result.publicVisibilityReasons, ["ZH_TRANSLATION_NOT_PUBLISHED"]);
+  assert.deepEqual(result.publicVisibilityReasons, ["ENGLISH_SOURCE_NOT_PUBLISHED"]);
 });
 
 test("all visibility blockers are reported together", () => {
   const result = getProductPublicVisibility({
     productStatus: ContentStatus.DRAFT,
-    zhTranslationStatus: TranslationStatus.MISSING,
+    englishTranslationStatus: TranslationStatus.MISSING,
+    englishContentStatus: "MISSING",
     hasPublicCategory: false,
   });
   assert.equal(result.publicVisible, false);
   assert.deepEqual(result.publicVisibilityReasons, [
     "PRODUCT_NOT_PUBLISHED",
-    "ZH_TRANSLATION_NOT_PUBLISHED",
+    "ENGLISH_SOURCE_MISSING",
     "CATEGORY_NOT_PUBLIC",
   ]);
+});
+
+test("incomplete English content is reported without throwing", () => {
+  const result = getProductPublicVisibility({
+    productStatus: ContentStatus.PUBLISHED,
+    englishTranslationStatus: TranslationStatus.PUBLISHED,
+    englishContentStatus: "INCOMPLETE",
+    hasPublicCategory: true,
+  });
+  assert.equal(result.publicVisible, false);
+  assert.deepEqual(result.publicVisibilityReasons, ["ENGLISH_SOURCE_INCOMPLETE"]);
 });

@@ -48,6 +48,16 @@ export type ProductCatalogItem = {
   title: string;
   thumbnailUrl: string;
   thumbnailAlt: string;
+  mediaStatus: "READY" | "MISSING" | "BROKEN";
+  hasEnglishContent: boolean;
+  englishContentStatus: "READY" | "MISSING" | "INCOMPLETE";
+  englishMissingFields: string[];
+  publicationReady: boolean;
+  publicationMissingFields: string[];
+  hasError: boolean;
+  errorCode: string | null;
+  errorMessage: string | null;
+  errorId: string | null;
   updatedAt: string | null;
   translationStates: Record<ContentLocale, TranslationStatus>;
   seoStates: Record<ContentLocale, boolean>;
@@ -99,9 +109,27 @@ const translationClass: Record<TranslationStatus, string> = {
 
 const publicVisibilityReasonLabel: Record<ProductPublicVisibilityReason, string> = {
   PRODUCT_NOT_PUBLISHED: "产品状态不是已发布",
-  ZH_TRANSLATION_NOT_PUBLISHED: "中文内容尚未审核发布",
+  ENGLISH_SOURCE_MISSING: "英文内容未创建",
+  ENGLISH_SOURCE_INCOMPLETE: "英文源内容不完整",
+  ENGLISH_SOURCE_NOT_PUBLISHED: "英文源内容尚未审核发布",
   CATEGORY_NOT_PUBLIC: "没有已启用的前台栏目",
 };
+
+const publicationFieldLabel: Record<string, string> = {
+  englishSource: "英文源内容",
+  title: "英文标题",
+  summary: "英文摘要",
+  seoTitle: "英文 SEO 标题",
+  seoDescription: "英文 SEO 描述",
+  slug: "URL Slug",
+  category: "产品栏目",
+  media: "产品图片",
+  features: "产品卖点",
+  specifications: "产品规格",
+};
+
+const publicationMissingText = (product: ProductCatalogItem) =>
+  product.publicationMissingFields.map((field) => publicationFieldLabel[field] ?? field).join("、");
 
 const visibilityReasonText = (product: ProductCatalogItem) =>
   product.publicVisibilityReasons.map((reason) => publicVisibilityReasonLabel[reason]).join(" · ");
@@ -313,16 +341,13 @@ export function AdminProductCatalog({ products, categories, databaseReady, canDe
   const [publishOpen, setPublishOpen] = useState(false);
   const batchFormRef = useRef<HTMLFormElement>(null);
   const confirmedDeleteRef = useRef(false);
-  const confirmedPublishRef = useRef(false);
   const selectedSet = useMemo(() => new Set(selected), [selected]);
   const selectedProducts = useMemo(
     () => products.filter((product) => selectedSet.has(product.slug)),
     [products, selectedSet],
   );
   const publishBlockedProducts = useMemo(
-    () => selectedProducts.filter((product) =>
-      product.publicVisibilityReasons.some((reason) => reason !== "PRODUCT_NOT_PUBLISHED"),
-    ),
+    () => selectedProducts.filter((product) => !product.publicationReady),
     [selectedProducts],
   );
   const allSelected = products.length > 0 && selected.length === products.length;
@@ -414,6 +439,26 @@ export function AdminProductCatalog({ products, categories, databaseReady, canDe
                         {product.title}
                       </Link>
                       <p className="mt-1 truncate font-mono text-[10px] text-zinc-700">{product.sku} · {product.slug}</p>
+                      {product.hasError ? (
+                        <p className="mt-2 flex items-start gap-1.5 rounded-md border border-rose-400/20 bg-rose-400/[0.07] px-2.5 py-2 text-[10px] leading-4 text-rose-200">
+                          <CircleAlert className="mt-0.5 size-3 shrink-0" />
+                          <span>{product.errorMessage} {product.errorId ? `错误编号：${product.errorId}` : ""}</span>
+                        </p>
+                      ) : product.englishContentStatus !== "READY" ? (
+                        <p className="mt-2 flex items-start gap-1.5 rounded-md border border-rose-400/15 bg-rose-400/[0.055] px-2.5 py-2 text-[10px] leading-4 text-rose-200/80">
+                          <Languages className="mt-0.5 size-3 shrink-0" />
+                          <span>
+                            {product.englishContentStatus === "MISSING"
+                              ? "英文内容未创建"
+                              : `英文内容不完整：${product.englishMissingFields.map((field) => publicationFieldLabel[field] ?? field).join("、")}`}
+                          </span>
+                        </p>
+                      ) : null}
+                      {product.mediaStatus !== "READY" ? (
+                        <p className="mt-2 text-[10px] text-amber-300/75">
+                          {product.mediaStatus === "BROKEN" ? "图片资源不可用，已显示占位图" : "尚未添加产品图片"}
+                        </p>
+                      ) : null}
                       {!product.publicVisible ? (
                         <p className="mt-2 flex items-start gap-1.5 rounded-md border border-amber-400/15 bg-amber-400/[0.055] px-2.5 py-2 text-[10px] leading-4 text-amber-200/75">
                           <CircleAlert className="mt-0.5 size-3 shrink-0 text-amber-300" />
@@ -468,13 +513,12 @@ export function AdminProductCatalog({ products, categories, databaseReady, canDe
               setDeleteOpen(true);
               return;
             }
-            if (batchOperation === "PUBLISH" && publishBlockedProducts.length > 0 && !confirmedPublishRef.current) {
+            if (batchOperation === "PUBLISH" && publishBlockedProducts.length > 0) {
               event.preventDefault();
               setPublishOpen(true);
               return;
             }
             confirmedDeleteRef.current = false;
-            confirmedPublishRef.current = false;
           }}
           className="fixed bottom-5 left-1/2 z-40 flex w-[min(calc(100%-2rem),620px)] -translate-x-1/2 flex-wrap items-center gap-2 rounded-xl border border-white/[0.12] bg-[#1a1a1d]/95 p-2.5 shadow-[0_20px_70px_rgba(0,0,0,0.55)] backdrop-blur-xl lg:left-[calc(50%+7.5rem)]"
         >
@@ -509,8 +553,9 @@ export function AdminProductCatalog({ products, categories, databaseReady, canDe
           ) : null}
           {batchOperation === "PUBLISH" ? (
             <p className={cn("basis-full rounded-md px-2 py-1.5 text-[10px]", publishBlockedProducts.length ? "bg-amber-400/[0.08] text-amber-200/80" : "text-emerald-300/75")}>
-              发布后预计 {selected.length - publishBlockedProducts.length} 个在产品中心可见
-              {publishBlockedProducts.length ? `；${publishBlockedProducts.length} 个仍需先审核中文内容或启用栏目。` : "，所选产品已满足公开条件。"}
+              {publishBlockedProducts.length
+                ? `${publishBlockedProducts.length} 个产品不满足英文源发布条件，系统将阻止本次批量发布。`
+                : `所选 ${selected.length} 个产品均满足英文源发布条件。`}
             </p>
           ) : null}
         </form>
@@ -521,29 +566,16 @@ export function AdminProductCatalog({ products, categories, databaseReady, canDe
           <AlertDialog.Overlay className="fixed inset-0 z-[100] bg-[#101828]/45 backdrop-blur-[2px]" />
           <AlertDialog.Content className="fixed left-1/2 top-1/2 z-[101] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-xl border border-[#E4E7EC] bg-white p-6 shadow-2xl">
             <div className="grid size-10 place-items-center rounded-full bg-amber-50 text-amber-600"><EyeOff className="size-5" /></div>
-            <AlertDialog.Title className="mt-4 text-lg font-semibold text-[#172033]">仍有 {publishBlockedProducts.length} 个产品不会出现在产品中心</AlertDialog.Title>
+            <AlertDialog.Title className="mt-4 text-lg font-semibold text-[#172033]">有 {publishBlockedProducts.length} 个产品暂不能发布</AlertDialog.Title>
             <AlertDialog.Description className="mt-2 text-sm leading-6 text-[#667085]">
-              这些产品缺少已审核发布的中文内容，或没有已启用的前台栏目。继续操作只会更新产品状态，不会让它们立即出现在产品中心。
+              英文是产品发布源。请先补齐英文内容、媒体、产品卖点、规格与栏目，系统不会以不完整资料更新发布状态。
             </AlertDialog.Description>
             <div className="mt-4 max-h-32 overflow-y-auto rounded-lg border border-[#E4E7EC] bg-[#F8FAFC] p-3 text-xs leading-5 text-[#667085]">
-              {publishBlockedProducts.slice(0, 8).map((product) => <p key={product.slug}><span className="font-medium text-[#344054]">{product.sku}</span>：{visibilityReasonText(product)}</p>)}
+              {publishBlockedProducts.slice(0, 8).map((product) => <p key={product.slug}><span className="font-medium text-[#344054]">{product.sku}</span>：缺少 {publicationMissingText(product)}</p>)}
               {publishBlockedProducts.length > 8 ? <p>另有 {publishBlockedProducts.length - 8} 个产品</p> : null}
             </div>
-            <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <AlertDialog.Cancel asChild><Button type="button" variant="outline">返回先处理</Button></AlertDialog.Cancel>
-              <AlertDialog.Action asChild>
-                <Button
-                  type="button"
-                  className="bg-amber-600 text-white hover:bg-amber-500"
-                  onClick={() => {
-                    confirmedPublishRef.current = true;
-                    setPublishOpen(false);
-                    batchFormRef.current?.requestSubmit();
-                  }}
-                >
-                  仍然更新发布状态
-                </Button>
-              </AlertDialog.Action>
+            <div className="mt-6 flex justify-end">
+              <AlertDialog.Cancel asChild><Button type="button">返回完善资料</Button></AlertDialog.Cancel>
             </div>
           </AlertDialog.Content>
         </AlertDialog.Portal>
