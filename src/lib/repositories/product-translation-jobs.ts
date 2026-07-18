@@ -68,6 +68,13 @@ export const translationLocales = [
 export type TranslationLocale = (typeof translationLocales)[number];
 export type TranslationJobScope = "MISSING" | "NON_PUBLISHED";
 
+export class TranslationJobValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "TranslationJobValidationError";
+  }
+}
+
 export type CreateTranslationJobInput = {
   actorEmail: string;
   provider: TranslationProviderId;
@@ -201,13 +208,13 @@ export async function getTranslationProductOptions(query = "") {
 
 export async function createProductTranslationJob(input: CreateTranslationJobInput) {
   assertDatabase();
-  if (input.sourceLocale !== SOURCE_LOCALE) throw new Error("产品翻译任务必须以英文（EN）作为唯一源语言。");
+  if (input.sourceLocale !== SOURCE_LOCALE) throw new TranslationJobValidationError("产品翻译任务必须以英文（EN）作为唯一源语言。");
   const service = getTranslationProviderState(input.provider);
   if (!service.configured || !service.provider || !service.model) {
     throw new Error(service.error || "翻译 Provider 配置无效。");
   }
   const targetLocales = Array.from(new Set(input.targetLocales)).filter((locale) => locale !== SOURCE_LOCALE);
-  if (!targetLocales.length) throw new Error("请至少选择一种不同于源语言的目标语言。");
+  if (!targetLocales.length) throw new TranslationJobValidationError("请至少选择一种不同于源语言的目标语言。");
   const contentTypes = Array.from(new Set(input.contentTypes?.length ? input.contentTypes : translationContentTypes));
   const translatesMainRecord = contentTypes.some((type) => type === "PRODUCT" || type === "SEO");
 
@@ -261,7 +268,7 @@ export async function createProductTranslationJob(input: CreateTranslationJobInp
     return missing.length ? [`${product.sku}：${Array.from(new Set(missing)).join("、")}`] : [];
   });
   if (missingEnglishSource.length) {
-    throw new Error(`以下产品缺少本次任务所需的英文源字段，已阻止创建任务：${missingEnglishSource.slice(0, 5).join("；")}${missingEnglishSource.length > 5 ? `；另有 ${missingEnglishSource.length - 5} 个产品` : ""}`);
+    throw new TranslationJobValidationError(`以下产品缺少本次任务所需的英文源字段，已阻止创建任务：${missingEnglishSource.slice(0, 5).join("；")}${missingEnglishSource.length > 5 ? `；另有 ${missingEnglishSource.length - 5} 个产品` : ""}`);
   }
 
   const items = products.flatMap((product) => targetLocales.flatMap((targetLocale) => {
@@ -277,7 +284,7 @@ export async function createProductTranslationJob(input: CreateTranslationJobInp
       targetLocale,
     }];
   }));
-  if (!items.length) throw new Error("当前筛选范围内没有可创建的翻译任务；已发布译文不会被自动覆盖。");
+  if (!items.length) throw new TranslationJobValidationError("当前筛选范围内没有可创建的翻译任务；已发布译文不会被自动覆盖。");
 
   return prisma.productTranslationJob.create({
     data: {

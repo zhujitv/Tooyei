@@ -7,10 +7,11 @@ import { requireTranslationManagerSession } from "@/lib/admin-auth";
 import { safeWriteAuditLog } from "@/lib/repositories/audit-logs";
 import {
   createProductTranslationJob,
+  TranslationJobValidationError,
   translationLocales,
 } from "@/lib/repositories/product-translation-jobs";
 import { productTranslationProviderId } from "@/lib/translation-providers/types";
-import { logError } from "@/lib/observability";
+import { logError, logWarn } from "@/lib/observability";
 
 const localeSchema = z.enum(translationLocales);
 const createJobSchema = z.object({
@@ -67,7 +68,11 @@ export async function createTranslationJobAction(formData: FormData) {
       },
     });
   } catch (error) {
-    logError("Create translation job failed", { operation: "translation.job-create" }, error);
+    if (error instanceof TranslationJobValidationError) {
+      logWarn("Translation job rejected by input validation", { operation: "translation.job-create.validation" }, error);
+    } else {
+      logError("Create translation job failed", { operation: "translation.job-create" }, error);
+    }
     redirect(errorPath(error));
   }
   redirect(`/admin/translations/${job.id}`);
