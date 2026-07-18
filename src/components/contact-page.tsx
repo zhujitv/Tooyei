@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
-import { socialLinks } from "@/config/social";
+import { getPublicSocialLinks } from "@/lib/repositories/social-links";
 import type { Product } from "@/lib/content";
 import { copy, readLocalizedText } from "@/lib/content";
 import { getPublicCategoryTree } from "@/lib/repositories/categories";
@@ -153,7 +153,7 @@ const labels = {
 } as const;
 
 export async function ContactPage({ locale, products, selectedProductSlug, feedback }: ContactPageProps) {
-  const categories = await getPublicCategoryTree(locale);
+  const [categories, socialLinks] = await Promise.all([getPublicCategoryTree(locale), getPublicSocialLinks()]);
   const t = copy[toContentLocale(locale)];
   const formLabels = labels[toContentLocale(locale)];
   const selectedProduct = products.find((product) => product.slug === selectedProductSlug);

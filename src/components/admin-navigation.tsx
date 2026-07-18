@@ -13,7 +13,7 @@ import {
   Menu,
   MessageSquare,
   Package,
-  Settings,
+  Share2,
   Users,
 } from "lucide-react";
 import { logoutAction } from "@/app/admin/login/actions";
@@ -36,6 +36,7 @@ const navItems = [
   { href: "/admin/media", label: "媒体中心", icon: Images },
   { href: "/admin/inquiries", label: "询盘", icon: MessageSquare },
   { href: "/admin/users", label: "团队与权限", icon: Users },
+  { href: "/admin/settings/social", label: "社媒管理", icon: Share2 },
 ] as const;
 
 const isActivePath = (pathname: string, href: string) => pathname === href || pathname.startsWith(`${href}/`);
@@ -108,14 +109,6 @@ export function AdminNavigation({ email }: { email: string }) {
         <div className="flex-1 overflow-y-auto px-3 py-4">
           <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Workspace</p>
           <NavigationLinks pathname={pathname} />
-          <div className="mt-7">
-            <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">System</p>
-            <div className="flex h-10 items-center gap-3 rounded-lg px-3 text-sm text-slate-400">
-              <Settings className="size-4" />
-              系统设置
-              <span className="ml-auto text-[9px] uppercase tracking-wider">Soon</span>
-            </div>
-          </div>
         </div>
 
         <AccountPanel email={email} />

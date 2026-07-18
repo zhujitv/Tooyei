@@ -1,13 +1,21 @@
+"use client";
+
 import {
+  AtSign,
   ArrowUpRight,
   BriefcaseBusiness,
   Camera,
+  Link2,
   MessageCircle,
+  Music2,
+  PinIcon,
   Play,
   Users,
   type LucideIcon,
 } from "lucide-react";
-import { visibleSocialLinks, type SocialLinkKey } from "@/config/social";
+import { useEffect, useState } from "react";
+import { visibleSocialLinks, type PublicSocialLink, type SocialLinkKey } from "@/config/social";
+import { fetchWithRetry } from "@/lib/fetch-with-retry";
 import { cn } from "@/lib/utils";
 
 const icons: Record<SocialLinkKey, LucideIcon> = {
@@ -16,6 +24,10 @@ const icons: Record<SocialLinkKey, LucideIcon> = {
   youtube: Play,
   facebook: Users,
   whatsapp: MessageCircle,
+  tiktok: Music2,
+  pinterest: PinIcon,
+  x: AtSign,
+  other: Link2,
 };
 
 export function SocialLinks({
@@ -23,22 +35,38 @@ export function SocialLinks({
   showArrow = false,
   className,
   linkClassName,
+  links,
 }: {
   showLabels?: boolean;
   showArrow?: boolean;
   className?: string;
   linkClassName?: string;
+  links?: PublicSocialLink[];
 }) {
-  if (visibleSocialLinks.length === 0) return null;
+  const [resolvedLinks, setResolvedLinks] = useState<PublicSocialLink[]>(links ?? visibleSocialLinks);
+
+  useEffect(() => {
+    if (links) return;
+    const controller = new AbortController();
+    fetchWithRetry("/api/social-links", { signal: controller.signal, timeoutMs: 10_000 })
+      .then((response) => response.json())
+      .then((payload: { ok?: boolean; links?: PublicSocialLink[] }) => {
+        if (payload.ok && Array.isArray(payload.links)) setResolvedLinks(payload.links);
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [links]);
+
+  if (resolvedLinks.length === 0) return null;
 
   return (
     <div className={cn("flex items-center gap-2", className)}>
-      {visibleSocialLinks.map(({ key, label, href }) => {
+      {resolvedLinks.map(({ id, key, label, href }) => {
         const Icon = icons[key];
 
         return (
           <a
-            key={key}
+            key={id}
             href={href}
             target="_blank"
             rel="noopener noreferrer"

@@ -2,8 +2,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { Mail, MapPin, MessageCircle, Phone } from "lucide-react";
 import { SocialLinks } from "@/components/social-links";
-import { socialLinks } from "@/config/social";
 import { getPublicCategoryTree } from "@/lib/repositories/categories";
+import { getPublicSocialLinks } from "@/lib/repositories/social-links";
 import { localizedPath, siteConfig, toContentLocale, type ContentLocale, type Locale } from "@/lib/site";
 
 type FooterCopy = {
@@ -108,8 +108,8 @@ const footerLinkClass = "inline-flex min-h-11 items-center text-sm text-white/55
 
 export async function SiteFooter({ locale }: { locale: Locale }) {
   const labels = footerCopy[toContentLocale(locale)];
+  const [categories, socialLinks] = await Promise.all([getPublicCategoryTree(locale), getPublicSocialLinks()]);
   const whatsapp = socialLinks.find(({ key }) => key === "whatsapp");
-  const categories = await getPublicCategoryTree(locale);
 
   return (
     <footer className="bg-[#050c16] text-white">
@@ -120,7 +120,7 @@ export async function SiteFooter({ locale }: { locale: Locale }) {
               <Image src="/brand/tooyei-logo-white.png" alt="TOOYEI" width={760} height={190} className="h-11 w-auto object-contain" />
             </Link>
             <p className="mt-6 max-w-sm text-sm leading-7 text-white/48">{labels.description}</p>
-            <SocialLinks className="mt-6" linkClassName="size-11 border border-white/10 text-white/55 hover:border-[var(--gold)]/45 hover:text-white" />
+            <SocialLinks links={socialLinks} className="mt-6" linkClassName="size-11 border border-white/10 text-white/55 hover:border-[var(--gold)]/45 hover:text-white" />
           </div>
 
           <div>
@@ -152,7 +152,7 @@ export async function SiteFooter({ locale }: { locale: Locale }) {
             <FooterHeading>{labels.company}</FooterHeading>
             <div className="mt-5 flex flex-col">
               {labels.companyLinks.map(([label, href]) => (
-                <Link key={label} href={href.startsWith("/#") || href === "/contact" ? localizedPath(locale, href) : href} className={footerLinkClass}>{label}</Link>
+                <Link key={label} href={href.startsWith("/") ? localizedPath(locale, href) : href} className={footerLinkClass}>{label}</Link>
               ))}
             </div>
           </div>
@@ -175,9 +175,9 @@ export async function SiteFooter({ locale }: { locale: Locale }) {
         <div className="flex flex-col gap-4 border-t border-white/10 py-6 text-[0.68rem] text-white/35 sm:flex-row sm:items-center sm:justify-between">
           <p>© {new Date().getFullYear()} {siteConfig.legalName}</p>
           <div className="flex flex-wrap gap-x-5">
-            <Link href="/privacy" className="min-h-11 py-3 transition-colors hover:text-white">{labels.privacy}</Link>
-            <Link href="/terms" className="min-h-11 py-3 transition-colors hover:text-white">{labels.terms}</Link>
-            <Link href="/cookies" className="min-h-11 py-3 transition-colors hover:text-white">{labels.cookies}</Link>
+            <Link href={localizedPath(locale, "/privacy")} className="min-h-11 py-3 transition-colors hover:text-white">{labels.privacy}</Link>
+            <Link href={localizedPath(locale, "/terms")} className="min-h-11 py-3 transition-colors hover:text-white">{labels.terms}</Link>
+            <Link href={localizedPath(locale, "/cookies")} className="min-h-11 py-3 transition-colors hover:text-white">{labels.cookies}</Link>
           </div>
         </div>
       </div>

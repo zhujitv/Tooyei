@@ -651,6 +651,21 @@ model Redirect {
   @@index([active])
 }
 
+model SocialLink {
+  id        String   @id @default(cuid())
+  platform  String
+  label     String
+  url       String
+  icon      String
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, sortOrder])
+  @@index([platform])
+}
+
 model RateLimitCounter {
   id        String   @id @default(cuid())
   key       String   @unique
