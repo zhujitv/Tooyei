@@ -1,9 +1,10 @@
 "use client";
 
+import Image from "next/image";
 import { useFormStatus } from "react-dom";
 import { ExternalLink, Loader2, Plus, Save, Trash2 } from "lucide-react";
 import { createSocialLinkAction, deleteSocialLinkAction, updateSocialLinkAction } from "@/app/admin/(protected)/settings/social/actions";
-import { socialPlatforms, type SocialLinkKey } from "@/config/social";
+import { socialIconImages, socialPlatforms, type SocialLinkKey } from "@/config/social";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -62,6 +63,15 @@ export function AdminSocialLinkManager({ links, databaseReady }: { links: AdminS
       <div className="space-y-3">
         {links.map((link) => (
           <article key={link.id} className="admin-card rounded-xl p-5">
+            <div className="mb-4 flex items-center gap-3">
+              <span className="grid size-9 place-items-center rounded-lg bg-white shadow-sm ring-1 ring-slate-200">
+                <Image src={(socialIconImages[link.key] ?? socialIconImages.other).src} alt="" width={18} height={18} className="size-4.5 object-contain" aria-hidden="true" />
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-slate-950">{link.label}</p>
+                <p className="text-xs text-slate-500">{platformLabels[link.key]}</p>
+              </div>
+            </div>
             <form action={updateSocialLinkAction} className="grid gap-4 lg:grid-cols-[180px_1fr_2fr_110px_auto] lg:items-end">
               <input type="hidden" name="id" value={link.id} />
               <div className="space-y-2"><Label className="admin-label">平台</Label><select name="key" defaultValue={link.key} className="admin-select px-3" disabled={!databaseReady}>{socialPlatforms.map((platform) => <option key={platform} value={platform}>{platformLabels[platform]}</option>)}</select></div>

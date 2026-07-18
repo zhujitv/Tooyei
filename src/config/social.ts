@@ -19,6 +19,18 @@ export type PublicSocialLink = {
   href: string;
 };
 
+export const socialIconImages: Record<SocialLinkKey, { src: string; title: string }> = {
+  linkedin: { src: "/social/linkedin.svg", title: "LinkedIn" },
+  instagram: { src: "/social/instagram.svg", title: "Instagram" },
+  youtube: { src: "/social/youtube.svg", title: "YouTube" },
+  facebook: { src: "/social/facebook.svg", title: "Facebook" },
+  whatsapp: { src: "/social/whatsapp.svg", title: "WhatsApp" },
+  tiktok: { src: "/social/tiktok.svg", title: "TikTok" },
+  pinterest: { src: "/social/pinterest.svg", title: "Pinterest" },
+  x: { src: "/social/x.svg", title: "X" },
+  other: { src: "/social/other.svg", title: "Social link" },
+};
+
 export const socialLinks: PublicSocialLink[] = [
   { id: "fallback-linkedin", key: "linkedin", label: "LinkedIn", href: "" },
   { id: "fallback-instagram", key: "instagram", label: "Instagram", href: "" },
