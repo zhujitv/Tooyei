@@ -12,16 +12,18 @@ import {
   Plus,
   Search,
   SearchCheck,
+  ShieldCheck,
   Sparkles,
   TriangleAlert,
 } from "lucide-react";
-import { ContentStatus, ProductKind } from "@/generated/prisma/client";
+import { AdminRole, ContentStatus, ProductKind } from "@/generated/prisma/client";
 import { AdminProductCatalog } from "@/components/admin-product-catalog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { getProductManagerSession } from "@/lib/admin-auth";
 import { isDatabaseConfigured } from "@/lib/db";
 import {
   getAdminProductCategoryOptions,
@@ -78,6 +80,10 @@ const feedbackCopy = {
     quick: ["保存失败", "请检查产品是否存在、状态和排序值是否有效。"],
     category: ["归类失败", "请选择有效栏目，并确认产品仍然存在。"],
     batch: ["批量操作失败", "请至少选择一个产品，并检查操作类型是否有效。"],
+    "batch-delete-blocked": ["本次未删除任何产品", "部分产品仍关联询盘或翻译任务。请保留历史记录，或先完成相应的数据迁移。"],
+    "batch-delete-permission": ["没有永久删除权限", "永久删除仅限站点所有者操作；编辑人员仍可审核、发布或归档产品。"],
+    "batch-review-empty": ["没有可审核的语言版本", "所选产品中没有状态为“待审核”且标题、摘要与 SEO 信息完整的语言内容。"],
+    "batch-stale": ["产品列表已发生变化", "部分所选产品已不存在，请刷新列表后重新选择。"],
   },
 } as const;
 
@@ -105,17 +111,18 @@ export default async function AdminProductsPage({
     ? (filters.classification as "CLASSIFIED" | "UNCLASSIFIED")
     : undefined;
   const locale = contentLocales.includes(filters.locale as ContentLocale) ? (filters.locale as ContentLocale) : undefined;
-  const translationState = ["MISSING", "NOT_PUBLISHED"].includes(filters.translationState ?? "")
-    ? (filters.translationState as "MISSING" | "NOT_PUBLISHED")
+  const translationState = ["MISSING", "NOT_PUBLISHED", "NEEDS_REVIEW"].includes(filters.translationState ?? "")
+    ? (filters.translationState as "MISSING" | "NOT_PUBLISHED" | "NEEDS_REVIEW")
     : undefined;
   const seoState = ["READY", "MISSING"].includes(filters.seoState ?? "")
     ? (filters.seoState as "READY" | "MISSING")
     : undefined;
   const page = Math.max(1, Number.parseInt(filters.page ?? "1", 10) || 1);
-  const [productPage, stats, categories] = await Promise.all([
+  const [productPage, stats, categories, managerSession] = await Promise.all([
     getAdminProducts({ q: filters.q, status, kind, classification, locale, translationState, seoState, page }),
     getAdminProductStats(),
     getAdminProductCategoryOptions(),
+    databaseReady ? getProductManagerSession() : Promise.resolve(null),
   ]);
   const products = productPage.items;
   const defaultCategoryId = categories[0]?.id ?? "";
@@ -151,6 +158,7 @@ export default async function AdminProductsPage({
 
   const metrics = [
     { label: "产品总数", value: stats.total, detail: `${stats.published} 个已发布 · ${stats.draft} 个草稿`, icon: Package, tone: "text-zinc-100" },
+    { label: "语言待审核", value: stats.needsReview, detail: "存在等待人工审核的语言版本", icon: ShieldCheck, tone: stats.needsReview ? "text-blue-300" : "text-emerald-300" },
     { label: "未归类", value: stats.unclassified, detail: "尚未关联动态栏目", icon: FolderX, tone: stats.unclassified ? "text-rose-300" : "text-emerald-300" },
     { label: "翻译待完善", value: stats.missing, detail: `覆盖 ${contentLocales.length} 个语言版本`, icon: Languages, tone: stats.missing ? "text-amber-300" : "text-emerald-300" },
     { label: "SEO 待完善", value: stats.missingSeo, detail: "缺少本语言 SEO 标题或描述", icon: SearchCheck, tone: stats.missingSeo ? "text-violet-300" : "text-emerald-300" },
@@ -199,7 +207,7 @@ export default async function AdminProductsPage({
         </Alert>
       ) : null}
 
-      <section className="mt-5 grid gap-px overflow-hidden rounded-xl border border-white/[0.07] bg-white/[0.07] sm:grid-cols-2 xl:grid-cols-5">
+      <section className="mt-5 grid gap-px overflow-hidden rounded-xl border border-white/[0.07] bg-white/[0.07] sm:grid-cols-2 xl:grid-cols-6">
         {metrics.map(({ label, value, detail, icon: Icon, tone }) => (
           <div key={label} className="bg-[#111113] p-4">
             <div className="flex items-center justify-between">
@@ -212,7 +220,12 @@ export default async function AdminProductsPage({
         ))}
       </section>
 
-      <section className="mt-4 grid gap-3 lg:grid-cols-3" aria-label="产品运营待办">
+      <section className="mt-4 grid gap-3 lg:grid-cols-2 2xl:grid-cols-4" aria-label="产品运营待办">
+        <Link href={filteredHref({ classification: null, translationState: "NEEDS_REVIEW", seoState: null })} className="group flex items-center gap-3 rounded-xl border border-[#E4E7EC] bg-white p-4 transition-colors hover:border-[#B8C0CC]">
+          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-blue-50 text-blue-600"><ShieldCheck className="size-4" /></span>
+          <span className="min-w-0 flex-1"><span className="block text-sm font-medium text-[#172033]">审核语言内容</span><span className="mt-1 block text-xs text-[#667085]">{stats.needsReview ? `${stats.needsReview} 个产品等待审核` : "当前没有待审核内容"}</span></span>
+          <Search className="size-4 text-[#98A2B3] transition-colors group-hover:text-[#344054]" />
+        </Link>
         <Link href={filteredHref({ classification: "UNCLASSIFIED", translationState: null, seoState: null })} className="group flex items-center gap-3 rounded-xl border border-[#E4E7EC] bg-white p-4 transition-colors hover:border-[#B8C0CC]">
           <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-rose-50 text-rose-600"><FolderX className="size-4" /></span>
           <span className="min-w-0 flex-1"><span className="block text-sm font-medium text-[#172033]">处理未归类产品</span><span className="mt-1 block text-xs text-[#667085]">{stats.unclassified ? `${stats.unclassified} 个产品等待归类` : "所有产品均已归类"}</span></span>
@@ -313,6 +326,7 @@ export default async function AdminProductsPage({
           <select id="translationState" name="translationState" defaultValue={translationState || ""} className="admin-select h-8 px-2.5 text-xs xl:col-span-2">
             <option value="">全部翻译状态</option>
             <option value="MISSING">翻译缺失</option>
+            <option value="NEEDS_REVIEW">等待审核</option>
             <option value="NOT_PUBLISHED">尚未发布</option>
           </select>
           <select id="seoState" name="seoState" defaultValue={seoState || ""} className="admin-select h-8 px-2.5 text-xs xl:col-span-2">
@@ -344,6 +358,7 @@ export default async function AdminProductsPage({
         products={catalogProducts}
         categories={categories}
         databaseReady={databaseReady}
+        canDelete={managerSession?.role === AdminRole.OWNER}
         returnTo={returnTo}
         quickAction={updateProductListSettingsAction}
         quickCategoryAction={assignProductCategoryAction}

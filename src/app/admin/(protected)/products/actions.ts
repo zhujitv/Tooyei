@@ -3,19 +3,22 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { ContentStatus } from "@/generated/prisma/client";
+import { AdminRole, ContentStatus } from "@/generated/prisma/client";
 import { requireProductManagerSession } from "@/lib/admin-auth";
 import { isDatabaseConfigured } from "@/lib/db";
 import { safeWriteAuditLog } from "@/lib/repositories/audit-logs";
 import {
   assignProductsToCategory,
+  batchDeleteProducts,
+  batchReviewProducts,
   batchUpdateProducts,
   createProduct,
   fillMissingProductSeo,
+  ProductBatchOperationError,
   updateProductListSettings,
 } from "@/lib/repositories/admin-products";
 import { contentLocales, localizedPath } from "@/lib/site";
-import { logError } from "@/lib/observability";
+import { logError, logWarn } from "@/lib/observability";
 
 const slugSchema = z
   .string()
@@ -51,7 +54,7 @@ const quickCategorySchema = z.object({
 
 const batchSchema = z.object({
   slugs: z.array(slugSchema).min(1).max(200),
-  operation: z.enum(["PUBLISH", "DRAFT", "ARCHIVE", "FEATURE", "UNFEATURE", "ASSIGN_CATEGORY", "FILL_SEO"]),
+  operation: z.enum(["REVIEW", "PUBLISH", "DRAFT", "ARCHIVE", "FEATURE", "UNFEATURE", "ASSIGN_CATEGORY", "FILL_SEO", "DELETE"]),
   categoryId: z.string().optional(),
 });
 
@@ -208,20 +211,36 @@ export async function batchUpdateProductsAction(formData: FormData) {
     categoryId: formData.get("categoryId") || undefined,
   });
   if (!parsed.success) redirect(feedbackPath(formData, "error", "batch"));
+  if (parsed.data.operation === "DELETE" && session.role !== AdminRole.OWNER) {
+    logWarn("Batch product deletion denied", {
+      operation: "admin-product.batch-delete.permission",
+      actorEmail: session.email,
+      actorRole: session.role,
+    });
+    redirect(feedbackPath(formData, "error", "batch-delete-permission"));
+  }
 
   try {
-    let result: { count: number };
+    let result: { count: number; translationCount?: number; orphanedAssetCount?: number };
     if (parsed.data.operation === "ASSIGN_CATEGORY") {
       if (!parsed.data.categoryId) throw new Error("Category is required for batch assignment.");
       result = await assignProductsToCategory(parsed.data.slugs, parsed.data.categoryId);
     } else if (parsed.data.operation === "FILL_SEO") {
       result = await fillMissingProductSeo(parsed.data.slugs);
+    } else if (parsed.data.operation === "REVIEW") {
+      result = await batchReviewProducts(parsed.data.slugs);
+    } else if (parsed.data.operation === "DELETE") {
+      result = await batchDeleteProducts(parsed.data.slugs);
     } else {
       result = await batchUpdateProducts(parsed.data.slugs, parsed.data.operation);
     }
     await safeWriteAuditLog({
       actorEmail: session.email,
-      action: "product.batch_updated",
+      action: parsed.data.operation === "DELETE"
+        ? "product.batch_deleted"
+        : parsed.data.operation === "REVIEW"
+          ? "product.batch_reviewed"
+          : "product.batch_updated",
       entityType: "Product",
       entityId: parsed.data.slugs.join(","),
       metadata: {
@@ -229,11 +248,26 @@ export async function batchUpdateProductsAction(formData: FormData) {
         categoryId: parsed.data.categoryId,
         requested: parsed.data.slugs.length,
         updated: result.count,
+        ...(result.translationCount === undefined ? {} : { reviewedTranslations: result.translationCount }),
+        ...(result.orphanedAssetCount === undefined ? {} : { orphanedAssets: result.orphanedAssetCount }),
       },
     });
 
     revalidateProductAdminPaths(parsed.data.slugs);
   } catch (error) {
+    if (error instanceof ProductBatchOperationError) {
+      logWarn("Batch product operation rejected", {
+        operation: "admin-product.batch-update.validation",
+        batchOperation: parsed.data.operation,
+        reason: error.code,
+      }, error);
+      const feedback = error.code === "DELETE_BLOCKED"
+        ? "batch-delete-blocked"
+        : error.code === "NOTHING_TO_REVIEW"
+          ? "batch-review-empty"
+          : "batch-stale";
+      redirect(feedbackPath(formData, "error", feedback));
+    }
     logError("Batch update products failed", { operation: "admin-product.batch-update" }, error);
     redirect(feedbackPath(formData, "error", "batch"));
   }

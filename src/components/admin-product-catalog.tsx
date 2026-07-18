@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { useFormStatus } from "react-dom";
+import { AlertDialog } from "radix-ui";
 import {
   Check,
   CircleAlert,
@@ -12,10 +14,13 @@ import {
   ImageIcon,
   Languages,
   List,
+  LoaderCircle,
   MoreHorizontal,
   Save,
   SearchX,
+  ShieldCheck,
   Sparkles,
+  Trash2,
 } from "lucide-react";
 import type { ContentStatus, ProductKind, TranslationStatus } from "@/generated/prisma/client";
 import type { AdminProductCategoryOption, BatchProductOperation } from "@/lib/repositories/admin-products";
@@ -57,6 +62,7 @@ type Props = {
   products: ProductCatalogItem[];
   categories: AdminProductCategoryOption[];
   databaseReady: boolean;
+  canDelete: boolean;
   returnTo: string;
   quickAction: (formData: FormData) => Promise<void>;
   quickCategoryAction: (formData: FormData) => Promise<void>;
@@ -254,10 +260,29 @@ function QuickSettings({
   );
 }
 
-export function AdminProductCatalog({ products, categories, databaseReady, returnTo, quickAction, quickCategoryAction, batchAction }: Props) {
+function BatchSubmitButton({ operation, disabled }: { operation: BatchProductOperation; disabled: boolean }) {
+  const { pending } = useFormStatus();
+  const destructive = operation === "DELETE";
+  return (
+    <Button
+      type="submit"
+      size="sm"
+      disabled={disabled || pending}
+      className={destructive ? "bg-rose-600 text-white hover:bg-rose-500" : "bg-zinc-100 text-zinc-950 hover:bg-white"}
+    >
+      {pending ? <LoaderCircle className="animate-spin" /> : operation === "REVIEW" ? <ShieldCheck /> : destructive ? <Trash2 /> : null}
+      {pending ? "处理中…" : destructive ? "删除产品" : "应用操作"}
+    </Button>
+  );
+}
+
+export function AdminProductCatalog({ products, categories, databaseReady, canDelete, returnTo, quickAction, quickCategoryAction, batchAction }: Props) {
   const [view, setView] = useState<"grid" | "list">("grid");
   const [selected, setSelected] = useState<string[]>([]);
   const [batchOperation, setBatchOperation] = useState<BatchProductOperation>("PUBLISH");
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const batchFormRef = useRef<HTMLFormElement>(null);
+  const confirmedDeleteRef = useRef(false);
   const selectedSet = useMemo(() => new Set(selected), [selected]);
   const allSelected = products.length > 0 && selected.length === products.length;
 
@@ -381,7 +406,16 @@ export function AdminProductCatalog({ products, categories, databaseReady, retur
 
       {selected.length > 0 ? (
         <form
+          ref={batchFormRef}
           action={batchAction}
+          onSubmit={(event) => {
+            if (batchOperation === "DELETE" && !confirmedDeleteRef.current) {
+              event.preventDefault();
+              setDeleteOpen(true);
+              return;
+            }
+            confirmedDeleteRef.current = false;
+          }}
           className="fixed bottom-5 left-1/2 z-40 flex w-[min(calc(100%-2rem),620px)] -translate-x-1/2 flex-wrap items-center gap-2 rounded-xl border border-white/[0.12] bg-[#1a1a1d]/95 p-2.5 shadow-[0_20px_70px_rgba(0,0,0,0.55)] backdrop-blur-xl lg:left-[calc(50%+7.5rem)]"
         >
           {selected.map((slug) => <input key={slug} type="hidden" name="slugs" value={slug} />)}
@@ -390,7 +424,8 @@ export function AdminProductCatalog({ products, categories, databaseReady, retur
             <span className="grid size-5 place-items-center rounded bg-violet-400 text-[10px] font-bold text-violet-950">{selected.length}</span>
             已选择
           </div>
-          <select name="operation" className="admin-select h-8 min-w-36 flex-1 px-2 text-xs" value={batchOperation} onChange={(event) => setBatchOperation(event.target.value as BatchProductOperation)}>
+          <select name="operation" className={cn("admin-select h-8 min-w-36 flex-1 px-2 text-xs", batchOperation === "DELETE" && "border-rose-500/40 text-rose-300")} value={batchOperation} onChange={(event) => setBatchOperation(event.target.value as BatchProductOperation)}>
+            <option value="REVIEW">批量审核通过</option>
             <option value="PUBLISH">批量发布</option>
             <option value="DRAFT">设为草稿</option>
             <option value="ARCHIVE">批量归档</option>
@@ -398,20 +433,51 @@ export function AdminProductCatalog({ products, categories, databaseReady, retur
             <option value="UNFEATURE">取消精选</option>
             <option value="ASSIGN_CATEGORY">批量归类</option>
             <option value="FILL_SEO">补齐已有翻译 SEO</option>
+            {canDelete ? <option value="DELETE">永久删除</option> : null}
           </select>
           {batchOperation === "ASSIGN_CATEGORY" ? (
             <select name="categoryId" required className="admin-select h-8 min-w-44 flex-1 px-2 text-xs" defaultValue={categories[0]?.id}>
               {categories.map((category) => <option key={category.id} value={category.id}>{category.depth ? "↳ " : ""}{category.label}{category.isActive ? "" : "（停用）"}</option>)}
             </select>
           ) : null}
-          <Button type="submit" size="sm" disabled={!databaseReady} className="bg-zinc-100 text-zinc-950 hover:bg-white">
-            应用操作
-          </Button>
+          <BatchSubmitButton operation={batchOperation} disabled={!databaseReady} />
           <Button type="button" size="sm" variant="ghost" onClick={() => setSelected([])} className="text-zinc-500 hover:bg-white/[0.06] hover:text-zinc-200">
             取消
           </Button>
+          {batchOperation === "REVIEW" ? (
+            <p className="basis-full px-2 text-[10px] text-zinc-500">审核通过会批准待审核语言版本；产品仍需执行“批量发布”后才会公开。</p>
+          ) : null}
         </form>
       ) : null}
+
+      <AlertDialog.Root open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialog.Portal>
+          <AlertDialog.Overlay className="fixed inset-0 z-[100] bg-[#101828]/45 backdrop-blur-[2px]" />
+          <AlertDialog.Content className="fixed left-1/2 top-1/2 z-[101] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-xl border border-[#E4E7EC] bg-white p-6 shadow-2xl">
+            <div className="grid size-10 place-items-center rounded-full bg-rose-50 text-rose-600"><Trash2 className="size-5" /></div>
+            <AlertDialog.Title className="mt-4 text-lg font-semibold text-[#172033]">永久删除 {selected.length} 个产品？</AlertDialog.Title>
+            <AlertDialog.Description className="mt-2 text-sm leading-6 text-[#667085]">
+              产品资料、语言内容、图片关联和结构化内容将一并删除，且无法恢复。有关联询盘或翻译任务的产品会被系统阻止删除。
+            </AlertDialog.Description>
+            <div className="mt-6 flex justify-end gap-2">
+              <AlertDialog.Cancel asChild><Button type="button" variant="outline">取消</Button></AlertDialog.Cancel>
+              <AlertDialog.Action asChild>
+                <Button
+                  type="button"
+                  className="bg-rose-600 text-white hover:bg-rose-500"
+                  onClick={() => {
+                    confirmedDeleteRef.current = true;
+                    setDeleteOpen(false);
+                    batchFormRef.current?.requestSubmit();
+                  }}
+                >
+                  <Trash2 />确认永久删除
+                </Button>
+              </AlertDialog.Action>
+            </div>
+          </AlertDialog.Content>
+        </AlertDialog.Portal>
+      </AlertDialog.Root>
     </section>
   );
 }

@@ -54,6 +54,9 @@
 }
 
 :root {
+  --font-inter: "Inter", "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-geist-mono: "SFMono-Regular", "Roboto Mono", Consolas, "Liberation Mono", monospace;
+  --font-noto-sans-sc: "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei UI", "Microsoft YaHei", "Hiragino Sans GB", sans-serif;
   --navy: #08111f;
   --navy-soft: #111b2b;
   --ivory: #f4f1ea;

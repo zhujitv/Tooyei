@@ -1,31 +1,9 @@
 import type { Metadata } from "next";
-import { Geist_Mono, Inter, Noto_Sans_SC } from "next/font/google";
 import { headers } from "next/headers";
 import "./globals.css";
 import { safeMetadata } from "@/lib/metadata";
 import { getPublicSiteSettings } from "@/lib/repositories/site-settings";
 import { isLocale, localeDirection } from "@/lib/site";
-
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin", "cyrillic"],
-  display: "swap",
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin", "cyrillic"],
-  display: "swap",
-});
-
-const notoSansSC = Noto_Sans_SC({
-  variable: "--font-noto-sans-sc",
-  weight: "variable",
-  display: "swap",
-  preload: false,
-  adjustFontFallback: false,
-  fallback: ["PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", "sans-serif"],
-});
 
 export async function generateMetadata(): Promise<Metadata> {
   return safeMetadata("layout.root.metadata", async () => {
@@ -57,7 +35,7 @@ export default async function RootLayout({
       lang={locale === "zh" ? "zh-CN" : locale}
       dir={localeDirection(locale)}
       data-scroll-behavior="smooth"
-      className={`${inter.variable} ${geistMono.variable} ${notoSansSC.variable} h-full antialiased`}
+      className="h-full antialiased"
     >
       <body className="min-h-full flex flex-col antialiased">{children}</body>
     </html>

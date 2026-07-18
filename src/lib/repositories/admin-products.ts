@@ -151,7 +151,7 @@ export type AdminProductFilters = {
   kind?: ProductKind;
   classification?: "CLASSIFIED" | "UNCLASSIFIED";
   locale?: ContentLocale;
-  translationState?: "MISSING" | "NOT_PUBLISHED";
+  translationState?: "MISSING" | "NOT_PUBLISHED" | "NEEDS_REVIEW";
   seoState?: "READY" | "MISSING";
   page?: number;
   pageSize?: number;
@@ -199,13 +199,30 @@ export type UpdateProductListSettingsInput = {
 };
 
 export type BatchProductOperation =
+  | "REVIEW"
   | "PUBLISH"
   | "DRAFT"
   | "ARCHIVE"
   | "FEATURE"
   | "UNFEATURE"
   | "ASSIGN_CATEGORY"
-  | "FILL_SEO";
+  | "FILL_SEO"
+  | "DELETE";
+
+export type ProductBatchOperationErrorCode =
+  | "STALE_SELECTION"
+  | "NOTHING_TO_REVIEW"
+  | "DELETE_BLOCKED";
+
+export class ProductBatchOperationError extends Error {
+  constructor(
+    public readonly code: ProductBatchOperationErrorCode,
+    message: string,
+  ) {
+    super(message);
+    this.name = "ProductBatchOperationError";
+  }
+}
 
 export type UpdateProductCoreInput = {
   slug: string;
@@ -751,6 +768,12 @@ const missingTranslationWhere = (locale?: ContentLocale, publishedOnly = false):
   OR: translationLocalesFor(locale).map((item) => ({ NOT: hasUsableTranslation(item, publishedOnly) })),
 });
 
+const needsReviewTranslationWhere = (locale?: ContentLocale): Prisma.ProductWhereInput => ({
+  OR: translationLocalesFor(locale).map((item) => ({
+    translations: { some: { locale: localeMap[item], status: TranslationStatus.NEEDS_REVIEW } },
+  })),
+});
+
 const missingSeoWhere = (locale?: ContentLocale): Prisma.ProductWhereInput => ({
   OR: translationLocalesFor(locale).map((item) => ({ NOT: hasSeoTranslation(item) })),
 });
@@ -763,7 +786,9 @@ const buildWhere = (filters: AdminProductFilters = {}): Prisma.ProductWhereInput
   if (filters.kind) clauses.push({ kind: filters.kind });
   if (filters.classification === "CLASSIFIED") clauses.push({ categoryAssignments: { some: {} } });
   if (filters.classification === "UNCLASSIFIED") clauses.push({ categoryAssignments: { none: {} } });
-  if (filters.translationState) {
+  if (filters.translationState === "NEEDS_REVIEW") {
+    clauses.push(needsReviewTranslationWhere(filters.locale));
+  } else if (filters.translationState) {
     clauses.push(missingTranslationWhere(filters.locale, filters.translationState === "NOT_PUBLISHED"));
   }
   if (filters.seoState === "MISSING") clauses.push(missingSeoWhere(filters.locale));
@@ -790,6 +815,10 @@ const applySampleFilters = (products: AdminProductSummary[], filters: AdminProdu
     if (
       filters.translationState === "NOT_PUBLISHED" &&
       !localesToCheck.some((locale) => product.translationStates[locale] !== TranslationStatus.PUBLISHED)
+    ) return false;
+    if (
+      filters.translationState === "NEEDS_REVIEW" &&
+      !localesToCheck.some((locale) => product.translationStates[locale] === TranslationStatus.NEEDS_REVIEW)
     ) return false;
     if (filters.seoState === "MISSING" && product.seoReadyTranslations === contentLocales.length) return false;
     if (filters.seoState === "READY" && product.seoReadyTranslations !== contentLocales.length) return false;
@@ -1091,7 +1120,7 @@ export async function batchUpdateProducts(slugs: string[], operation: BatchProdu
     throw new Error("DATABASE_URL is required before products can be updated.");
   }
 
-  if (operation === "ASSIGN_CATEGORY" || operation === "FILL_SEO") {
+  if (operation === "ASSIGN_CATEGORY" || operation === "FILL_SEO" || operation === "REVIEW" || operation === "DELETE") {
     throw new Error("This batch operation requires its dedicated handler.");
   }
 
@@ -1110,6 +1139,159 @@ export async function batchUpdateProducts(slugs: string[], operation: BatchProdu
     where: { slug: { in: slugs } },
     data,
   });
+}
+
+const selectedProductsOrThrow = async (
+  prisma: Prisma.TransactionClient,
+  slugs: string[],
+) => {
+  const uniqueSlugs = Array.from(new Set(slugs));
+  const products = await prisma.product.findMany({
+    where: { slug: { in: uniqueSlugs } },
+    select: {
+      id: true,
+      slug: true,
+      sku: true,
+      _count: { select: { inquiries: true, translationJobItems: true } },
+    },
+  });
+  if (products.length !== uniqueSlugs.length) {
+    throw new ProductBatchOperationError("STALE_SELECTION", "One or more selected products no longer exist.");
+  }
+  return products;
+};
+
+export async function batchReviewProducts(slugs: string[]) {
+  if (!isDatabaseConfigured()) {
+    throw new Error("DATABASE_URL is required before products can be reviewed.");
+  }
+
+  return getPrisma().$transaction(async (prisma) => {
+    const products = await selectedProductsOrThrow(prisma, slugs);
+    const translations = await prisma.productTranslation.findMany({
+      where: {
+        productId: { in: products.map(({ id }) => id) },
+        status: TranslationStatus.NEEDS_REVIEW,
+      },
+      select: {
+        id: true,
+        productId: true,
+        title: true,
+        summary: true,
+        seoTitle: true,
+        seoDescription: true,
+      },
+    });
+    const completeTranslations = translations.filter(
+      ({ title, summary, seoTitle, seoDescription }) =>
+        title.trim().length > 0 &&
+        summary.trim().length > 0 &&
+        Boolean(seoTitle?.trim()) &&
+        Boolean(seoDescription?.trim()),
+    );
+    if (!completeTranslations.length) {
+      throw new ProductBatchOperationError("NOTHING_TO_REVIEW", "Selected products have no complete translations awaiting review.");
+    }
+
+    const result = await prisma.productTranslation.updateMany({
+      where: { id: { in: completeTranslations.map(({ id }) => id) } },
+      data: { status: TranslationStatus.PUBLISHED, publishedAt: new Date() },
+    });
+    return {
+      count: new Set(completeTranslations.map(({ productId }) => productId)).size,
+      translationCount: result.count,
+    };
+  });
+}
+
+export async function batchDeleteProducts(slugs: string[]) {
+  if (!isDatabaseConfigured()) {
+    throw new Error("DATABASE_URL is required before products can be deleted.");
+  }
+
+  try {
+    return await getPrisma().$transaction(async (prisma) => {
+      const products = await selectedProductsOrThrow(prisma, slugs);
+      const blocked = products.filter(({ _count }) => _count.inquiries > 0 || _count.translationJobItems > 0);
+      if (blocked.length) {
+        const summary = blocked
+          .slice(0, 5)
+          .map(({ sku, _count }) => `${sku}（询盘 ${_count.inquiries}，翻译任务 ${_count.translationJobItems}）`)
+          .join("；");
+        throw new ProductBatchOperationError(
+          "DELETE_BLOCKED",
+          `以下产品仍有关联记录，不能删除：${summary}${blocked.length > 5 ? `；另有 ${blocked.length - 5} 个产品` : ""}`,
+        );
+      }
+
+      const productIds = products.map(({ id }) => id);
+      const assetLinks = await prisma.product.findMany({
+        where: { id: { in: productIds } },
+        select: {
+          primaryImageId: true,
+          media: { select: { assetId: true } },
+          applications: { select: { imageAssetId: true } },
+          downloads: { select: { assetId: true } },
+        },
+      });
+      const candidateAssetIds = Array.from(new Set(assetLinks.flatMap((product) => [
+        product.primaryImageId,
+        ...product.media.map(({ assetId }) => assetId),
+        ...product.applications.map(({ imageAssetId }) => imageAssetId),
+        ...product.downloads.map(({ assetId }) => assetId),
+      ].filter((assetId): assetId is string => Boolean(assetId)))));
+
+      const deleted = await prisma.product.deleteMany({ where: { id: { in: productIds } } });
+      if (!candidateAssetIds.length) return { ...deleted, orphanedAssetCount: 0 };
+
+      const unreferencedAssets = await prisma.mediaAsset.findMany({
+        where: {
+          id: { in: candidateAssetIds },
+          deletedAt: null,
+          products: { none: {} },
+          primaryFor: { none: {} },
+          applications: { none: {} },
+          downloads: { none: {} },
+          categoryCovers: { none: {} },
+        },
+        select: { id: true, url: true },
+      });
+      const legacyCategoryCovers = unreferencedAssets.length
+        ? await prisma.category.findMany({
+            where: {
+              coverAssetId: null,
+              coverImage: { in: unreferencedAssets.map(({ url }) => url) },
+            },
+            select: { coverImage: true },
+          })
+        : [];
+      const legacyCoverUrls = new Set(legacyCategoryCovers.map(({ coverImage }) => coverImage).filter(Boolean));
+      const orphanedAssetIds = unreferencedAssets
+        .filter(({ url }) => !legacyCoverUrls.has(url))
+        .map(({ id }) => id);
+      const orphanedAssets = orphanedAssetIds.length
+        ? await prisma.mediaAsset.updateMany({
+            where: { id: { in: orphanedAssetIds } },
+            data: { orphanedAt: new Date() },
+          })
+        : { count: 0 };
+
+      return { ...deleted, orphanedAssetCount: orphanedAssets.count };
+    });
+  } catch (error) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === "P2003"
+    ) {
+      throw new ProductBatchOperationError(
+        "DELETE_BLOCKED",
+        "One or more selected products gained a protected reference while deletion was in progress.",
+      );
+    }
+    throw error;
+  }
 }
 
 export async function assignProductsToCategory(slugs: string[], categoryId: string) {
