@@ -122,7 +122,7 @@ export async function SiteFooter({ locale }: { locale: Locale }) {
               <Image src="/brand/tooyei-logo-white.png" alt="TOOYEI" width={760} height={190} className="h-11 w-auto object-contain" />
             </Link>
             <p className="mt-6 max-w-sm text-sm leading-7 text-white/48">{labels.description}</p>
-            <SocialLinks links={socialLinks} className="mt-6" linkClassName="size-11 border border-white/10 text-white/55 hover:border-[var(--gold)]/45 hover:text-white" />
+            <SocialLinks variant="footer" links={socialLinks} className="mt-6" linkClassName="size-11 border border-white/10 text-white/55 hover:border-[var(--gold)]/45 hover:text-white" />
           </div>
 
           <div>

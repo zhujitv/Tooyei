@@ -291,7 +291,7 @@ export function SiteHeader({ locale, initialCategories = [], initialSettings }: 
           <div className="flex items-center gap-3">
             <a href={`mailto:${settings.email}`} className="hidden transition-colors hover:text-[var(--gold)] sm:inline-flex">{settings.email}</a>
             <span className="hidden h-3 w-px bg-white/15 sm:block" />
-            <SocialLinks linkClassName="size-7 min-h-0 text-white/60 hover:text-white" />
+            <SocialLinks variant="header" linkClassName="size-7 min-h-0 text-white/60 hover:text-white" />
           </div>
         </div>
       </div>
@@ -372,7 +372,7 @@ export function SiteHeader({ locale, initialCategories = [], initialSettings }: 
                 </nav>
                 <div className="py-7"><p className="mb-3 text-[0.62rem] font-bold uppercase tracking-[0.18em] text-white/35">{labels.languages}</p><div className="grid grid-cols-2 gap-2">{locales.map((language) => <SheetClose key={language} asChild><LanguagePreferenceLink locale={language} href={languagePath(language)} className={cn("flex min-h-11 items-center justify-center gap-2 border border-white/10 px-3 text-xs font-semibold text-white/55", language === locale && "border-[var(--gold)]/60 text-[var(--gold)]")}><span aria-hidden>{languageMarkers[language]}</span>{languageNames[language]}</LanguagePreferenceLink></SheetClose>)}</div></div>
               </div>
-              <div className="border-t border-white/10 p-6"><p className="text-sm font-semibold">{labels.contactLead}</p><p className="mt-1 text-xs leading-5 text-white/45">{labels.contactHelp}</p><SheetClose asChild><Link href={localizedPath(locale, "/contact")} className="mt-5 flex min-h-12 items-center justify-between bg-[var(--gold)] px-5 text-sm font-bold text-[var(--navy)] transition hover:bg-[var(--gold-hover)]">{labels.quote}<ArrowUpRight className="size-4" /></Link></SheetClose><SocialLinks className="mt-5" linkClassName="size-11 border border-white/10 text-white/55 hover:text-white" /></div>
+              <div className="border-t border-white/10 p-6"><p className="text-sm font-semibold">{labels.contactLead}</p><p className="mt-1 text-xs leading-5 text-white/45">{labels.contactHelp}</p><SheetClose asChild><Link href={localizedPath(locale, "/contact")} className="mt-5 flex min-h-12 items-center justify-between bg-[var(--gold)] px-5 text-sm font-bold text-[var(--navy)] transition hover:bg-[var(--gold-hover)]">{labels.quote}<ArrowUpRight className="size-4" /></Link></SheetClose><SocialLinks variant="header" className="mt-5" linkClassName="size-11 border border-white/10 text-white/55 hover:text-white" /></div>
             </SheetContent>
           </Sheet>
         </div>

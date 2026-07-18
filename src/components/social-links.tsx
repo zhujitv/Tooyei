@@ -1,24 +1,29 @@
 "use client";
 
 import Image from "next/image";
-import { ArrowUpRight } from "lucide-react";
 import { useEffect, useState } from "react";
-import { socialIconImages, visibleSocialLinks, type PublicSocialLink } from "@/config/social";
+import {
+  socialIconImages,
+  socialLinkVariants,
+  visibleSocialLinks,
+  type PublicSocialLink,
+  type SocialLinkVariant,
+} from "@/config/social";
 import { fetchWithRetry } from "@/lib/fetch-with-retry";
 import { cn } from "@/lib/utils";
 
 export function SocialLinks({
   showLabels = false,
-  showArrow = false,
   className,
   linkClassName,
   links,
+  variant,
 }: {
   showLabels?: boolean;
-  showArrow?: boolean;
   className?: string;
   linkClassName?: string;
   links?: PublicSocialLink[];
+  variant: SocialLinkVariant;
 }) {
   const [resolvedLinks, setResolvedLinks] = useState<PublicSocialLink[]>(links ?? visibleSocialLinks);
 
@@ -34,11 +39,16 @@ export function SocialLinks({
     return () => controller.abort();
   }, [links]);
 
-  if (resolvedLinks.length === 0) return null;
+  const displayedLinks = socialLinkVariants[variant].flatMap((platform) => {
+    const link = resolvedLinks.find(({ key }) => key === platform);
+    return link ? [link] : [];
+  });
+
+  if (displayedLinks.length === 0) return null;
 
   return (
     <div className={cn("flex items-center gap-2", className)}>
-      {resolvedLinks.map(({ id, key, label, href }) => {
+      {displayedLinks.map(({ id, key, label, href }) => {
         const icon = socialIconImages[key] ?? socialIconImages.other;
 
         return (
@@ -54,12 +64,9 @@ export function SocialLinks({
             )}
           >
             <span className="grid size-5 shrink-0 place-items-center rounded-full bg-white p-1 shadow-sm ring-1 ring-black/5 transition-transform duration-300 group-hover:-translate-y-0.5">
-              <Image src={icon.src} alt="" width={14} height={14} className="size-3.5 object-contain" aria-hidden="true" />
+              <Image src={icon.src} alt="" width={14} height={14} className="object-contain" aria-hidden="true" />
             </span>
             {showLabels ? <span>{label}</span> : null}
-            {showArrow ? (
-              <ArrowUpRight className="ml-auto size-3.5 text-current/40 transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
-            ) : null}
           </a>
         );
       })}

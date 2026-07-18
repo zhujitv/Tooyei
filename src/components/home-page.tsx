@@ -47,7 +47,7 @@ type HomeCopy = {
   oem: { eyebrow: string; title: string; body: string; steps: Array<[string, string]>; action: string };
   why: { eyebrow: string; title: string; body: string; values: Array<[string, string]> };
   support: { eyebrow: string; title: string; body: string; cards: Array<[string, string]>; action: string };
-  global: { eyebrow: string; title: string; body: string; markets: string; follow: string };
+  global: { eyebrow: string; title: string; body: string; markets: string };
   newsletter: { eyebrow: string; title: string; body: string };
   cta: { eyebrow: string; title: string; body: string; action: string };
 };
@@ -121,7 +121,6 @@ const homeCopy: Record<ContentLocale, HomeCopy> = {
       title: "面向全球市场",
       body: "为进口商、分销商、工程采购和自有品牌客户提供地板产品与 OEM 支持。",
       markets: "Europe · North America · Australia · Middle East · Asia",
-      follow: "Follow TOOYEI",
     },
     newsletter: { eyebrow: "Stay Updated", title: "保持产品信息同步。", body: "获取新品系列、设计灵感与产品资料更新。" },
     cta: {
@@ -155,7 +154,7 @@ const homeCopy: Record<ContentLocale, HomeCopy> = {
     oem: { eyebrow: "OEM / ODM collaboration", title: "A clear path from brief to delivery.", body: "We translate market positioning, construction, decor, locking, backing, packaging and documentation into an actionable programme.", steps: [["Confirm the brief", "Market, application, price point and target specification"], ["Match the product", "Construction, decor, surface, locking and backing"], ["Approve samples", "Physical finish, specification, packaging and data"], ["Produce & deliver", "Quality checks, export packing and shipment support"]], action: "Send a project brief" },
     why: { eyebrow: "Brand values", title: "Why TOOYEI", body: "Clear product systems and coordinated project work—without inflated scale claims.", values: [["Stable product systems", "Clear product families built around mainstream constructions and applications."], ["Flexible customization", "Colour, surface, construction, packaging and private-label options."], ["Clear collaboration", "One team coordinates the brief, sampling and production delivery."], ["Export market focus", "Careful documentation, packaging, communication and delivery support."]] },
     support: { eyebrow: "Sourcing support", title: "Better information. Faster project conversations.", body: "Specifications, samples and OEM requirements are coordinated by one team to reduce friction.", cards: [["Product catalogue", "Browse existing products by system, decor and application."], ["Technical information", "Request construction, specification and performance details."], ["Sample planning", "Plan samples around your market and project direction."], ["OEM project brief", "Share product, specification, packaging and market needs."]], action: "Request access" },
-    global: { eyebrow: "GLOBAL BUSINESS", title: "Built for global markets", body: "Flooring products and OEM support for importers, distributors, project buyers and private-label brands.", markets: "Europe · North America · Australia · Middle East · Asia", follow: "Follow TOOYEI" },
+    global: { eyebrow: "GLOBAL BUSINESS", title: "Built for global markets", body: "Flooring products and OEM support for importers, distributors, project buyers and private-label brands.", markets: "Europe · North America · Australia · Middle East · Asia" },
     newsletter: { eyebrow: "Stay Updated", title: "Keep product information within reach.", body: "Receive updates on new collections, design directions and product materials." },
     cta: { eyebrow: "START A PROJECT", title: "Let’s build a more\nreliable flooring programme.", body: "Product selection, OEM development and export collaboration for wholesale, projects and private-label brands.", action: "Start a project" },
   },
@@ -169,7 +168,7 @@ const homeCopy: Record<ContentLocale, HomeCopy> = {
     oem: { eyebrow: "Colaboración OEM / ODM", title: "Del briefing a la entrega, con claridad.", body: "Convertimos mercado, estructura, diseño, cierre, base, embalaje y documentación en un programa viable.", steps: [["Confirmar requisitos", "Mercado, uso, precio y especificación"], ["Definir producto", "Estructura, diseño, superficie, cierre y base"], ["Aprobar muestras", "Acabado, especificaciones, embalaje y datos"], ["Producir y entregar", "Calidad, embalaje de exportación y envío"]], action: "Enviar proyecto" },
     why: { eyebrow: "Valores de marca", title: "Por qué TOOYEI", body: "Sistemas claros y coordinación de proyecto sin afirmaciones exageradas.", values: [["Sistemas estables", "Familias claras para estructuras y aplicaciones habituales."], ["Personalización flexible", "Color, superficie, estructura, embalaje y marca privada."], ["Colaboración clara", "Un equipo coordina requisitos, muestras y producción."], ["Enfoque exportador", "Documentación, embalaje, comunicación y entrega."]] },
     support: { eyebrow: "Soporte de compras", title: "Mejor información. Proyectos más ágiles.", body: "Especificaciones, muestras y OEM coordinados por un único equipo.", cards: [["Catálogo", "Productos por sistema, diseño y aplicación."], ["Información técnica", "Estructura, especificaciones y rendimiento."], ["Plan de muestras", "Muestras según mercado y proyecto."], ["Formulario OEM", "Producto, especificación, embalaje y mercado."]], action: "Solicitar" },
-    global: { eyebrow: "GLOBAL BUSINESS", title: "Para mercados globales", body: "Productos y soporte OEM para importadores, distribuidores, proyectos y marcas privadas.", markets: "Europe · North America · Australia · Middle East · Asia", follow: "Follow TOOYEI" },
+    global: { eyebrow: "GLOBAL BUSINESS", title: "Para mercados globales", body: "Productos y soporte OEM para importadores, distribuidores, proyectos y marcas privadas.", markets: "Europe · North America · Australia · Middle East · Asia" },
     newsletter: { eyebrow: "Stay Updated", title: "Información de producto siempre disponible.", body: "Nuevas colecciones, inspiración y materiales de producto." },
     cta: { eyebrow: "START A PROJECT", title: "Construyamos un programa\nde suelos más fiable.", body: "Selección, desarrollo OEM y colaboración de exportación para mayoristas, proyectos y marcas privadas.", action: "Iniciar proyecto" },
   },
@@ -183,7 +182,7 @@ const homeCopy: Record<ContentLocale, HomeCopy> = {
     oem: { eyebrow: "OEM / ODM Zusammenarbeit", title: "Ein klarer Weg vom Briefing zur Lieferung.", body: "Wir übersetzen Markt, Aufbau, Dekor, Verriegelung, Unterlage, Verpackung und Dokumentation in ein umsetzbares Programm.", steps: [["Anforderungen klären", "Markt, Anwendung, Preis und Spezifikation"], ["Produkt abstimmen", "Aufbau, Dekor, Oberfläche, Klick und Unterlage"], ["Muster freigeben", "Oberfläche, Daten, Verpackung und Dokumente"], ["Produzieren & liefern", "Qualität, Exportverpackung und Versand"]], action: "Projekt anfragen" },
     why: { eyebrow: "Markenwerte", title: "Warum TOOYEI", body: "Klare Produktsysteme und koordinierte Projektarbeit ohne übertriebene Versprechen.", values: [["Stabile Produktsysteme", "Klare Familien für marktübliche Aufbauten und Anwendungen."], ["Flexible Anpassung", "Farbe, Oberfläche, Aufbau, Verpackung und Eigenmarke."], ["Klare Zusammenarbeit", "Ein Team koordiniert Briefing, Muster und Produktion."], ["Exportmarktfokus", "Dokumentation, Verpackung, Kommunikation und Lieferung."]] },
     support: { eyebrow: "Einkaufssupport", title: "Bessere Daten. Schnellere Projekte.", body: "Spezifikationen, Muster und OEM-Anforderungen werden von einem Team koordiniert.", cards: [["Produktkatalog", "Produkte nach System, Dekor und Anwendung."], ["Technische Daten", "Aufbau, Spezifikation und Leistung."], ["Musterplanung", "Muster für Markt und Projekt."], ["OEM-Projektbrief", "Produkt, Spezifikation, Verpackung und Markt."]], action: "Anfragen" },
-    global: { eyebrow: "GLOBAL BUSINESS", title: "Für globale Märkte", body: "Produkte und OEM-Support für Importeure, Händler, Projekte und Eigenmarken.", markets: "Europe · North America · Australia · Middle East · Asia", follow: "Follow TOOYEI" },
+    global: { eyebrow: "GLOBAL BUSINESS", title: "Für globale Märkte", body: "Produkte und OEM-Support für Importeure, Händler, Projekte und Eigenmarken.", markets: "Europe · North America · Australia · Middle East · Asia" },
     newsletter: { eyebrow: "Stay Updated", title: "Produktinformationen immer griffbereit.", body: "Updates zu Kollektionen, Designrichtungen und Produktunterlagen." },
     cta: { eyebrow: "START A PROJECT", title: "Entwickeln wir ein\nverlässliches Bodenprogramm.", body: "Produktauswahl, OEM-Entwicklung und Exportunterstützung für Großhandel, Projekte und Eigenmarken.", action: "Projekt starten" },
   },
@@ -197,7 +196,7 @@ const homeCopy: Record<ContentLocale, HomeCopy> = {
     oem: { eyebrow: "Collaboration OEM / ODM", title: "Un parcours clair, du brief à la livraison.", body: "Nous transformons le positionnement marché, la structure, le décor, le verrouillage, la sous-couche, l’emballage et la documentation en programme réalisable.", steps: [["Confirmer le brief", "Marché, usage, prix et spécification cible"], ["Définir le produit", "Structure, décor, surface, verrouillage et sous-couche"], ["Valider les échantillons", "Finition, spécification, emballage et données"], ["Produire et livrer", "Contrôle qualité, emballage export et expédition"]], action: "Envoyer un projet" },
     why: { eyebrow: "Valeurs de marque", title: "Pourquoi TOOYEI", body: "Des systèmes produits clairs et une coordination de projet unifiée, sans promesses de taille exagérées.", values: [["Systèmes produits stables", "Des familles claires pour les structures et usages principaux."], ["Personnalisation flexible", "Couleur, surface, structure, emballage et marque privée."], ["Collaboration claire", "Une équipe coordonne le brief, les échantillons et la production."], ["Orientation export", "Documentation, emballage, communication et livraison soignés."]] },
     support: { eyebrow: "Aide à l’approvisionnement", title: "De meilleures informations. Des échanges plus rapides.", body: "Spécifications, échantillons et besoins OEM sont coordonnés par une seule équipe.", cards: [["Catalogue produits", "Parcourir les produits par système, décor et application."], ["Informations techniques", "Demander structure, spécifications et performances."], ["Planification des échantillons", "Préparer les échantillons selon le marché et le projet."], ["Brief OEM", "Partager produit, spécification, emballage et marché."]], action: "Demander l’accès" },
-    global: { eyebrow: "ACTIVITÉ MONDIALE", title: "Conçu pour les marchés mondiaux", body: "Produits de sol et accompagnement OEM pour importateurs, distributeurs, acheteurs de projets et marques privées.", markets: "Europe · Amérique du Nord · Australie · Moyen-Orient · Asie", follow: "Suivre TOOYEI" },
+    global: { eyebrow: "ACTIVITÉ MONDIALE", title: "Conçu pour les marchés mondiaux", body: "Produits de sol et accompagnement OEM pour importateurs, distributeurs, acheteurs de projets et marques privées.", markets: "Europe · Amérique du Nord · Australie · Moyen-Orient · Asie" },
     newsletter: { eyebrow: "RESTEZ INFORMÉ", title: "Gardez les informations produits à portée de main.", body: "Recevez les nouveautés collections, orientations design et documentations produits." },
     cta: { eyebrow: "DÉMARRER UN PROJET", title: "Construisons un programme\nde sol plus fiable.", body: "Sélection produit, développement OEM et collaboration export pour le négoce, les projets et les marques privées.", action: "Démarrer un projet" },
   },
@@ -211,7 +210,7 @@ const homeCopy: Record<ContentLocale, HomeCopy> = {
     oem: { eyebrow: "Сотрудничество OEM / ODM", title: "Понятный путь от задачи до поставки.", body: "Мы превращаем позиционирование, конструкцию, декор, замок, подложку, упаковку и документы в выполнимую программу.", steps: [["Согласовать задачу", "Рынок, применение, цена и целевая спецификация"], ["Подобрать продукт", "Конструкция, декор, поверхность, замок и подложка"], ["Утвердить образцы", "Внешний вид, спецификация, упаковка и данные"], ["Произвести и доставить", "Контроль качества, экспортная упаковка и отгрузка"]], action: "Отправить запрос" },
     why: { eyebrow: "Ценности бренда", title: "Почему TOOYEI", body: "Понятные продуктовые системы и единая проектная работа без преувеличенных заявлений.", values: [["Стабильные системы", "Понятные семейства для основных конструкций и применений."], ["Гибкая кастомизация", "Цвет, поверхность, конструкция, упаковка и частная марка."], ["Чёткое сотрудничество", "Одна команда ведёт задачу, образцы и производство."], ["Фокус на экспорт", "Документы, упаковка, коммуникация и поддержка поставки."]] },
     support: { eyebrow: "Поддержка закупок", title: "Больше данных. Быстрее обсуждение проекта.", body: "Характеристики, образцы и OEM-требования координирует одна команда.", cards: [["Каталог продукции", "Поиск по системе, декору и применению."], ["Технические материалы", "Конструкция, характеристики и показатели."], ["План образцов", "Образцы под рынок и направление проекта."], ["Запрос OEM", "Продукт, спецификация, упаковка и рынок."]], action: "Запросить" },
-    global: { eyebrow: "ГЛОБАЛЬНЫЙ БИЗНЕС", title: "Для мировых рынков", body: "Напольные покрытия и OEM-поддержка для импортёров, дистрибьюторов, проектных закупок и частных марок.", markets: "Европа · Северная Америка · Австралия · Ближний Восток · Азия", follow: "Следить за TOOYEI" },
+    global: { eyebrow: "ГЛОБАЛЬНЫЙ БИЗНЕС", title: "Для мировых рынков", body: "Напольные покрытия и OEM-поддержка для импортёров, дистрибьюторов, проектных закупок и частных марок.", markets: "Европа · Северная Америка · Австралия · Ближний Восток · Азия" },
     newsletter: { eyebrow: "БУДЬТЕ В КУРСЕ", title: "Держите информацию о продуктах под рукой.", body: "Получайте новости о коллекциях, дизайне и продуктовых материалах." },
     cta: { eyebrow: "НАЧАТЬ ПРОЕКТ", title: "Создадим более надёжную\nпрограмму напольных покрытий.", body: "Подбор продуктов, OEM-разработка и экспортное сотрудничество для опта, проектов и частных марок.", action: "Начать проект" },
   },
@@ -225,7 +224,7 @@ const homeCopy: Record<ContentLocale, HomeCopy> = {
     oem: { eyebrow: "OEM・ODM協業", title: "要件から納品まで、明確なプロセス。", body: "市場ポジション、構造、柄、ロック、下地、梱包、書類要件を実行可能な製品計画に変換します。", steps: [["要件確認", "市場、用途、価格帯、目標仕様"], ["製品選定", "構造、柄、表面、ロック、下地"], ["サンプル承認", "仕上がり、仕様、梱包、資料"], ["量産・納品", "品質確認、輸出梱包、出荷支援"]], action: "プロジェクトを相談" },
     why: { eyebrow: "ブランド価値", title: "TOOYEIが選ばれる理由", body: "誇張された規模ではなく、明確な製品体系と統一された案件対応を重視します。", values: [["安定した製品体系", "主要な構造と用途を軸にした明確な製品群。"], ["柔軟なカスタマイズ", "色、表面、構造、梱包、プライベートブランドに対応。"], ["明確な協業", "要件、サンプル、量産を一つのチームが調整。"], ["輸出市場重視", "資料、梱包、連絡、納品支援を重視。"]] },
     support: { eyebrow: "調達サポート", title: "より良い情報で、案件協議を迅速に。", body: "仕様、サンプル、OEM要件を同じチームが調整し、情報ロスを減らします。", cards: [["製品カタログ", "システム、柄、用途から製品を検索。"], ["技術資料", "構造、仕様、性能情報を提供。"], ["サンプル計画", "市場と案件方向に合わせてサンプルを計画。"], ["OEM案件概要", "製品、仕様、梱包、市場要件を共有。"]], action: "資料を依頼" },
-    global: { eyebrow: "グローバルビジネス", title: "世界市場に向けて", body: "輸入業者、販売店、プロジェクト調達、プライベートブランド向けの床材とOEM支援。", markets: "欧州 · 北米 · オーストラリア · 中東 · アジア", follow: "TOOYEIをフォロー" },
+    global: { eyebrow: "グローバルビジネス", title: "世界市場に向けて", body: "輸入業者、販売店、プロジェクト調達、プライベートブランド向けの床材とOEM支援。", markets: "欧州 · 北米 · オーストラリア · 中東 · アジア" },
     newsletter: { eyebrow: "最新情報", title: "製品情報をいつでも身近に。", body: "新しいコレクション、デザイン、製品資料の更新をお届けします。" },
     cta: { eyebrow: "プロジェクトを開始", title: "より信頼できる床材計画を、\n一緒につくりましょう。", body: "卸売、プロジェクト、プライベートブランド向けの製品選定、OEM開発、輸出協業。", action: "相談を始める" },
   },
@@ -239,7 +238,7 @@ const homeCopy: Record<ContentLocale, HomeCopy> = {
     oem: { eyebrow: "Collaborazione OEM / ODM", title: "Un percorso chiaro dal brief alla consegna.", body: "Traduciamo posizionamento, struttura, decoro, incastro, supporto, imballaggio e documentazione in un programma realizzabile.", steps: [["Conferma del brief", "Mercato, applicazione, prezzo e specifica target"], ["Definizione prodotto", "Struttura, decoro, superficie, incastro e supporto"], ["Approvazione campioni", "Finitura, specifica, imballaggio e dati"], ["Produzione e consegna", "Controlli qualità, imballaggio export e spedizione"]], action: "Invia un progetto" },
     why: { eyebrow: "Valori del marchio", title: "Perché TOOYEI", body: "Sistemi di prodotto chiari e lavoro coordinato, senza affermazioni di scala esagerate.", values: [["Sistemi stabili", "Famiglie chiare per strutture e applicazioni principali."], ["Personalizzazione flessibile", "Colore, superficie, struttura, imballaggio e marchio privato."], ["Collaborazione chiara", "Un team coordina brief, campioni e produzione."], ["Focus export", "Documentazione, imballaggio, comunicazione e consegna."]] },
     support: { eyebrow: "Supporto acquisti", title: "Informazioni migliori. Progetti più rapidi.", body: "Specifiche, campioni e requisiti OEM sono coordinati da un unico team.", cards: [["Catalogo prodotti", "Sfoglia per sistema, decoro e applicazione."], ["Informazioni tecniche", "Richiedi struttura, specifiche e prestazioni."], ["Piano campioni", "Pianifica i campioni per mercato e progetto."], ["Brief OEM", "Condividi prodotto, specifica, imballaggio e mercato."]], action: "Richiedi accesso" },
-    global: { eyebrow: "BUSINESS GLOBALE", title: "Pensato per i mercati globali", body: "Pavimenti e supporto OEM per importatori, distributori, acquirenti di progetto e marchi privati.", markets: "Europa · Nord America · Australia · Medio Oriente · Asia", follow: "Segui TOOYEI" },
+    global: { eyebrow: "BUSINESS GLOBALE", title: "Pensato per i mercati globali", body: "Pavimenti e supporto OEM per importatori, distributori, acquirenti di progetto e marchi privati.", markets: "Europa · Nord America · Australia · Medio Oriente · Asia" },
     newsletter: { eyebrow: "RESTA AGGIORNATO", title: "Informazioni prodotto sempre disponibili.", body: "Ricevi aggiornamenti su collezioni, design e materiali di prodotto." },
     cta: { eyebrow: "AVVIA UN PROGETTO", title: "Costruiamo un programma\ndi pavimenti più affidabile.", body: "Selezione prodotto, sviluppo OEM e collaborazione export per ingrosso, progetti e marchi privati.", action: "Avvia un progetto" },
   },
@@ -253,7 +252,7 @@ const homeCopy: Record<ContentLocale, HomeCopy> = {
     oem: { eyebrow: "تعاون OEM وODM", title: "مسار واضح من المتطلبات إلى التسليم.", body: "نحوّل تموضع السوق والبنية والتصميم والقفل والطبقة السفلية والتغليف والوثائق إلى برنامج قابل للتنفيذ.", steps: [["تأكيد المتطلبات", "السوق والتطبيق والسعر والمواصفة المستهدفة"], ["مطابقة المنتج", "البنية والتصميم والسطح والقفل والطبقة السفلية"], ["اعتماد العينات", "التشطيب والمواصفات والتغليف والبيانات"], ["الإنتاج والتسليم", "فحص الجودة وتغليف التصدير ودعم الشحن"]], action: "أرسل موجز المشروع" },
     why: { eyebrow: "قيم العلامة", title: "لماذا TOOYEI", body: "أنظمة منتجات واضحة وعمل مشروع منسق دون ادعاءات مبالغ فيها.", values: [["أنظمة منتجات مستقرة", "عائلات واضحة للبنى والتطبيقات الرئيسية."], ["تخصيص مرن", "اللون والسطح والبنية والتغليف والعلامة الخاصة."], ["تعاون واضح", "فريق واحد ينسق المتطلبات والعينات والإنتاج."], ["تركيز على التصدير", "اهتمام بالوثائق والتغليف والتواصل والتسليم."]] },
     support: { eyebrow: "دعم التوريد", title: "معلومات أفضل. محادثات أسرع.", body: "ينسق فريق واحد المواصفات والعينات ومتطلبات OEM لتقليل فقدان المعلومات.", cards: [["كتالوج المنتجات", "تصفح حسب النظام والتصميم والتطبيق."], ["المعلومات الفنية", "اطلب البنية والمواصفات وبيانات الأداء."], ["تخطيط العينات", "خطط العينات وفق السوق واتجاه المشروع."], ["موجز OEM", "شارك المنتج والمواصفات والتغليف والسوق."]], action: "اطلب الوصول" },
-    global: { eyebrow: "أعمال عالمية", title: "مصمم للأسواق العالمية", body: "أرضيات ودعم OEM للمستوردين والموزعين ومشتري المشاريع والعلامات الخاصة.", markets: "أوروبا · أمريكا الشمالية · أستراليا · الشرق الأوسط · آسيا", follow: "تابع TOOYEI" },
+    global: { eyebrow: "أعمال عالمية", title: "مصمم للأسواق العالمية", body: "أرضيات ودعم OEM للمستوردين والموزعين ومشتري المشاريع والعلامات الخاصة.", markets: "أوروبا · أمريكا الشمالية · أستراليا · الشرق الأوسط · آسيا" },
     newsletter: { eyebrow: "ابقَ على اطلاع", title: "احتفظ بمعلومات المنتجات في متناولك.", body: "احصل على تحديثات التشكيلات واتجاهات التصميم ومواد المنتجات." },
     cta: { eyebrow: "ابدأ مشروعاً", title: "لنبنِ برنامج أرضيات\nأكثر موثوقية.", body: "اختيار المنتجات وتطوير OEM والتعاون في التصدير للجملة والمشاريع والعلامات الخاصة.", action: "ابدأ مشروعاً" },
   },
@@ -573,7 +572,7 @@ export async function HomePage({ locale }: { locale: Locale }) {
         </section>
 
         <section className="bg-[var(--navy-soft)] text-white">
-          <div className="mx-auto grid max-w-[86rem] gap-10 px-5 py-18 lg:grid-cols-[1.25fr_0.75fr] lg:px-10 lg:py-22">
+          <div className="mx-auto grid max-w-[86rem] gap-10 px-5 py-18 lg:grid-cols-[1.05fr_0.95fr] lg:items-end lg:px-10 lg:py-22">
             <div>
               <p className="brand-eyebrow-light"><span />{t.global.eyebrow}</p>
               <h2 className="brand-h2 mt-4 text-white">{t.global.title}</h2>
@@ -583,22 +582,13 @@ export async function HomePage({ locale }: { locale: Locale }) {
                 <p className="mt-3 text-sm leading-7 text-white/72 sm:text-base">{t.global.markets}</p>
               </div>
             </div>
-            <div className="lg:border-l lg:border-white/10 lg:pl-12">
-              <p className="text-[0.68rem] font-bold uppercase tracking-[0.18em] text-white/45">{t.global.follow}</p>
-              <SocialLinks showLabels showArrow className="mt-5 flex-col items-stretch gap-0" linkClassName="w-full border-b border-white/10 py-3 text-sm font-medium text-white/70 hover:text-white" />
-            </div>
-          </div>
-        </section>
-
-        <section id="newsletter" className="scroll-mt-28 bg-[var(--paper)]">
-          <div className="mx-auto grid max-w-[86rem] gap-8 px-5 py-14 lg:grid-cols-[0.85fr_1.15fr] lg:items-end lg:px-10 lg:py-16">
-            <div>
+            <div id="newsletter" className="scroll-mt-28 bg-[var(--paper)] p-6 text-[var(--text)] sm:p-8 lg:p-10">
               <p className="brand-eyebrow">{t.newsletter.eyebrow}</p>
               <h2 className="mt-4 text-3xl font-medium tracking-[-0.04em] text-[var(--navy)] sm:text-4xl">{t.newsletter.title}</h2>
               <p className="mt-3 text-base leading-7 text-[var(--muted)]">{t.newsletter.body}</p>
-            </div>
-            <div className="lg:justify-self-end lg:w-full lg:max-w-xl">
-              <NewsletterForm locale={locale} />
+              <div className="mt-6">
+                <NewsletterForm locale={locale} />
+              </div>
             </div>
           </div>
         </section>
@@ -618,7 +608,7 @@ export async function HomePage({ locale }: { locale: Locale }) {
               </Button>
               <div className="mt-5 space-y-1 text-sm text-white/60">
                 <a href={`mailto:${settings.email}`} className="block min-h-11 py-3 transition-colors hover:text-white">{settings.email}</a>
-                <SocialLinks showLabels linkClassName="min-h-11 justify-start text-white/60 hover:text-white" />
+                <SocialLinks variant="contact" showLabels linkClassName="min-h-11 justify-start text-white/60 hover:text-white" />
               </div>
             </div>
           </div>

@@ -12,6 +12,14 @@ export const socialPlatforms = [
 
 export type SocialLinkKey = (typeof socialPlatforms)[number];
 
+export const socialLinkVariants = {
+  header: ["whatsapp"],
+  contact: ["whatsapp"],
+  footer: ["whatsapp", "facebook", "instagram"],
+} as const satisfies Record<string, readonly SocialLinkKey[]>;
+
+export type SocialLinkVariant = keyof typeof socialLinkVariants;
+
 export type PublicSocialLink = {
   id: string;
   key: SocialLinkKey;
