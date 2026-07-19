@@ -12,6 +12,13 @@ export function resolveSeoUrl(value: string | null | undefined, siteUrl: string)
   }
 }
 
+type BreadcrumbListItem = {
+  "@type": "ListItem";
+  position: number;
+  name: string;
+  item?: string;
+};
+
 export function buildArticleJsonLd(input: {
   siteUrl: string;
   siteName: string;
@@ -54,16 +61,17 @@ export function buildArticleBreadcrumbJsonLd(input: {
   category?: { path: string; label: string };
   title: string;
 }) {
-  const categoryItem = input.category
+  const categoryItem: BreadcrumbListItem[] = input.category
     ? [{ "@type": "ListItem", position: 2, name: input.category.label, item: new URL(input.category.path, input.siteUrl).toString() }]
     : [];
+  const itemListElement: BreadcrumbListItem[] = [
+    { "@type": "ListItem", position: 1, name: input.insightsLabel, item: new URL(input.localePath, input.siteUrl).toString() },
+    ...categoryItem,
+    { "@type": "ListItem", position: categoryItem.length + 2, name: input.title },
+  ];
   return {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
-    itemListElement: [
-      { "@type": "ListItem", position: 1, name: input.insightsLabel, item: new URL(input.localePath, input.siteUrl).toString() },
-      ...categoryItem,
-      { "@type": "ListItem", position: categoryItem.length + 2, name: input.title },
-    ],
+    itemListElement,
   };
 }
