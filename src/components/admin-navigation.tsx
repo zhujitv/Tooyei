@@ -19,6 +19,7 @@ import {
   Users,
 } from "lucide-react";
 import { logoutAction } from "@/app/admin/login/actions";
+import { AdminDatabaseIndicator } from "@/components/admin-database-health";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -29,6 +30,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+import type { DatabaseHealthResult } from "@/lib/database-health-status";
 
 const navItems = [
   { href: "/admin/content", label: "工作台", icon: LayoutDashboard },
@@ -93,7 +95,7 @@ function AccountPanel({ email, compact = false }: { email: string; compact?: boo
   );
 }
 
-export function AdminNavigation({ email }: { email: string }) {
+export function AdminNavigation({ email, databaseHealth }: { email: string; databaseHealth: DatabaseHealthResult }) {
   const pathname = usePathname();
   const current = navItems.find((item) => isActivePath(pathname, item.href));
 
@@ -144,10 +146,7 @@ export function AdminNavigation({ email }: { email: string }) {
           <span className="font-medium text-[#172033]">{current?.label ?? "管理后台"}</span>
         </div>
         <div className="ml-auto flex items-center gap-2">
-          <span className="hidden items-center gap-2 text-[11px] text-[#667085] sm:flex">
-            <span className="size-1.5 rounded-full bg-emerald-500" />
-            系统正常
-          </span>
+          <AdminDatabaseIndicator initialHealth={databaseHealth} />
           <Button asChild size="sm" variant="ghost" className="text-[#667085] hover:bg-[#F2F4F7] hover:text-[#172033]">
             <Link href="/" target="_blank">
               查看网站

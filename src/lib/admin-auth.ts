@@ -4,6 +4,8 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { AdminRole } from "@/generated/prisma/client";
+import { getRequestDatabaseHealth } from "@/lib/database-health";
+import { databaseHealthAllowsAdminUserLookup } from "@/lib/database-health-status";
 import { isDatabaseConfigured } from "@/lib/db";
 import { getCurrentAdminUser } from "@/lib/repositories/admin-users";
 import { logError } from "@/lib/observability";
@@ -83,12 +85,21 @@ export async function requireAdminSession(): Promise<AdminSession> {
   const session = await getAdminSession();
   if (!session) redirect("/admin/login");
   if (isDatabaseConfigured()) {
+    const health = await getRequestDatabaseHealth();
+    // Keep an already signed-in session in read-only mode during a database outage.
+    // All article mutations perform their own health gate before writing.
+    if (!databaseHealthAllowsAdminUserLookup(health.status)) return session;
     const user = await getCurrentAdminUser(session.email);
     if (!user?.active) {
-      await clearAdminSession();
-      redirect("/admin/login");
+      redirect("/admin/logout");
     }
   }
+  return session;
+}
+
+export async function requireSignedAdminSession(): Promise<AdminSession> {
+  const session = await getAdminSession();
+  if (!session) redirect("/admin/login");
   return session;
 }
 

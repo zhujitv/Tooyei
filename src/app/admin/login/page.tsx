@@ -17,6 +17,7 @@ export const metadata: Metadata = {
 
 const messages: Record<string, { title: string; description: string }> = {
   invalid: { title: "登录失败", description: "请检查邮箱和密码后重试。" },
+  session: { title: "登录状态已失效", description: "账号已停用或登录状态已过期，请重新登录。" },
   unconfigured: { title: "后台登录未配置", description: "请先补齐 ADMIN 相关环境变量，再登录后台。" },
 };
 

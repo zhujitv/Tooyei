@@ -1,9 +1,11 @@
 import "server-only";
 
 import { ContentStatus, Locale, TranslationStatus } from "@/generated/prisma/client";
+import { getRequestDatabaseHealth } from "@/lib/database-health";
+import { classifyDatabaseError, databaseHealthResult, type DatabaseHealthResult } from "@/lib/database-health-status";
+import { logError } from "@/lib/observability";
 import { articleTranslationLocales, getArticleWorkerMonitor } from "@/lib/repositories/article-translation-jobs";
-import { getPrisma, isDatabaseConfigured } from "@/lib/db";
-import { withDataFallback } from "@/lib/server-data";
+import { getPrisma } from "@/lib/db";
 
 export type AdminArticleFilters = {
   query?: string;
@@ -11,44 +13,64 @@ export type AdminArticleFilters = {
   categoryId?: string;
 };
 
-const emptyDashboard = async () => ({
-  source: "sample" as const,
+const emptyWorker = (database: DatabaseHealthResult) => ({
+  available: false,
+  status: database.status,
+  pendingItems: 0,
+  runningItems: 0,
+  failedItems: 0,
+  staleItems: 0,
+  lastHeartbeatAt: null,
+  jobs: [],
+});
+
+const emptyDashboard = (database: DatabaseHealthResult) => ({
+  source: "unavailable" as const,
+  database,
   total: 0,
   published: 0,
   drafts: 0,
   missingEnglish: 0,
   rows: [],
-  worker: await getArticleWorkerMonitor(),
+  worker: emptyWorker(database),
 });
 
 export async function getAdminArticleDashboard(filters: AdminArticleFilters = {}) {
-  if (!isDatabaseConfigured()) return emptyDashboard();
+  const database = await getRequestDatabaseHealth();
+  if (!database.connected) return emptyDashboard(database);
   const query = filters.query?.trim();
   const prisma = getPrisma();
-  const [result, worker] = await Promise.all([withDataFallback("admin-articles.dashboard", () => Promise.all([
-    prisma.article.count(),
-    prisma.article.count({ where: { status: ContentStatus.PUBLISHED } }),
-    prisma.article.count({ where: { status: ContentStatus.DRAFT } }),
-    prisma.article.findMany({
-      where: {
-        ...(filters.status ? { status: filters.status } : {}),
-        ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
-        ...(query ? { OR: [
-          { slug: { contains: query, mode: "insensitive" } },
-          { translations: { some: { title: { contains: query, mode: "insensitive" } } } },
-        ] } : {}),
-      },
-      orderBy: [{ updatedAt: "desc" }],
-      take: 100,
-      select: {
-        id: true, slug: true, kind: true, categoryId: true, status: true, featured: true, coverImage: true,
-        publishedAt: true, updatedAt: true,
-        category: { select: { slug: true, isActive: true, translations: { where: { locale: { in: [Locale.ZH, Locale.EN] } }, select: { locale: true, name: true } } } },
-        translations: { select: { locale: true, status: true, title: true } },
-      },
-    }),
-  ]), null, filters), getArticleWorkerMonitor()]);
-  if (!result) return emptyDashboard();
+  let result;
+  let worker;
+  try {
+    [result, worker] = await Promise.all([Promise.all([
+      prisma.article.count(),
+      prisma.article.count({ where: { status: ContentStatus.PUBLISHED } }),
+      prisma.article.count({ where: { status: ContentStatus.DRAFT } }),
+      prisma.article.findMany({
+        where: {
+          ...(filters.status ? { status: filters.status } : {}),
+          ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
+          ...(query ? { OR: [
+            { slug: { contains: query, mode: "insensitive" } },
+            { translations: { some: { title: { contains: query, mode: "insensitive" } } } },
+          ] } : {}),
+        },
+        orderBy: [{ updatedAt: "desc" }],
+        take: 100,
+        select: {
+          id: true, slug: true, kind: true, categoryId: true, status: true, featured: true, coverImage: true,
+          publishedAt: true, updatedAt: true,
+          category: { select: { slug: true, isActive: true, translations: { where: { locale: { in: [Locale.ZH, Locale.EN] } }, select: { locale: true, name: true } } } },
+          translations: { select: { locale: true, status: true, title: true } },
+        },
+      }),
+    ]), getArticleWorkerMonitor()]);
+  } catch (error) {
+    const status = classifyDatabaseError(error);
+    logError("Admin article dashboard could not be loaded", { operation: "admin-articles.dashboard", ...filters, status }, error);
+    return emptyDashboard(databaseHealthResult(status));
+  }
   const [total, published, drafts, rows] = result;
   const normalizedRows = rows.map((article) => {
     const english = article.translations.find((translation) => translation.locale === Locale.EN);
@@ -71,6 +93,7 @@ export async function getAdminArticleDashboard(filters: AdminArticleFilters = {}
   });
   return {
     source: "database" as const,
+    database,
     total,
     published,
     drafts,
@@ -81,11 +104,9 @@ export async function getAdminArticleDashboard(filters: AdminArticleFilters = {}
 }
 
 export async function getAdminArticle(id: string, selectedLocale: Locale = Locale.EN) {
-  if (!isDatabaseConfigured()) return null;
-  return withDataFallback("admin-articles.detail", async () => {
-    const prisma = getPrisma();
-    const [article, fullTranslations] = await Promise.all([
-      prisma.article.findUnique({
+  const prisma = getPrisma();
+  const [article, fullTranslations] = await Promise.all([
+    prisma.article.findUnique({
         where: { id },
         include: {
           coverAsset: {
@@ -108,16 +129,15 @@ export async function getAdminArticle(id: string, selectedLocale: Locale = Local
             },
           },
         },
-      }),
-      prisma.articleTranslation.findMany({
-        where: { articleId: id, locale: { in: Array.from(new Set([Locale.EN, selectedLocale])) } },
-      }),
-    ]);
-    if (!article) return null;
-    return {
-      ...article,
-      selectedTranslation: fullTranslations.find((translation) => translation.locale === selectedLocale) ?? null,
-      englishTranslation: fullTranslations.find((translation) => translation.locale === Locale.EN) ?? null,
-    };
-  }, null, { id, selectedLocale });
+    }),
+    prisma.articleTranslation.findMany({
+      where: { articleId: id, locale: { in: Array.from(new Set([Locale.EN, selectedLocale])) } },
+    }),
+  ]);
+  if (!article) return null;
+  return {
+    ...article,
+    selectedTranslation: fullTranslations.find((translation) => translation.locale === selectedLocale) ?? null,
+    englishTranslation: fullTranslations.find((translation) => translation.locale === Locale.EN) ?? null,
+  };
 }

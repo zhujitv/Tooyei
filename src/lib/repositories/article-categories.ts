@@ -251,7 +251,7 @@ export async function reorderArticleCategories(orderedIds: string[]) {
 }
 
 export async function getArticleCategoryOptions() {
-  if (!isDatabaseConfigured()) return [];
+  if (!isDatabaseConfigured()) throw new Error("DATABASE_URL is required before article categories can be loaded.");
   return getPrisma().articleCategory.findMany({
     orderBy: [{ sortOrder: "asc" }, { slug: "asc" }],
     include: { translations: { where: { locale: { in: [DatabaseLocale.ZH, DatabaseLocale.EN] } } } },

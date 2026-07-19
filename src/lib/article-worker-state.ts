@@ -15,3 +15,11 @@ export function deriveArticleTranslationJobStatus(counts: {
   if (counts.completed > 0) return "PARTIAL_FAILED";
   return "FAILED";
 }
+
+export function isArticleWorkerMonitorHealthy(monitor: {
+  available: boolean;
+  failedItems: number;
+  staleItems: number;
+}) {
+  return monitor.available && monitor.failedItems === 0 && monitor.staleItems === 0;
+}

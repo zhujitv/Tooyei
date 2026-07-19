@@ -7,8 +7,14 @@ import { ArticleKind, ContentStatus, Locale, Prisma, TranslationStatus } from "@
 import { articleContentFromEditor, articleReadingMinutes, parseArticleContentJson } from "@/lib/article-content";
 import { normalizeArticleCoverImage } from "@/lib/article-cover";
 import { articleSlugPattern, validateArticleSource } from "@/lib/article-publication";
-import { requireProductManagerSession, requireTranslationManagerSession } from "@/lib/admin-auth";
-import { getPrisma, isDatabaseConfigured } from "@/lib/db";
+import {
+  requireProductManagerSession,
+  requireSignedAdminSession,
+  requireTranslationManagerSession,
+} from "@/lib/admin-auth";
+import { checkDatabaseHealth } from "@/lib/database-health";
+import { databaseHealthMessageZh } from "@/lib/database-health-status";
+import { getPrisma } from "@/lib/db";
 import { safeWriteAuditLog } from "@/lib/repositories/audit-logs";
 import {
   refreshRemovedArticleAssets,
@@ -51,8 +57,11 @@ const translationSchema = z.object({
   seoDescription: z.string().trim().max(500),
 });
 
-const requireDatabase = () => {
-  if (!isDatabaseConfigured()) throw new Error("DATABASE_URL 尚未配置，无法保存文章。");
+const requireDatabaseForAction = async (path: string) => {
+  const health = await checkDatabaseHealth();
+  if (!health.connected) {
+    errorRedirect(path, new Error(`${databaseHealthMessageZh(health.status)} 当前无法保存或发布文章。`));
+  }
 };
 
 const parseEditorContent = (value: { contentJson?: string; contentText: string }) =>
@@ -81,10 +90,11 @@ const errorRedirect = (path: string, error: unknown): never => {
 };
 
 export async function createArticleAction(formData: FormData) {
+  await requireSignedAdminSession();
+  await requireDatabaseForAction("/admin/articles/new");
   const session = await requireProductManagerSession();
   let destination = "/admin/articles";
   try {
-    requireDatabase();
     const core = articleCoreSchema.safeParse({
       slug: formData.get("slug"), kind: formData.get("kind"), categoryId: formData.get("categoryId"), status: ContentStatus.DRAFT,
       featured: formData.get("featured") === "on", coverAssetId: formData.get("coverAssetId") || "",
@@ -135,11 +145,12 @@ export async function createArticleAction(formData: FormData) {
 }
 
 export async function saveArticleCoreAction(formData: FormData) {
-  const session = await requireProductManagerSession();
+  await requireSignedAdminSession();
   const id = String(formData.get("id") || "");
   let destination = `/admin/articles/${id}`;
+  await requireDatabaseForAction(destination);
+  const session = await requireProductManagerSession();
   try {
-    requireDatabase();
     const parsed = articleCoreSchema.safeParse({
       id, slug: formData.get("slug"), kind: formData.get("kind"), categoryId: formData.get("categoryId"), status: formData.get("status"),
       featured: formData.get("featured") === "on", coverAssetId: formData.get("coverAssetId") || "",
@@ -189,12 +200,13 @@ export async function saveArticleCoreAction(formData: FormData) {
 }
 
 export async function saveArticleTranslationAction(formData: FormData) {
-  const session = await requireProductManagerSession();
+  await requireSignedAdminSession();
   const articleId = String(formData.get("articleId") || "");
   const locale = String(formData.get("locale") || "EN");
   let destination = `/admin/articles/${articleId}?locale=${encodeURIComponent(locale)}`;
+  await requireDatabaseForAction(destination);
+  const session = await requireProductManagerSession();
   try {
-    requireDatabase();
     const parsed = translationSchema.safeParse({
       articleId, locale, status: formData.get("status"), title: formData.get("title"), excerpt: formData.get("excerpt") || "",
       contentText: formData.get("contentText") || "", contentJson: formData.get("contentJson") || undefined,
@@ -246,9 +258,11 @@ export async function saveArticleTranslationAction(formData: FormData) {
 }
 
 export async function createArticleTranslationJobAction(formData: FormData) {
-  const session = await requireTranslationManagerSession();
+  await requireSignedAdminSession();
   const articleId = String(formData.get("articleId") || "");
   let destination = `/admin/articles/${articleId}`;
+  await requireDatabaseForAction(destination);
+  const session = await requireTranslationManagerSession();
   try {
     const parsed = z.object({
       articleId: z.string().min(1),

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Bot, CheckCircle2, ExternalLink, FileText, Languages, TriangleAlert } from "lucide-react";
 import { ArticleKind, ContentStatus, Locale, TranslationStatus } from "@/generated/prisma/client";
+import { AdminDatabaseUnavailable } from "@/components/admin-database-health";
 import { validateArticleSource } from "@/lib/article-publication";
 import { ArticleContentEditor } from "@/components/article-content-editor";
 import { ArticleImageField } from "@/components/article-image-field";
@@ -13,6 +14,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { MediaAssetOption } from "@/lib/media-asset-types";
+import { getRequestDatabaseHealth } from "@/lib/database-health";
+import {
+  classifyDatabaseError,
+  databaseHealthResult,
+  type DatabaseHealthResult,
+} from "@/lib/database-health-status";
+import { logError } from "@/lib/observability";
 import { getAdminArticle } from "@/lib/repositories/admin-articles";
 import { getArticleCategoryOptions } from "@/lib/repositories/article-categories";
 import { articleTranslationLocales } from "@/lib/repositories/article-translation-jobs";
@@ -58,6 +66,19 @@ const toMediaAssetOption = (asset: NonNullable<AdminArticleRecord["coverAsset"]>
   references: [],
 });
 
+function ArticleDatabaseUnavailablePage({ database }: { database: DatabaseHealthResult }) {
+  return (
+    <main className="admin-page max-w-5xl">
+      <header className="border-b border-[#E4E7EC] pb-6">
+        <Button asChild variant="ghost" size="sm" className="-ml-3 text-[#667085]"><Link href="/admin/articles"><ArrowLeft className="size-4" />返回文章列表</Link></Button>
+        <h1 className="mt-4 text-2xl font-semibold tracking-[-0.035em] text-[#172033]">文章编辑暂时不可用</h1>
+        <p className="mt-1.5 text-sm text-[#667085]">数据库恢复后可在当前页面重新检测并继续编辑。</p>
+      </header>
+      <AdminDatabaseUnavailable initialHealth={database} />
+    </main>
+  );
+}
+
 export default async function ArticleDetailPage({
   params,
   searchParams,
@@ -69,12 +90,30 @@ export default async function ArticleDetailPage({
   const selectedLocale = articleTranslationLocales.includes(query.locale as (typeof articleTranslationLocales)[number])
     ? query.locale as (typeof articleTranslationLocales)[number]
     : Locale.EN;
-  const [article, provider, categories] = await Promise.all([
-    getAdminArticle(id, selectedLocale),
-    Promise.resolve(getTranslationProviderState()),
-    getArticleCategoryOptions(),
-  ]);
+  let database = await getRequestDatabaseHealth();
+  if (!database.connected) {
+    return <ArticleDatabaseUnavailablePage database={database} />;
+  }
+  let article: Awaited<ReturnType<typeof getAdminArticle>>;
+  let categories: Awaited<ReturnType<typeof getArticleCategoryOptions>>;
+  try {
+    [article, categories] = await Promise.all([
+      getAdminArticle(id, selectedLocale),
+      getArticleCategoryOptions(),
+    ]);
+  } catch (error) {
+    const status = classifyDatabaseError(error);
+    logError("Admin article detail could not be loaded", {
+      operation: "admin-articles.detail-page",
+      articleId: id,
+      selectedLocale,
+      status,
+    }, error);
+    database = databaseHealthResult(status);
+    return <ArticleDatabaseUnavailablePage database={database} />;
+  }
   if (!article) notFound();
+  const provider = getTranslationProviderState();
   const selected = article.selectedTranslation;
   const english = article.englishTranslation;
   const blobConfigured = Boolean(process.env.BLOB_READ_WRITE_TOKEN);

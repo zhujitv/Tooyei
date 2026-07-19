@@ -1,11 +1,19 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Activity, BookOpen, Bot, Clock3, FolderOpen, Languages, Plus, Search, TriangleAlert } from "lucide-react";
+import { Activity, BookOpen, Bot, Clock3, Languages, Search, TriangleAlert } from "lucide-react";
 import { ContentStatus, TranslationStatus } from "@/generated/prisma/client";
+import { isArticleWorkerMonitorHealthy } from "@/lib/article-worker-state";
+import { AdminArticleHeader } from "@/components/admin-database-health";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  classifyDatabaseError,
+  databaseHealthMessageZh,
+  databaseHealthResult,
+} from "@/lib/database-health-status";
+import { logError } from "@/lib/observability";
 import { getAdminArticleDashboard } from "@/lib/repositories/admin-articles";
 import { getArticleCategoryOptions } from "@/lib/repositories/article-categories";
 
@@ -28,29 +36,33 @@ export default async function ArticlesPage({
 }) {
   const filters = await searchParams;
   const status = Object.values(ContentStatus).includes(filters.status as ContentStatus) ? filters.status as ContentStatus : undefined;
-  const [dashboard, categories] = await Promise.all([
-    getAdminArticleDashboard({ query: filters.q, status, categoryId: filters.category }),
-    getArticleCategoryOptions(),
-  ]);
+  const dashboard = await getAdminArticleDashboard({ query: filters.q, status, categoryId: filters.category });
+  let pageDatabase = dashboard.database;
+  let categories: Awaited<ReturnType<typeof getArticleCategoryOptions>> = [];
+  if (pageDatabase.connected) {
+    try {
+      categories = await getArticleCategoryOptions();
+    } catch (error) {
+      const failureStatus = classifyDatabaseError(error);
+      logError("Admin article category options could not be loaded", {
+        operation: "admin-articles.category-options",
+        status: failureStatus,
+      }, error);
+      pageDatabase = databaseHealthResult(failureStatus);
+    }
+  }
   const categoryName = (category: (typeof categories)[number]) =>
     category.translations.find((translation) => translation.locale === "ZH")?.name
     || category.translations.find((translation) => translation.locale === "EN")?.name
     || category.slug;
-  const workerHealthy = dashboard.worker.staleItems === 0 && dashboard.worker.failedItems === 0;
+  const workerHealthy = isArticleWorkerMonitorHealthy(dashboard.worker);
+  const workerValue = (value: number) => dashboard.worker.available ? value : "—";
 
   return (
     <main className="admin-page">
-      <header className="flex flex-col gap-4 border-b border-[#E4E7EC] pb-6 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <p className="text-xs font-medium text-[#667085]">内容管理 / 国际 SEO</p>
-          <h1 className="mt-3 text-2xl font-semibold tracking-[-0.035em] text-[#172033]">文章与 SEO 增长中心</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-[#667085]">以英文为内容源，统一管理九语言文章、AI 翻译、发布状态、结构化数据与搜索收录。</p>
-        </div>
-        <div className="flex gap-2"><Button asChild variant="outline"><Link href="/admin/article-categories"><FolderOpen className="size-4" />栏目管理</Link></Button><Button asChild className="bg-[#172033] text-white hover:bg-[#27334a]"><Link href="/admin/articles/new"><Plus className="size-4" />新建文章</Link></Button></div>
-      </header>
+      <AdminArticleHeader initialHealth={pageDatabase} />
 
       {filters.error ? <Alert className="mt-5 border-rose-200 bg-rose-50 text-rose-800"><TriangleAlert className="size-4" /><AlertTitle>操作失败</AlertTitle><AlertDescription>{filters.error}</AlertDescription></Alert> : null}
-      {dashboard.source === "sample" ? <Alert className="mt-5 border-amber-200 bg-amber-50 text-amber-900"><TriangleAlert className="size-4" /><AlertTitle>数据库未连接</AlertTitle><AlertDescription>连接 PostgreSQL 后才能创建和发布文章。</AlertDescription></Alert> : null}
 
       <section className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="文章指标">
         {[
@@ -71,16 +83,19 @@ export default async function ArticlesPage({
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-start gap-3">
             <span className={`grid size-9 place-items-center rounded-lg ${workerHealthy ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}><Bot className="size-4" /></span>
-            <div><h2 id="worker-title" className="text-sm font-semibold text-[#172033]">文章翻译 Worker</h2><p className="mt-1 text-xs text-[#667085]">每分钟处理一个语言任务；失败任务自动退避重试，心跳超过 5 分钟会自动恢复。</p></div>
+            <div>
+              <div className="flex items-center gap-2"><h2 id="worker-title" className="text-sm font-semibold text-[#172033]">文章翻译 Worker</h2>{!dashboard.worker.available ? <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700">监控不可用</Badge> : null}</div>
+              <p className="mt-1 text-xs text-[#667085]">{dashboard.worker.available ? "每分钟处理一个语言任务；失败任务自动退避重试，心跳超过 5 分钟会自动恢复。" : databaseHealthMessageZh(dashboard.worker.status)}</p>
+            </div>
           </div>
           <div className="grid grid-cols-4 gap-5 text-center text-xs">
-            <p><span className="block text-base font-semibold text-[#344054]">{dashboard.worker.pendingItems}</span><span className="text-[#98A2B3]">排队</span></p>
-            <p><span className="block text-base font-semibold text-blue-700">{dashboard.worker.runningItems}</span><span className="text-[#98A2B3]">执行</span></p>
-            <p><span className="block text-base font-semibold text-rose-700">{dashboard.worker.failedItems}</span><span className="text-[#98A2B3]">24h 失败</span></p>
-            <p><span className="block text-base font-semibold text-amber-700">{dashboard.worker.staleItems}</span><span className="text-[#98A2B3]">超时</span></p>
+            <p><span className="block text-base font-semibold text-[#344054]">{workerValue(dashboard.worker.pendingItems)}</span><span className="text-[#98A2B3]">排队</span></p>
+            <p><span className="block text-base font-semibold text-blue-700">{workerValue(dashboard.worker.runningItems)}</span><span className="text-[#98A2B3]">执行</span></p>
+            <p><span className="block text-base font-semibold text-rose-700">{workerValue(dashboard.worker.failedItems)}</span><span className="text-[#98A2B3]">24h 失败</span></p>
+            <p><span className="block text-base font-semibold text-amber-700">{workerValue(dashboard.worker.staleItems)}</span><span className="text-[#98A2B3]">超时</span></p>
           </div>
         </div>
-        {dashboard.worker.jobs.length ? (
+        {dashboard.worker.available && dashboard.worker.jobs.length ? (
           <div className="mt-4 grid gap-2 border-t border-[#EAECF0] pt-4 lg:grid-cols-2">
             {dashboard.worker.jobs.slice(0, 4).map((job) => (
               <Link href={`/admin/articles/${job.article.id}`} key={job.id} className="flex items-center justify-between rounded-lg border border-[#EAECF0] px-3 py-2.5 hover:bg-[#F9FAFB]">

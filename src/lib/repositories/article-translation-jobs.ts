@@ -11,11 +11,14 @@ import { ArticleTranslationError, generateArticleTranslation } from "@/lib/artic
 import { articleReadingMinutes } from "@/lib/article-content";
 import { validateArticleSource } from "@/lib/article-publication";
 import { deriveArticleTranslationJobStatus, shouldRetryArticleTranslation } from "@/lib/article-worker-state";
+import {
+  classifyDatabaseError,
+  type DatabaseHealthStatus,
+} from "@/lib/database-health-status";
 import { getPrisma, isDatabaseConfigured } from "@/lib/db";
 import { getTranslationProviderState } from "@/lib/translation-providers/config";
 import { TranslationProviderRequestError, type TranslationProviderId } from "@/lib/translation-providers/types";
 import { logError, logWarn } from "@/lib/observability";
-import { withDataFallback } from "@/lib/server-data";
 import { TranslationResponseParseError } from "@/lib/translation-response-parser";
 
 export const articleTranslationLocales = [
@@ -357,13 +360,21 @@ export async function runNextArticleTranslationWorkerPass() {
 }
 
 export async function getArticleWorkerMonitor() {
-  if (!isDatabaseConfigured()) return {
-    pendingItems: 0, runningItems: 0, failedItems: 0, staleItems: 0, lastHeartbeatAt: null, jobs: [],
-  };
+  const unavailable = (status: DatabaseHealthStatus) => ({
+    available: false as const,
+    status,
+    pendingItems: 0,
+    runningItems: 0,
+    failedItems: 0,
+    staleItems: 0,
+    lastHeartbeatAt: null,
+    jobs: [],
+  });
+  if (!isDatabaseConfigured()) return unavailable("not_configured");
   const prisma = getPrisma();
   const staleBefore = new Date(Date.now() - staleWorkerMs);
   const failedSince = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  return withDataFallback("article-translation.worker-monitor", async () => {
+  try {
     const [pendingItems, runningItems, failedItems, staleItems, latestHeartbeat, jobs] = await Promise.all([
     prisma.articleTranslationJobItem.count({ where: { status: TranslationJobItemStatus.PENDING } }),
     prisma.articleTranslationJobItem.count({ where: { status: TranslationJobItemStatus.RUNNING } }),
@@ -380,6 +391,22 @@ export async function getArticleWorkerMonitor() {
       },
     }),
     ]);
-    return { pendingItems, runningItems, failedItems, staleItems, lastHeartbeatAt: latestHeartbeat?.heartbeatAt ?? null, jobs };
-  }, { pendingItems: 0, runningItems: 0, failedItems: 0, staleItems: 0, lastHeartbeatAt: null, jobs: [] });
+    return {
+      available: true as const,
+      status: "connected" as const,
+      pendingItems,
+      runningItems,
+      failedItems,
+      staleItems,
+      lastHeartbeatAt: latestHeartbeat?.heartbeatAt ?? null,
+      jobs,
+    };
+  } catch (error) {
+    const status = classifyDatabaseError(error);
+    logError("Article translation worker monitor could not be loaded", {
+      operation: "article-translation.worker-monitor",
+      status,
+    }, error);
+    return unavailable(status);
+  }
 }
