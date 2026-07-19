@@ -51,14 +51,19 @@ export function buildArticleBreadcrumbJsonLd(input: {
   siteUrl: string;
   localePath: string;
   insightsLabel: string;
+  category?: { path: string; label: string };
   title: string;
 }) {
+  const categoryItem = input.category
+    ? [{ "@type": "ListItem", position: 2, name: input.category.label, item: new URL(input.category.path, input.siteUrl).toString() }]
+    : [];
   return {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
     itemListElement: [
       { "@type": "ListItem", position: 1, name: input.insightsLabel, item: new URL(input.localePath, input.siteUrl).toString() },
-      { "@type": "ListItem", position: 2, name: input.title },
+      ...categoryItem,
+      { "@type": "ListItem", position: categoryItem.length + 2, name: input.title },
     ],
   };
 }

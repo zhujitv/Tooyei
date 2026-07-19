@@ -28,6 +28,7 @@ const articleCoreSchema = z.object({
   id: z.string().min(1).optional(),
   slug: z.string().trim().min(2).max(160).regex(articleSlugPattern, "Slug 只能使用小写字母、数字和连字符。"),
   kind: z.enum(ArticleKind),
+  categoryId: z.string().trim().min(1, "请选择文章栏目。"),
   status: z.enum(ContentStatus),
   featured: z.boolean(),
   coverAssetId: z.string().trim().max(120).optional().transform((value) => value || null),
@@ -60,10 +61,13 @@ const parseEditorContent = (value: { contentJson?: string; contentText: string }
 const revalidateArticlePaths = (slug?: string) => {
   revalidatePath("/admin/content");
   revalidatePath("/admin/articles");
+  revalidatePath("/admin/article-categories");
   revalidatePath("/sitemap.xml");
   revalidatePath("/insights");
+  revalidatePath("/insights/category/[slug]", "page");
   for (const locale of contentLocales) {
     revalidatePath(localizedPath(locale, "/insights"));
+    revalidatePath(localizedPath(locale, "/insights/category/[slug]"), "page");
     if (slug) revalidatePath(localizedPath(locale, `/insights/${slug}`));
   }
   if (slug) revalidatePath(`/insights/${slug}`);
@@ -82,7 +86,7 @@ export async function createArticleAction(formData: FormData) {
   try {
     requireDatabase();
     const core = articleCoreSchema.safeParse({
-      slug: formData.get("slug"), kind: formData.get("kind"), status: ContentStatus.DRAFT,
+      slug: formData.get("slug"), kind: formData.get("kind"), categoryId: formData.get("categoryId"), status: ContentStatus.DRAFT,
       featured: formData.get("featured") === "on", coverAssetId: formData.get("coverAssetId") || "",
       coverImage: formData.get("coverImage") || "", authorName: formData.get("authorName") || undefined,
     });
@@ -98,13 +102,15 @@ export async function createArticleAction(formData: FormData) {
     const validation = validateArticleSource({ ...english.data, content });
     if (!validation.ok) throw new Error(`英文内容缺少：${validation.missingFields.join("、")}`);
     const article = await getPrisma().$transaction(async (transaction) => {
-      const [cover, resolvedContent] = await Promise.all([
+      const [category, cover, resolvedContent] = await Promise.all([
+        transaction.articleCategory.findUnique({ where: { id: core.data.categoryId }, select: { id: true } }),
         resolveArticleCoverAsset(transaction, core.data.coverAssetId, core.data.coverImage),
         resolveArticleContentAssets(transaction, content),
       ]);
+      if (!category) throw new Error("选择的文章栏目不存在或已经删除。");
       const created = await transaction.article.create({
         data: {
-          slug: core.data.slug, kind: core.data.kind, status: ContentStatus.DRAFT,
+          slug: core.data.slug, kind: core.data.kind, categoryId: category.id, status: ContentStatus.DRAFT,
           featured: core.data.featured, coverImage: cover.coverImage, coverAssetId: cover.coverAssetId, authorName: core.data.authorName,
           translations: { create: {
             locale: Locale.EN, status: TranslationStatus.NEEDS_REVIEW,
@@ -135,14 +141,18 @@ export async function saveArticleCoreAction(formData: FormData) {
   try {
     requireDatabase();
     const parsed = articleCoreSchema.safeParse({
-      id, slug: formData.get("slug"), kind: formData.get("kind"), status: formData.get("status"),
+      id, slug: formData.get("slug"), kind: formData.get("kind"), categoryId: formData.get("categoryId"), status: formData.get("status"),
       featured: formData.get("featured") === "on", coverAssetId: formData.get("coverAssetId") || "",
       coverImage: formData.get("coverImage") || "", authorName: formData.get("authorName") || undefined,
     });
     if (!parsed.success) throw new Error(parsed.error.issues[0]?.message || "请检查文章基础信息。");
     const { currentSlug, updated } = await getPrisma().$transaction(async (transaction) => {
-      const current = await transaction.article.findUnique({ where: { id }, include: { translations: { where: { locale: Locale.EN } } } });
+      const [current, category] = await Promise.all([
+        transaction.article.findUnique({ where: { id }, include: { translations: { where: { locale: Locale.EN } } } }),
+        transaction.articleCategory.findUnique({ where: { id: parsed.data.categoryId }, select: { id: true, isActive: true } }),
+      ]);
       if (!current) throw new Error("文章不存在或已经删除。");
+      if (!category) throw new Error("选择的文章栏目不存在或已经删除。");
       const cover = await resolveArticleCoverAsset(transaction, parsed.data.coverAssetId, parsed.data.coverImage);
       let english: (typeof current.translations)[number] | undefined = current.translations[0];
       if (english) {
@@ -150,6 +160,7 @@ export async function saveArticleCoreAction(formData: FormData) {
         english = await transaction.articleTranslation.findUnique({ where: { id: english.id } }) ?? undefined;
       }
       if (parsed.data.status === ContentStatus.PUBLISHED) {
+        if (!category.isActive) throw new Error("当前文章栏目已停用，请先启用栏目或选择其他栏目后再发布。");
         const validation = validateArticleSource(english);
         if (!english || !validation.ok) throw new Error(`发布前请补全英文内容：${validation.missingFields.join("、") || "英文内容未创建"}`);
         if (english.status !== TranslationStatus.PUBLISHED) throw new Error("发布文章前，请先把英文版本设为“已发布”。");
@@ -158,7 +169,7 @@ export async function saveArticleCoreAction(formData: FormData) {
       const next = await transaction.article.update({
         where: { id },
         data: {
-          slug: parsed.data.slug, kind: parsed.data.kind, status: parsed.data.status,
+          slug: parsed.data.slug, kind: parsed.data.kind, categoryId: category.id, status: parsed.data.status,
           featured: parsed.data.featured, coverImage: cover.coverImage, coverAssetId: cover.coverAssetId, authorName: parsed.data.authorName,
           publishedAt: parsed.data.status === ContentStatus.PUBLISHED ? current.publishedAt ?? new Date() : current.publishedAt,
         },

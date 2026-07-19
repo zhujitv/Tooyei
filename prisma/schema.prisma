@@ -554,6 +554,8 @@ model Article {
   id              String                  @id @default(cuid())
   slug            String                  @unique
   kind            ArticleKind             @default(NEWS)
+  categoryId      String
+  category        ArticleCategory         @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   status          ContentStatus           @default(DRAFT)
   featured        Boolean                 @default(false)
   coverImage      String?
@@ -569,7 +571,37 @@ model Article {
 
   @@index([status, publishedAt])
   @@index([status, featured, publishedAt])
+  @@index([categoryId])
   @@index([coverAssetId])
+}
+
+model ArticleCategory {
+  id           String                       @id @default(cuid())
+  slug         String                       @unique
+  isActive     Boolean                      @default(true)
+  sortOrder    Int                          @default(0)
+  translations ArticleCategoryTranslation[]
+  articles     Article[]
+  createdAt    DateTime                     @default(now())
+  updatedAt    DateTime                     @updatedAt
+
+  @@index([isActive, sortOrder])
+}
+
+model ArticleCategoryTranslation {
+  id             String          @id @default(cuid())
+  categoryId     String
+  category       ArticleCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  locale         Locale
+  name           String
+  description    String?
+  seoTitle       String?
+  seoDescription String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@unique([categoryId, locale])
+  @@index([locale])
 }
 
 model ArticleMedia {

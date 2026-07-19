@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Activity, BookOpen, Bot, Clock3, Languages, Plus, Search, TriangleAlert } from "lucide-react";
+import { Activity, BookOpen, Bot, Clock3, FolderOpen, Languages, Plus, Search, TriangleAlert } from "lucide-react";
 import { ContentStatus, TranslationStatus } from "@/generated/prisma/client";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getAdminArticleDashboard } from "@/lib/repositories/admin-articles";
+import { getArticleCategoryOptions } from "@/lib/repositories/article-categories";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "文章与 SEO 增长中心", robots: { index: false, follow: false } };
@@ -23,11 +24,18 @@ const jobStatusLabel: Record<string, string> = {
 export default async function ArticlesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string; error?: string }>;
+  searchParams: Promise<{ q?: string; status?: string; category?: string; error?: string }>;
 }) {
   const filters = await searchParams;
   const status = Object.values(ContentStatus).includes(filters.status as ContentStatus) ? filters.status as ContentStatus : undefined;
-  const dashboard = await getAdminArticleDashboard({ query: filters.q, status });
+  const [dashboard, categories] = await Promise.all([
+    getAdminArticleDashboard({ query: filters.q, status, categoryId: filters.category }),
+    getArticleCategoryOptions(),
+  ]);
+  const categoryName = (category: (typeof categories)[number]) =>
+    category.translations.find((translation) => translation.locale === "ZH")?.name
+    || category.translations.find((translation) => translation.locale === "EN")?.name
+    || category.slug;
   const workerHealthy = dashboard.worker.staleItems === 0 && dashboard.worker.failedItems === 0;
 
   return (
@@ -38,7 +46,7 @@ export default async function ArticlesPage({
           <h1 className="mt-3 text-2xl font-semibold tracking-[-0.035em] text-[#172033]">文章与 SEO 增长中心</h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-[#667085]">以英文为内容源，统一管理九语言文章、AI 翻译、发布状态、结构化数据与搜索收录。</p>
         </div>
-        <Button asChild className="bg-[#172033] text-white hover:bg-[#27334a]"><Link href="/admin/articles/new"><Plus className="size-4" />新建文章</Link></Button>
+        <div className="flex gap-2"><Button asChild variant="outline"><Link href="/admin/article-categories"><FolderOpen className="size-4" />栏目管理</Link></Button><Button asChild className="bg-[#172033] text-white hover:bg-[#27334a]"><Link href="/admin/articles/new"><Plus className="size-4" />新建文章</Link></Button></div>
       </header>
 
       {filters.error ? <Alert className="mt-5 border-rose-200 bg-rose-50 text-rose-800"><TriangleAlert className="size-4" /><AlertTitle>操作失败</AlertTitle><AlertDescription>{filters.error}</AlertDescription></Alert> : null}
@@ -86,8 +94,9 @@ export default async function ArticlesPage({
 
       <section className="mt-5 admin-card overflow-hidden">
         <div className="flex flex-col gap-3 border-b border-[#E4E7EC] p-4 md:flex-row md:items-center md:justify-between">
-          <form className="flex flex-1 gap-2" action="/admin/articles">
+          <form className="flex flex-1 flex-wrap gap-2" action="/admin/articles">
             <div className="relative max-w-md flex-1"><Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#98A2B3]" /><Input name="q" defaultValue={filters.q} placeholder="搜索标题或 Slug" className="pl-9" /></div>
+            <select name="category" defaultValue={filters.category ?? ""} className="admin-select h-10 min-w-36 px-3"><option value="">全部栏目</option>{categories.map((category) => <option key={category.id} value={category.id}>{categoryName(category)}</option>)}</select>
             <select name="status" defaultValue={status ?? ""} className="admin-select h-10 min-w-28 px-3"><option value="">全部状态</option>{Object.values(ContentStatus).map((value) => <option key={value} value={value}>{articleStatusLabel[value]}</option>)}</select>
             <Button type="submit" variant="outline">筛选</Button>
           </form>
@@ -100,7 +109,7 @@ export default async function ArticlesPage({
               <article key={article.id} className="grid gap-4 p-4 transition hover:bg-[#FCFCFD] lg:grid-cols-[minmax(0,1.45fr)_minmax(280px,.8fr)_160px_110px] lg:items-center">
                 <div className="flex min-w-0 gap-3">
                   <div className="h-16 w-24 shrink-0 overflow-hidden rounded-lg border border-[#EAECF0] bg-[#F2F4F7] bg-cover bg-center" style={article.coverImage ? { backgroundImage: `url(${JSON.stringify(article.coverImage)})` } : undefined} />
-                  <div className="min-w-0"><div className="flex items-center gap-2"><h2 className="truncate text-sm font-semibold text-[#172033]">{article.displayTitle}</h2>{article.featured ? <Badge className="bg-amber-50 text-amber-700">推荐</Badge> : null}</div><p className="mt-1 truncate font-mono text-[11px] text-[#98A2B3]">/{article.slug}</p><p className="mt-1 text-xs text-[#667085]">{article.kind} · 更新于 {article.updatedAt.toLocaleDateString("zh-CN")}</p></div>
+                  <div className="min-w-0"><div className="flex items-center gap-2"><h2 className="truncate text-sm font-semibold text-[#172033]">{article.displayTitle}</h2>{article.featured ? <Badge className="bg-amber-50 text-amber-700">推荐</Badge> : null}</div><p className="mt-1 truncate font-mono text-[11px] text-[#98A2B3]">/{article.slug}</p><p className="mt-1 text-xs text-[#667085]">{article.categoryDisplayName}{article.category.isActive ? "" : "（栏目已停用）"} · 更新于 {article.updatedAt.toLocaleDateString("zh-CN")}</p></div>
                 </div>
                 <div>
                   <div className="mb-2 flex items-center justify-between text-xs"><span className="text-[#667085]">九语言发布</span><span className="font-medium text-[#344054]">{article.publishedLocaleCount}/9</span></div>

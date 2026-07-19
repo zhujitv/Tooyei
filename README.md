@@ -84,7 +84,10 @@ locale URLs are added to the sitemap with hreflang alternates and Article plus
 Breadcrumb structured data. The editor stores reorderable text and image
 blocks; cover and inline images upload directly to Vercel Blob or can be reused
 from the media center. Article-to-asset database references keep active images
-out of orphan cleanup.
+out of orphan cleanup. Article categories are also database-driven: admins can
+create, translate, enable, delete and drag-sort them at
+`/admin/article-categories`. The public Insights category navigation, category
+SEO routes and sitemap read the same ordered records without hardcoded labels.
 
 The legacy catalogue migration discovers all product URLs from the existing
 Tooyei sitemap and exports English, Spanish and German content, product images

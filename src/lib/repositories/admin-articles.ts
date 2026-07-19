@@ -8,6 +8,7 @@ import { withDataFallback } from "@/lib/server-data";
 export type AdminArticleFilters = {
   query?: string;
   status?: ContentStatus;
+  categoryId?: string;
 };
 
 const emptyDashboard = async () => ({
@@ -31,6 +32,7 @@ export async function getAdminArticleDashboard(filters: AdminArticleFilters = {}
     prisma.article.findMany({
       where: {
         ...(filters.status ? { status: filters.status } : {}),
+        ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
         ...(query ? { OR: [
           { slug: { contains: query, mode: "insensitive" } },
           { translations: { some: { title: { contains: query, mode: "insensitive" } } } },
@@ -39,8 +41,9 @@ export async function getAdminArticleDashboard(filters: AdminArticleFilters = {}
       orderBy: [{ updatedAt: "desc" }],
       take: 100,
       select: {
-        id: true, slug: true, kind: true, status: true, featured: true, coverImage: true,
+        id: true, slug: true, kind: true, categoryId: true, status: true, featured: true, coverImage: true,
         publishedAt: true, updatedAt: true,
+        category: { select: { slug: true, isActive: true, translations: { where: { locale: { in: [Locale.ZH, Locale.EN] } }, select: { locale: true, name: true } } } },
         translations: { select: { locale: true, status: true, title: true } },
       },
     }),
@@ -53,6 +56,9 @@ export async function getAdminArticleDashboard(filters: AdminArticleFilters = {}
     const publishedLocales = new Set(article.translations.filter((translation) => translation.status === TranslationStatus.PUBLISHED).map((translation) => translation.locale));
     return {
       ...article,
+      categoryDisplayName: article.category.translations.find((translation) => translation.locale === Locale.ZH)?.name?.trim()
+        || article.category.translations.find((translation) => translation.locale === Locale.EN)?.name?.trim()
+        || article.category.slug,
       displayTitle: english?.title?.trim() || article.translations.find((translation) => translation.locale === Locale.ZH)?.title?.trim() || article.slug,
       hasEnglishContent: Boolean(english),
       translatedCount: articleTranslationLocales.filter((locale) => translatedLocales.has(locale)).length,
@@ -88,6 +94,7 @@ export async function getAdminArticle(id: string, selectedLocale: Locale = Local
               width: true, height: true, assetType: true, storageProvider: true, uploadedAt: true, createdAt: true,
             },
           },
+          category: { include: { translations: true } },
           translations: {
             orderBy: { locale: "asc" },
             select: { id: true, locale: true, status: true, title: true, publishedAt: true, updatedAt: true },

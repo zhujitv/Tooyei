@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { MediaAssetOption } from "@/lib/media-asset-types";
 import { getAdminArticle } from "@/lib/repositories/admin-articles";
+import { getArticleCategoryOptions } from "@/lib/repositories/article-categories";
 import { articleTranslationLocales } from "@/lib/repositories/article-translation-jobs";
 import { getTranslationProviderState } from "@/lib/translation-providers/config";
 import {
@@ -68,7 +69,11 @@ export default async function ArticleDetailPage({
   const selectedLocale = articleTranslationLocales.includes(query.locale as (typeof articleTranslationLocales)[number])
     ? query.locale as (typeof articleTranslationLocales)[number]
     : Locale.EN;
-  const [article, provider] = await Promise.all([getAdminArticle(id, selectedLocale), Promise.resolve(getTranslationProviderState())]);
+  const [article, provider, categories] = await Promise.all([
+    getAdminArticle(id, selectedLocale),
+    Promise.resolve(getTranslationProviderState()),
+    getArticleCategoryOptions(),
+  ]);
   if (!article) notFound();
   const selected = article.selectedTranslation;
   const english = article.englishTranslation;
@@ -76,6 +81,10 @@ export default async function ArticleDetailPage({
   const sourceValidation = validateArticleSource(english);
   const localeStatus = (locale: (typeof articleTranslationLocales)[number]) =>
     article.translations.find((translation) => translation.locale === locale)?.status ?? TranslationStatus.MISSING;
+  const categoryName = (category: (typeof categories)[number]) =>
+    category.translations.find((translation) => translation.locale === Locale.ZH)?.name
+    || category.translations.find((translation) => translation.locale === Locale.EN)?.name
+    || category.slug;
 
   return (
     <main className="admin-page">
@@ -91,7 +100,8 @@ export default async function ArticleDetailPage({
         <form action={saveArticleCoreAction} className="admin-card p-5">
           <input type="hidden" name="id" value={article.id} />
           <div><h2 className="text-sm font-semibold text-[#172033]">发布与基础设置</h2><p className="mt-1 text-xs text-[#667085]">公开发布要求英文版本完整且已经发布；其他语言可独立审核上线。</p></div>
-          <div className="mt-5 grid gap-4 md:grid-cols-2"><div className="space-y-1.5"><Label htmlFor="slug">URL Slug</Label><Input id="slug" name="slug" required defaultValue={article.slug} /></div><div className="space-y-1.5"><Label htmlFor="kind">类型</Label><select id="kind" name="kind" defaultValue={article.kind} className="admin-select h-10 w-full px-3">{Object.values(ArticleKind).map((kind) => <option key={kind} value={kind}>{kind}</option>)}</select></div><div className="space-y-1.5"><Label htmlFor="status">文章状态</Label><select id="status" name="status" defaultValue={article.status} className="admin-select h-10 w-full px-3">{Object.values(ContentStatus).map((status) => <option key={status} value={status}>{status}</option>)}</select></div><div className="space-y-1.5"><Label htmlFor="authorName">作者</Label><Input id="authorName" name="authorName" defaultValue={article.authorName ?? ""} /></div><div className="space-y-1.5 md:col-span-2"><Label>文章封面</Label><ArticleImageField initialAsset={article.coverAsset ? toMediaAssetOption(article.coverAsset) : null} legacyUrl={article.coverImage} serviceConfigured={blobConfigured} /></div></div>
+          <div className="mt-5 grid gap-4 md:grid-cols-2"><div className="space-y-1.5"><Label htmlFor="slug">URL Slug</Label><Input id="slug" name="slug" required defaultValue={article.slug} /></div><div className="space-y-1.5"><Label htmlFor="categoryId">所属文章栏目</Label><select id="categoryId" name="categoryId" required defaultValue={article.categoryId} className="admin-select h-10 w-full px-3">{categories.map((category) => <option key={category.id} value={category.id}>{categoryName(category)}{category.isActive ? "" : "（已停用）"}</option>)}</select></div><div className="space-y-1.5"><Label htmlFor="kind">内容形式（内部）</Label><select id="kind" name="kind" defaultValue={article.kind} className="admin-select h-10 w-full px-3">{Object.values(ArticleKind).map((kind) => <option key={kind} value={kind}>{kind}</option>)}</select></div><div className="space-y-1.5"><Label htmlFor="status">文章状态</Label><select id="status" name="status" defaultValue={article.status} className="admin-select h-10 w-full px-3">{Object.values(ContentStatus).map((status) => <option key={status} value={status}>{status}</option>)}</select></div><div className="space-y-1.5"><Label htmlFor="authorName">作者</Label><Input id="authorName" name="authorName" defaultValue={article.authorName ?? ""} /></div><div className="space-y-1.5 md:col-span-2"><Label>文章封面</Label><ArticleImageField initialAsset={article.coverAsset ? toMediaAssetOption(article.coverAsset) : null} legacyUrl={article.coverImage} serviceConfigured={blobConfigured} /></div></div>
+          {!article.category.isActive ? <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">当前栏目已停用，前台不会显示；发布前请启用栏目或重新归类。</p> : null}
           <label className="mt-4 flex items-center gap-2 text-sm text-[#475467]"><input type="checkbox" name="featured" defaultChecked={article.featured} className="size-4 rounded border-[#D0D5DD]" />推荐文章</label>
           {!sourceValidation.ok ? <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">英文源仍缺少：{sourceValidation.missingFields.join("、")}</p> : null}
           <div className="mt-5 flex justify-end"><Button type="submit" className="bg-[#172033] text-white hover:bg-[#27334a]">保存基础设置</Button></div>

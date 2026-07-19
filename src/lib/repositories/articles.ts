@@ -2,6 +2,7 @@ import { cache } from "react";
 import { ContentStatus, Locale as DatabaseLocale, TranslationStatus } from "@/generated/prisma/client";
 import { normalizeArticleContent, type ArticleContent } from "@/lib/article-content";
 import { normalizeArticleCoverImage } from "@/lib/article-cover";
+import { localizeArticleCategory } from "@/lib/article-category";
 import { resolveArticleLocale } from "@/lib/article-locale";
 import { validateArticleSource } from "@/lib/article-publication";
 import { databaseLocaleBySiteLocale, siteLocaleByDatabaseLocale } from "@/lib/database-locales";
@@ -9,9 +10,10 @@ import { getPrisma, isDatabaseConfigured } from "@/lib/db";
 import { locales, type Locale } from "@/lib/site";
 import { withDataFallback } from "@/lib/server-data";
 
-const publicArticleWhere = () => ({
+const publicArticleWhere = (categorySlug?: string) => ({
   status: ContentStatus.PUBLISHED,
   publishedAt: { not: null, lte: new Date() },
+  category: { is: { isActive: true, ...(categorySlug ? { slug: categorySlug } : {}) } },
 } as const);
 
 type PublicTranslation = {
@@ -37,7 +39,6 @@ const selectTranslation = (rows: PublicTranslation[], locale: Locale, requireCon
 export type PublicArticleSummary = {
   id: string;
   slug: string;
-  kind: "NEWS" | "GUIDE" | "CASE_STUDY";
   featured: boolean;
   coverImage: string | null;
   authorName: string | null;
@@ -53,17 +54,25 @@ export type PublicArticleSummary = {
   resolvedLocale: Locale;
   hasExactTranslation: boolean;
   availableLocales: Locale[];
+  category: {
+    id: string;
+    slug: string;
+    name: string;
+    description: string;
+    seoTitle: string;
+    seoDescription: string;
+  };
 };
 
 const toPublicArticle = <T extends {
   id: string;
   slug: string;
-  kind: "NEWS" | "GUIDE" | "CASE_STUDY";
   featured: boolean;
   coverImage: string | null;
   authorName: string | null;
   publishedAt: Date | null;
   updatedAt: Date;
+  category: { id: string; slug: string; translations: Parameters<typeof localizeArticleCategory>[0] };
   translations: PublicTranslation[];
 }>(article: T, locale: Locale, requireContent: boolean): PublicArticleSummary | null => {
   const selected = selectTranslation(article.translations, locale, requireContent);
@@ -73,7 +82,6 @@ const toPublicArticle = <T extends {
   return {
     id: article.id,
     slug: article.slug,
-    kind: article.kind,
     featured: article.featured,
     coverImage: normalizeArticleCoverImage(article.coverImage),
     authorName: article.authorName,
@@ -91,18 +99,25 @@ const toPublicArticle = <T extends {
     availableLocales: article.translations
       .map((translation) => siteLocaleByDatabaseLocale[translation.locale])
       .filter((value): value is Locale => Boolean(value)),
+    category: {
+      id: article.category.id,
+      slug: article.category.slug,
+      ...localizeArticleCategory(article.category.translations, locale, article.category.slug),
+    },
   };
 };
 
 const publicArticleBaseSelect = {
   id: true,
   slug: true,
-  kind: true,
   featured: true,
   coverImage: true,
   authorName: true,
   publishedAt: true,
   updatedAt: true,
+  category: {
+    select: { id: true, slug: true, translations: { select: { locale: true, name: true, description: true, seoTitle: true, seoDescription: true } } },
+  },
   translations: {
     where: { status: TranslationStatus.PUBLISHED, publishedAt: { not: null } },
     select: {
@@ -117,13 +132,13 @@ const publicArticleBaseSelect = {
   },
 } as const;
 
-export const getPublishedArticles = cache(async (locale: Locale) => {
+export const getPublishedArticles = cache(async (locale: Locale, categorySlug?: string) => {
   if (!isDatabaseConfigured()) return [];
   const rows = await withDataFallback("articles.public-list", () => getPrisma().article.findMany({
-    where: publicArticleWhere(),
+    where: publicArticleWhere(categorySlug),
     orderBy: [{ featured: "desc" }, { publishedAt: "desc" }],
     select: publicArticleBaseSelect,
-  }), [], { locale });
+  }), [], { locale, categorySlug });
   return rows.map((article) => toPublicArticle(article, locale, false)).filter((article): article is PublicArticleSummary => Boolean(article));
 });
 

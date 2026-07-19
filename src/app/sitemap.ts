@@ -2,13 +2,14 @@ import type { MetadataRoute } from "next";
 import { resolveSeoUrl } from "@/lib/article-seo";
 import { capabilitySlugs } from "@/lib/capabilities";
 import { getPublicCategorySlugs } from "@/lib/repositories/categories";
+import { getPublicArticleCategorySlugs } from "@/lib/repositories/article-categories";
 import { getArticleSitemapRecords } from "@/lib/repositories/articles";
 import { getPublishedProductSlugs } from "@/lib/repositories/products";
 import { getPublicSiteSettings } from "@/lib/repositories/site-settings";
 import { locales, localizedPath } from "@/lib/site";
 export const dynamic = "force-dynamic";
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [productSlugs, categorySlugs, articleRecords, settings] = await Promise.all([getPublishedProductSlugs(), getPublicCategorySlugs(), getArticleSitemapRecords(), getPublicSiteSettings()]);
+  const [productSlugs, categorySlugs, articleCategorySlugs, articleRecords, settings] = await Promise.all([getPublishedProductSlugs(), getPublicCategorySlugs(), getPublicArticleCategorySlugs(), getArticleSitemapRecords(), getPublicSiteSettings()]);
   const paths = [
     "/",
     "/products",
@@ -20,6 +21,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     "/cookies",
     ...capabilitySlugs.map((slug) => `/capabilities/${slug}`),
     ...categorySlugs.map((slug) => `/products/${slug}`),
+    ...articleCategorySlugs.map((slug) => `/insights/category/${slug}`),
     ...productSlugs.map((slug) => `/products/${slug}`),
   ];
   const localizedEntries = locales.flatMap((locale) =>
